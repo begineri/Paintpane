@@ -47,7 +47,7 @@ Get `paintpane.exe` from the [latest release](https://github.com/begineri/Paintp
 
 ## Build from source
 
-Requires Go 1.25 and a MinGW-w64 C compiler (for Fyne/OpenGL).
+Requires Go 1.27 (the version CI and release builds use) and a MinGW-w64 C compiler (for Fyne/OpenGL).
 
 ```bash
 go test ./...

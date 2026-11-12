@@ -47,7 +47,7 @@
 
 ## 从源码构建
 
-需要 Go 1.25 和 MinGW-w64 C 编译器（Fyne/OpenGL 需要）。
+需要 Go 1.27（CI 和正式版构建用的版本）和 MinGW-w64 C 编译器（Fyne/OpenGL 需要）。
 
 ```bash
 go test ./...
