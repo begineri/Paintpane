@@ -36,13 +36,10 @@ Get `paintpane.exe` from the [latest release](https://github.com/begineri/Paintp
 
 ## What's different from Spice
 
-- **Paintings shown whole.** The default mode, **Full artwork**, fits the whole painting on a wall-colour background; **Museum frame** hangs it in a gallery frame. Spice's cropping is still there as **Smart crop**. Switch in one click from the tray.
-- **Tune image** in the tray adjusts just the picture on screen: drag to choose the part that is kept, or pick a different mode for this picture alone.
-- **NSFW images are hidden by default**, including curated collections of nudes and anything you mark with **Mark as NSFW**. **Don't show this image again** skips a picture from then on.
-- **The Windows lock screen gets a painting too.** **Next lock screen picture** in the tray changes only the lock screen.
-- **Redesigned settings and tray menu.** One settings window with light and dark appearance and accent colours; a shorter tray menu with the work and artist on top. New icon: Van Gogh's *The Bedroom* in a gold frame.
-- **Quieter and lighter.** Starts with Windows and waits a minute or two before going online, shows no Windows notifications, and caps originals at about 4K to save disk space.
-- **More reliable.** Memory use is kept in check, the image cache stays within its limit, and failed downloads are retried.
+- **Paintings shown whole** by default, with or without a museum frame. Spice's cropping stays as **Smart crop**, and **Tune image** adjusts a single picture.
+- **NSFW images are hidden by default.**
+- **The Windows lock screen gets a painting too.**
+- **Redesigned and quieter.** New settings window and tray menu, starts with Windows, no notifications, less disk and memory use.
 - **No browser extension.** The Chrome and Firefox extensions belong to the Spice project and are not tested with Paintpane.
 
 ## Build from source
