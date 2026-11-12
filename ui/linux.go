@@ -62,12 +62,12 @@ func (c *chromeOS) SetupLifecycle(app fyne.App, sa *SpiceApp) {
 }
 
 func (c *chromeOS) createTrayWindow(app fyne.App, sa *SpiceApp) {
-	w := app.NewWindow("Spice Tray")
+	w := app.NewWindow("Paintpane Tray")
 	// Workaround for potential interface mismatch or version skew
 	if wDecor, ok := w.(interface{ SetDecorated(bool) }); ok {
 		wDecor.SetDecorated(false)
 	}
-	w.SetTitle("Spice")
+	w.SetTitle("Paintpane")
 
 	// Convert Tray Menu items to Buttons
 	var items []fyne.CanvasObject

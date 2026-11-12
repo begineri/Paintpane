@@ -4,6 +4,7 @@ package wallpaper
 
 import (
 	"context"
+	"errors"
 	"image"
 	"testing"
 	"time"
@@ -49,9 +50,9 @@ func TestMonitorController_ProcessNext(t *testing.T) {
 	mc.Commands <- CmdNext
 	time.Sleep(100 * time.Millisecond)
 
-	assert.Equal(t, 1, mc.State.RandomPos)
-	assert.Equal(t, "id0", mc.State.CurrentID)
-	assert.Equal(t, "img0.jpg", mc.State.CurrentImage.FilePath)
+	assert.Equal(t, 1, stateOf(mc).RandomPos)
+	assert.Equal(t, "id0", stateOf(mc).CurrentID)
+	assert.Equal(t, "img0.jpg", stateOf(mc).CurrentImage.FilePath)
 }
 
 func TestMonitorController_ResolutionAwarePath(t *testing.T) {
@@ -93,7 +94,7 @@ func TestMonitorController_ResolutionAwarePath(t *testing.T) {
 	mc.Commands <- CmdNext
 	time.Sleep(100 * time.Millisecond)
 
-	assert.Equal(t, "hd.jpg", mc.State.CurrentImage.FilePath)
+	assert.Equal(t, "hd.jpg", stateOf(mc).CurrentImage.FilePath)
 	mockOS.AssertExpectations(t)
 }
 
@@ -120,8 +121,8 @@ func TestMonitorController_HistoryPrev(t *testing.T) {
 	mc.Commands <- CmdPrev
 	time.Sleep(100 * time.Millisecond)
 
-	assert.Equal(t, "id0", mc.State.CurrentID)
-	assert.Equal(t, "img0.jpg", mc.State.CurrentImage.FilePath)
+	assert.Equal(t, "id0", stateOf(mc).CurrentID)
+	assert.Equal(t, "img0.jpg", stateOf(mc).CurrentImage.FilePath)
 }
 
 func TestMonitorController_Delete(t *testing.T) {
@@ -256,4 +257,59 @@ func TestMonitorController_TuningAllowsManualNext(t *testing.T) {
 	mc.mu.RLock()
 	assert.Equal(t, "id1", mc.State.CurrentID, "Manual CmdNext SHOULD succeed even when tuning is active")
 	mc.mu.RUnlock()
+}
+
+// When Windows refuses to set the wallpaper the desktop keeps showing the old picture, so the app
+// must not record the new one as current; the failure has to be visible in the state.
+func TestMonitorController_FailedSetKeepsPreviousWallpaper(t *testing.T) {
+	mockStore := new(MockImageStore)
+	mockStore.On("MarkSeen", "a.jpg").Return()
+
+	mockOS := new(MockOS)
+	mockOS.On("Stat", mock.Anything).Return(nil, nil)
+	mockOS.On("SetWallpaper", "a.jpg", 1).Return(nil)
+	mockOS.On("SetWallpaper", "b.jpg", 1).Return(errors.New("SetWallpaper failed: 0x80070002"))
+
+	mc := NewMonitorController(1, Monitor{ID: 1}, mockStore, nil, mockOS, GetConfig(NewMockPreferences()), new(MockImageProcessor))
+
+	mc.applyImage(provider.Image{ID: "a", FilePath: "a.jpg"})
+	assert.Equal(t, "a", mc.State.CurrentImage.ID)
+	assert.Empty(t, mc.State.LastSetError)
+
+	mc.State.CurrentID = "b" // the caller advances the cursor before applying
+	mc.applyImage(provider.Image{ID: "b", FilePath: "b.jpg"})
+	assert.Equal(t, "a", mc.State.CurrentImage.ID, "failed image must not become the current wallpaper")
+	assert.Equal(t, "a", mc.State.CurrentID)
+	assert.Contains(t, mc.State.LastSetError, "0x80070002")
+	mockStore.AssertNotCalled(t, "MarkSeen", "b.jpg")
+
+	mockOS.On("SetWallpaper", "c.jpg", 1).Return(nil)
+	mockStore.On("MarkSeen", "c.jpg").Return()
+	mc.applyImage(provider.Image{ID: "c", FilePath: "c.jpg"})
+	assert.Equal(t, "c", mc.State.CurrentImage.ID)
+	assert.Empty(t, mc.State.LastSetError, "a later success clears the error")
+}
+
+// A failed change must not stay in the history either: "Previous" would otherwise step back
+// onto the picture already on screen and seem to do nothing.
+func TestMonitorController_FailedSetLeavesHistoryAlone(t *testing.T) {
+	mockStore := new(MockImageStore)
+	mockStore.On("MarkSeen", "a.jpg").Return()
+
+	mockOS := new(MockOS)
+	mockOS.On("Stat", mock.Anything).Return(nil, nil)
+	mockOS.On("SetWallpaper", "a.jpg", 1).Return(nil)
+	mockOS.On("SetWallpaper", "b.jpg", 1).Return(errors.New("SetWallpaper failed: 0x80070002"))
+
+	mc := NewMonitorController(1, Monitor{ID: 1}, mockStore, nil, mockOS, GetConfig(NewMockPreferences()), new(MockImageProcessor))
+
+	mc.State.History = []string{"a"}
+	mc.applyImage(provider.Image{ID: "a", FilePath: "a.jpg"})
+
+	// next() advances the cursor and the history before applying.
+	mc.State.CurrentID = "b"
+	mc.State.History = append(mc.State.History, "b")
+	mc.applyImage(provider.Image{ID: "b", FilePath: "b.jpg"})
+
+	assert.Equal(t, []string{"a"}, mc.State.History)
 }

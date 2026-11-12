@@ -8,10 +8,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/container"
-	"fyne.io/fyne/v2/data/validation"
-	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/layout"
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
@@ -39,7 +36,29 @@ type SettingsManager struct {
 	applyFuncs          map[string]func(interface{}) // Type-safe wrappers for native apply functions
 	isRenderingCompact  bool                         // Tracks if the current section being rendered is compact
 	assetMgr            *asset.Manager
+
+	// Changes apply on their own after applyDelay without further edits. The
+	// Apply button is no longer shown; it remains for tests and callers that
+	// want to apply at once.
+	applyDelay time.Duration
+	applyTimer *time.Timer
+
+	// valueWatchers run when a boolean setting's switch changes, e.g. to keep a
+	// Select all switch in step with its members.
+	valueWatchers map[string][]func()
+	// afterRender runs once a panel is fully rendered, for items that depend on
+	// items rendered after them.
+	afterRender []func()
+
+	// sourcesShowList returns the Sources page from a source's detail to the list.
+	sourcesShowList func()
+	// subPages shows pages inside a settings page, such as the blocked images.
+	subPages subPages
 }
+
+// defaultApplyDelay is how long settings wait after the last change before they
+// apply, so typing in a field or flicking through options applies once.
+const defaultApplyDelay = 800 * time.Millisecond
 
 type managedWidget struct {
 	widget    fyne.CanvasObject
@@ -50,6 +69,8 @@ type managedWidget struct {
 type selectConfig struct {
 	Name         string
 	Options      []string
+	Segmented    bool
+	Swatches     bool
 	InitialValue interface{}
 	Label        fyne.CanvasObject
 	HelpContent  fyne.CanvasObject
@@ -64,6 +85,9 @@ type boolConfig struct {
 	Name         string
 	InitialValue bool
 	LabelText    string
+	Note         string // muted text after the label
+	ActionIcon   string // icon of an action button left of the switch
+	ActionFunc   func()
 	Label        fyne.CanvasObject
 	HelpContent  fyne.CanvasObject
 	OnChanged    func(bool)
@@ -100,11 +124,16 @@ type buttonWithConfirmationConfig struct {
 	ButtonText     string
 	ConfirmTitle   string
 	ConfirmMessage string
-	Importance     widget.Importance
-	OnPressed      func()
-	IconName       string
-	EnabledIf      func() bool
-	VisibleIf      func() bool
+	// ConfirmButtonText is what the dialog's confirming button says; ConfirmDanger fills it red.
+	ConfirmButtonText  string
+	ConfirmDanger      bool
+	ConfirmMessageFunc func() string
+	HelpAsync          func(set func(string))
+	Importance         widget.Importance
+	OnPressed          func()
+	IconName           string
+	EnabledIf          func() bool
+	VisibleIf          func() bool
 }
 
 type asyncButtonConfig struct {
@@ -154,6 +183,8 @@ func NewSettingsManager(window fyne.Window) setting.SettingsManager {
 		statusLabels:        make(map[string]*widget.Label),
 		applyFuncs:          make(map[string]func(interface{})),
 		assetMgr:            asset.NewManager(),
+		applyDelay:          defaultApplyDelay,
+		valueWatchers:       make(map[string][]func()),
 	}
 
 	sm.applyButton = createApplyButton(sm)
@@ -161,8 +192,9 @@ func NewSettingsManager(window fyne.Window) setting.SettingsManager {
 		// Evaluate UI dependencies first
 		sm.refreshWidgetStates()
 
-		if len(sm.refreshFlags) > 0 || len(sm.chgPrefsCallbacks) > 0 {
+		if sm.hasPending() {
 			sm.applyButton.Enable() // Enable if changes or refresh needed
+			sm.scheduleApply()
 		} else {
 			sm.applyButton.Disable() // Otherwise, disable
 		}
@@ -232,6 +264,14 @@ func (sm *SettingsManager) SetValue(name string, val interface{}) {
 				v.SetChecked(b)
 				v.Refresh()
 			}
+		case *toggleSwitch:
+			if b, ok := val.(bool); ok {
+				v.SetChecked(b)
+			}
+		case *segmented:
+			if i, ok := val.(int); ok {
+				v.SetSelectedIndex(i)
+			}
 		case *widget.Entry:
 			if s, ok := val.(string); ok {
 				v.SetText(s)
@@ -262,50 +302,75 @@ func (sm *SettingsManager) HasPendingChange(name string) bool {
 	return exists
 }
 
-// CreateApplyButton is a helper function that creates and sets up the Apply Changes button.
+// createApplyButton creates the (hidden) Apply button, which applies pending changes at once.
 func createApplyButton(sm *SettingsManager) *widget.Button {
-	var applyButton *widget.Button
-	applyButton = widget.NewButton(i18n.T("Apply Changes"), func() {
-		originalText := applyButton.Text
-		sm.applyButton.Disable()
-		sm.applyButton.SetText(i18n.T("Applying changes, please wait..."))
-		sm.applyButton.Refresh()
-		fyne.Do(func() {
-			defer func() {
-
-				// Notify listeners that settings have been saved (e.g. refresh UI counters)
-				for _, cb := range sm.onSettingsSaved {
-					cb()
-				}
-
-				// Disable the Apply button after saving
-				if sm.applyButton != nil {
-					sm.applyButton.Disable()
-				}
-				sm.applyButton.SetText(originalText)
-				sm.applyButton.Refresh()
-			}()
-
-			if len(sm.chgPrefsCallbacks) > 0 {
-				for name, callback := range sm.chgPrefsCallbacks {
-					callback()
-					// Update registry baseline so subsequent changes are compared to NEW state
-					if getter, ok := sm.valueGetters[name]; ok {
-						sm.registry[name] = getter()
-					}
-				}
-				sm.chgPrefsCallbacks = make(map[string]func())
-			}
-
-			// Conditional refresh based on dirty flags (evaluated during ApplyFuncs above)
-			if len(sm.refreshFlags) > 0 {
-				sm.fullRefresh()
-				sm.refreshFlags = make(map[string]bool)
-			}
-		})
+	applyButton := widget.NewButton(i18n.T("Apply changes"), func() {
+		sm.applyPending()
 	})
 	applyButton.Disable()
 	return applyButton
+}
+
+func (sm *SettingsManager) hasPending() bool {
+	return len(sm.refreshFlags) > 0 || len(sm.chgPrefsCallbacks) > 0
+}
+
+// scheduleApply (re)starts the timer that applies pending changes. Each new
+// change restarts it, so a burst of edits applies once.
+func (sm *SettingsManager) scheduleApply() {
+	if sm.applyTimer != nil {
+		sm.applyTimer.Stop()
+	}
+	sm.applyTimer = time.AfterFunc(sm.applyDelay, func() {
+		fyne.Do(sm.applyPending)
+	})
+}
+
+// FlushPending applies pending changes now. Call it before the window closes so
+// a change made in the last moment is not lost.
+func (sm *SettingsManager) FlushPending() {
+	if sm.applyTimer != nil {
+		sm.applyTimer.Stop()
+		sm.applyTimer = nil
+	}
+	if sm.hasPending() {
+		sm.applyPending()
+	}
+}
+
+// applyPending runs the apply callbacks of every changed setting, moves their
+// baselines, then refreshes once if any of them asked for it. It must run on
+// the Fyne thread.
+func (sm *SettingsManager) applyPending() {
+	if !sm.hasPending() {
+		return
+	}
+	if len(sm.chgPrefsCallbacks) > 0 {
+		for name, callback := range sm.chgPrefsCallbacks {
+			callback()
+			// Update registry baseline so subsequent changes are compared to NEW state
+			if getter, ok := sm.valueGetters[name]; ok {
+				sm.registry[name] = getter()
+			}
+		}
+		sm.chgPrefsCallbacks = make(map[string]func())
+	}
+
+	// Conditional refresh based on dirty flags (evaluated during ApplyFuncs above)
+	if len(sm.refreshFlags) > 0 {
+		sm.fullRefresh()
+		sm.refreshFlags = make(map[string]bool)
+	}
+
+	// Notify listeners that settings have been saved (e.g. refresh counters)
+	for _, cb := range sm.onSettingsSaved {
+		cb()
+	}
+
+	if sm.applyButton != nil {
+		sm.applyButton.Disable()
+		sm.applyButton.Refresh()
+	}
 }
 
 // GetApplySettingsButton returns the Apply Changes button from the SettingsManager to be used in the UI.
@@ -359,34 +424,38 @@ func (sm *SettingsManager) renderSliderSetting(cfg *schema.SliderItem, header *f
 		return slider.Value
 	}
 
-	container := container.NewBorder(nil, nil, nil, valLabel, slider)
+	control := container.NewBorder(nil, nil, nil, valLabel, slider)
 
-	if cfg.EnabledIf != nil || cfg.VisibleIf != nil {
-		sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-			widget:    slider,
-			enabledIf: cfg.EnabledIf,
-			visibleIf: cfg.VisibleIf,
-		})
-		sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-			widget:    valLabel,
-			enabledIf: cfg.EnabledIf,
-			visibleIf: cfg.VisibleIf,
-		})
+	var help fyne.CanvasObject
+	if cfg.Help != "" {
+		help = sm.CreateSettingDescriptionLabel(cfg.Help)
+	}
+	var row fyne.CanvasObject
+	if cfg.Label != "" {
+		row = addRow(header, newSettingRow(sm.CreateSettingTitleLabel(cfg.Label), help, control, true))
+	} else {
+		row = addRow(header, control, help)
+	}
+
+	if cfg.EnabledIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: slider, enabledIf: cfg.EnabledIf})
+	}
+	if cfg.VisibleIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: row, visibleIf: cfg.VisibleIf})
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: slider, visibleIf: cfg.VisibleIf})
 	}
 	sm.allWidgets[cfg.Name] = slider
-
-	if cfg.Label != "" {
-		header.Add(NewSplitRow(widget.NewLabel(cfg.Label), container, SplitProportion.OneThird))
-	} else {
-		header.Add(container)
-	}
-
-	if cfg.Help != "" {
-		header.Add(widget.NewLabel(cfg.Help))
-	}
 }
 
 func (sm *SettingsManager) renderSelectSetting(cfg *selectConfig, header *fyne.Container) {
+	if cfg.Swatches {
+		sm.renderSwatchSetting(cfg, header)
+		return
+	}
+	if cfg.Segmented {
+		sm.renderSegmentedSetting(cfg, header)
+		return
+	}
 	selectWidget := widget.NewSelect(cfg.Options, func(selected string) {})
 	selectWidget.SetSelectedIndex(cfg.InitialValue.(int))
 	sm.registry[cfg.Name] = cfg.InitialValue.(int)
@@ -407,26 +476,11 @@ func (sm *SettingsManager) renderSelectSetting(cfg *selectConfig, header *fyne.C
 		return selectWidget.SelectedIndex()
 	}
 
-	label := cfg.Label
-	labelIsEmpty := true
-	if label != nil {
-		if l, ok := label.(*widget.Label); ok {
-			if l.Text != "" {
-				labelIsEmpty = false
-			}
-		} else {
-			labelIsEmpty = false
-		}
-	}
-
-	if !labelIsEmpty {
-		header.Add(NewSplitRow(cfg.Label, selectWidget, SplitProportion.OneThird))
+	var row fyne.CanvasObject
+	if hasLabel(cfg.Label) {
+		row = addRow(header, newSettingRow(cfg.Label, cfg.HelpContent, newBorderedSelect(selectWidget), true))
 	} else {
-		header.Add(selectWidget)
-	}
-
-	if cfg.HelpContent != nil {
-		header.Add(cfg.HelpContent)
+		row = addRow(header, newBorderedSelect(selectWidget), cfg.HelpContent)
 	}
 
 	selectWidget.OnChanged = func(s string) {
@@ -469,60 +523,196 @@ func (sm *SettingsManager) renderSelectSetting(cfg *selectConfig, header *fyne.C
 		return -1
 	}
 
-	// Track if it has an EnabledIf or VisibleIf condition
-	if cfg.EnabledIf != nil || cfg.VisibleIf != nil {
-		sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-			widget:    selectWidget,
-			enabledIf: cfg.EnabledIf,
-			visibleIf: cfg.VisibleIf,
-		})
+	if cfg.EnabledIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: selectWidget, enabledIf: cfg.EnabledIf})
+	}
+	if cfg.VisibleIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: row, visibleIf: cfg.VisibleIf})
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: selectWidget, visibleIf: cfg.VisibleIf})
 	}
 
 	sm.allWidgets[cfg.Name] = selectWidget
 }
 
-// renderBoolSetting creates a reusable boolean check setting.
-func (sm *SettingsManager) renderBoolSetting(cfg *boolConfig, header *fyne.Container) *widget.Check {
-	label := cfg.Label
-	labelIsEmpty := true
-	if label != nil {
-		if l, ok := label.(*widget.Label); ok {
-			if l.Text != "" {
-				labelIsEmpty = false
+// renderSegmentedSetting renders a select setting as a segmented control.
+// renderSwatchSetting renders a choice among colours as a row of round swatches.
+func (sm *SettingsManager) renderSwatchSetting(cfg *selectConfig, header *fyne.Container) {
+	initial, _ := cfg.InitialValue.(int)
+	picker := newSwatchPicker(cfg.Options, initial, nil)
+	sm.registry[cfg.Name] = initial
+	sm.applyFuncs[cfg.Name] = func(val interface{}) {
+		if i, ok := val.(int); ok {
+			cfg.ApplyFunc(i)
+		}
+	}
+	sm.valueGetters[cfg.Name] = func() interface{} { return picker.Selected }
+	row := addRow(header, newSettingRow(cfg.Label, cfg.HelpContent, picker, false))
+	picker.OnChanged = func(i int) {
+		if i != sm.registry[cfg.Name].(int) {
+			sm.chgPrefsCallbacks[cfg.Name] = func() { cfg.ApplyFunc(i) }
+		} else {
+			delete(sm.chgPrefsCallbacks, cfg.Name)
+		}
+		if cfg.OnChanged != nil && i >= 0 && i < len(cfg.Options) {
+			cfg.OnChanged(cfg.Options[i], i)
+		}
+		sm.checkAndEnableApply()
+	}
+	if cfg.VisibleIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: row, visibleIf: cfg.VisibleIf})
+	}
+	sm.allWidgets[cfg.Name] = picker
+}
+
+func (sm *SettingsManager) renderSegmentedSetting(cfg *selectConfig, header *fyne.Container) {
+	initial, _ := cfg.InitialValue.(int)
+	seg := newSegmented(cfg.Options, initial, nil)
+	sm.registry[cfg.Name] = initial
+	sm.applyFuncs[cfg.Name] = func(val interface{}) {
+		if i, ok := val.(int); ok {
+			cfg.ApplyFunc(i)
+		}
+	}
+	sm.valueGetters[cfg.Name] = func() interface{} {
+		return seg.Selected
+	}
+
+	var row fyne.CanvasObject
+	if hasLabel(cfg.Label) {
+		row = addRow(header, newSettingRow(cfg.Label, cfg.HelpContent, seg, false))
+	} else {
+		row = addRow(header, hug(seg), cfg.HelpContent)
+	}
+
+	seg.OnChanged = func(i int) {
+		if i != sm.registry[cfg.Name].(int) {
+			sm.chgPrefsCallbacks[cfg.Name] = func() {
+				cfg.ApplyFunc(i)
+				if cfg.NeedsRefresh {
+					sm.refreshFlags[cfg.Name] = true
+				}
 			}
 		} else {
-			labelIsEmpty = false
+			delete(sm.chgPrefsCallbacks, cfg.Name)
+		}
+		if cfg.OnChanged != nil && i >= 0 && i < len(cfg.Options) {
+			cfg.OnChanged(cfg.Options[i], i)
+		}
+		sm.checkAndEnableApply()
+	}
+
+	if cfg.EnabledIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: seg, enabledIf: cfg.EnabledIf})
+	}
+	if cfg.VisibleIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: row, visibleIf: cfg.VisibleIf})
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: seg, visibleIf: cfg.VisibleIf})
+	}
+	sm.allWidgets[cfg.Name] = seg
+}
+
+// renderSelectAllHeader renders a section label with a count of the members that
+// are on ("Curated Collections · 2/7 on") and, at its right, a Select all switch
+// that turns every member on or off. The switch shows on only while every member
+// is on. It has the row switches' size and lines up with them (G5).
+func (sm *SettingsManager) renderSelectAllHeader(title string, v schema.SelectAllItem) fyne.CanvasObject {
+	countOn := func() int {
+		n := 0
+		for _, m := range v.Members {
+			if on, ok := sm.GetValue(m).(bool); ok && on {
+				n++
+			}
+		}
+		return n
+	}
+
+	title = strings.TrimSpace(title)
+	titleText := newSectionLabel(title)
+	setTitle := func(on int) {
+		text := i18n.Tf("{{.On}}/{{.Total}} on", map[string]any{"On": on, "Total": len(v.Members)})
+		if title != "" {
+			text = title + " · " + text
+		}
+		titleText.SetText(text)
+	}
+
+	sw := newToggleSwitch(false, nil)
+	syncing := false // set while the switch follows its members, so it does not drive them back
+	sync := func() {
+		on := countOn()
+		setTitle(on)
+		syncing = true
+		sw.SetChecked(len(v.Members) > 0 && on == len(v.Members))
+		syncing = false
+	}
+	sw.OnChanged = func(on bool) {
+		if syncing {
+			return
+		}
+		for _, m := range v.Members {
+			sm.SetValue(m, on)
+		}
+		sync()
+	}
+	for _, m := range v.Members {
+		sm.watchValue(m, sync)
+	}
+	// The members are rendered after the header, so read them once the panel is done.
+	sm.afterRender = append(sm.afterRender, sync)
+	sm.allWidgets[v.Name] = sw
+
+	allLabel := newStyledText(v.Label, sectionLabelSize, false, theme.ColorNamePlaceHolder)
+	// The right inset is the card's, so the switch sits above the row switches.
+	right := inset(container.NewHBox(container.NewCenter(allLabel), container.NewCenter(sw)), 0, cardInsetX, 0, 0)
+	return container.NewBorder(nil, nil, nil, right, vcenter(titleText))
+}
+
+// watchValue runs fn whenever the named boolean setting changes in the UI.
+func (sm *SettingsManager) watchValue(name string, fn func()) {
+	sm.valueWatchers[name] = append(sm.valueWatchers[name], fn)
+}
+
+func (sm *SettingsManager) notifyValueChanged(name string) {
+	for _, fn := range sm.valueWatchers[name] {
+		fn()
+	}
+}
+
+// renderBoolSetting renders a boolean setting as a row with a switch.
+func (sm *SettingsManager) renderBoolSetting(cfg *boolConfig, header *fyne.Container) *toggleSwitch {
+	label := cfg.Label
+	if !hasLabel(label) {
+		label = nil
+		if cfg.LabelText != "" {
+			label = sm.CreateSettingTitleLabel(cfg.LabelText)
+		}
+	}
+	if cfg.Note != "" && cfg.LabelText != "" {
+		label = newLabelWithNote(cfg.LabelText, cfg.Note)
+	}
+
+	sw := newToggleSwitch(cfg.InitialValue, nil)
+	var control fyne.CanvasObject = sw
+	if cfg.ActionIcon != "" && cfg.ActionFunc != nil {
+		actionBtn := widget.NewButtonWithIcon("", actionIconResource(cfg.ActionIcon), cfg.ActionFunc)
+		actionBtn.Importance = widget.LowImportance
+		control = container.NewHBox(sizedControl(actionBtn), sw)
+	}
+	sm.registry[cfg.Name] = cfg.InitialValue
+	if cfg.ApplyFunc != nil {
+		sm.applyFuncs[cfg.Name] = func(val interface{}) {
+			cfg.ApplyFunc(val.(bool))
 		}
 	}
 
-	checkText := ""
-	if labelIsEmpty {
-		checkText = cfg.LabelText
-	}
+	row := addRow(header, newSettingRow(label, cfg.HelpContent, control, false))
 
-	check := widget.NewCheck(checkText, nil)
-	check.SetChecked(cfg.InitialValue)
-	sm.registry[cfg.Name] = cfg.InitialValue
-	sm.applyFuncs[cfg.Name] = func(val interface{}) {
-		cfg.ApplyFunc(val.(bool))
-	}
-
-	// Keep a reference to the label row so we can manage its visibility
-	var labelRow fyne.CanvasObject
-	if labelIsEmpty {
-		header.Add(check)
-	} else {
-		labelRow = NewSplitRow(label, check, SplitProportion.OneThird)
-		header.Add(labelRow)
-	}
-	if cfg.HelpContent != nil {
-		header.Add(cfg.HelpContent)
-	}
-
-	check.OnChanged = func(b bool) {
+	sw.OnChanged = func(b bool) {
 		if b != sm.registry[cfg.Name].(bool) {
 			sm.chgPrefsCallbacks[cfg.Name] = func() {
-				cfg.ApplyFunc(b)
+				if cfg.ApplyFunc != nil {
+					cfg.ApplyFunc(b)
+				}
 				if cfg.NeedsRefresh {
 					sm.refreshFlags[cfg.Name] = true
 				}
@@ -536,40 +726,23 @@ func (sm *SettingsManager) renderBoolSetting(cfg *boolConfig, header *fyne.Conta
 		}
 
 		sm.checkAndEnableApply()
+		sm.notifyValueChanged(cfg.Name)
 	}
 
-	// Register value getter for dependency tracking
 	sm.valueGetters[cfg.Name] = func() interface{} {
-		return check.Checked
+		return sw.Checked
 	}
 
-	// Track if it has an EnabledIf or VisibleIf condition.
-	// When VisibleIf is set, also register the label row and help text
-	// so they are hidden/shown together with the checkbox.
-	if cfg.EnabledIf != nil || cfg.VisibleIf != nil {
-		sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-			widget:    check,
-			enabledIf: cfg.EnabledIf,
-			visibleIf: cfg.VisibleIf,
-		})
-		if cfg.VisibleIf != nil {
-			if labelRow != nil {
-				sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-					widget:    labelRow,
-					visibleIf: cfg.VisibleIf,
-				})
-			}
-			if cfg.HelpContent != nil {
-				sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-					widget:    cfg.HelpContent,
-					visibleIf: cfg.VisibleIf,
-				})
-			}
-		}
+	if cfg.EnabledIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: sw, enabledIf: cfg.EnabledIf})
+	}
+	if cfg.VisibleIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: row, visibleIf: cfg.VisibleIf})
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: sw, visibleIf: cfg.VisibleIf})
 	}
 
-	sm.allWidgets[cfg.Name] = check
-	return check
+	sm.allWidgets[cfg.Name] = sw
+	return sw
 }
 
 // renderTextEntrySetting creates a reusable text entry setting.
@@ -594,34 +767,23 @@ func (sm *SettingsManager) renderTextEntrySetting(cfg *textEntrySettingConfig, h
 		entry.Validator = cfg.Validator
 	}
 
-	label := cfg.Label
-	// Density Optimization: If label is nil or a label with empty text, skip the SplitRow for the input.
-	// We check for *widget.Label specifically to see if it's the standard label we created.
-	labelIsEmpty := true
-	if label != nil {
-		if l, ok := label.(*widget.Label); ok {
-			if l.Text != "" {
-				labelIsEmpty = false
-			}
-		} else {
-			labelIsEmpty = false
-		}
-	}
-
 	statusLabel := widget.NewLabel("")
+	statusLabel.Wrapping = fyne.TextWrapWord
+	statusLabel.SizeName = theme.SizeNameCaptionText
 	sm.statusLabels[cfg.Name] = statusLabel
 
-	if labelIsEmpty {
-		header.Add(entry)
-	} else {
-		header.Add(NewSplitRow(label, entry, SplitProportion.OneThird))
+	// The status line sits under the help text and only takes space when it has text.
+	status := collapseWhenEmpty(statusLabel)
+	helpBlock := status
+	if cfg.HelpContent != nil {
+		helpBlock = container.New(&tightVBox{}, cfg.HelpContent, status)
 	}
 
-	if cfg.HelpContent != nil {
-		header.Add(NewSplitRowWithAlignment(cfg.HelpContent, statusLabel, SplitProportion.TwoThirds, SplitAlign.Opposed))
-	} else if !labelIsEmpty {
-		// Only add empty status row if we have a label (to keep alignment)
-		header.Add(NewSplitRow(widget.NewLabel(""), statusLabel, SplitProportion.TwoThirds))
+	var row fyne.CanvasObject
+	if hasLabel(cfg.Label) {
+		row = addRow(header, newSettingRow(cfg.Label, helpBlock, entry, true))
+	} else {
+		row = addRow(header, entry, helpBlock)
 	}
 
 	var debounceTimer *time.Timer
@@ -646,13 +808,12 @@ func (sm *SettingsManager) renderTextEntrySetting(cfg *textEntrySettingConfig, h
 		sm.handleTextEntryChanged(s, cfg, entry, statusLabel, &debounceTimer)
 	}
 
-	// Track if it has an EnabledIf or VisibleIf condition
-	if cfg.EnabledIf != nil || cfg.VisibleIf != nil {
-		sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-			widget:    entry,
-			enabledIf: cfg.EnabledIf,
-			visibleIf: cfg.VisibleIf,
-		})
+	if cfg.EnabledIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: entry, enabledIf: cfg.EnabledIf})
+	}
+	if cfg.VisibleIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: row, visibleIf: cfg.VisibleIf})
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: entry, visibleIf: cfg.VisibleIf})
 	}
 
 	return entry
@@ -756,112 +917,83 @@ func (sm *SettingsManager) runTextEntryPostCheck(val string, cfg *textEntrySetti
 	})
 }
 
-// renderButtonWithConfirmationSetting creates a reusable button setting with confirmation dialog.
+// renderButtonWithConfirmationSetting renders a button that asks for confirmation first.
 func (sm *SettingsManager) renderButtonWithConfirmationSetting(cfg *buttonWithConfirmationConfig, header *fyne.Container) {
-	var button *widget.Button
-	icon := sm.getIconResource(cfg.IconName)
-
-	button = widget.NewButtonWithIcon(cfg.ButtonText, icon, func() {
-		if cfg.ConfirmTitle != "" && cfg.ConfirmMessage != "" {
-			d := dialog.NewConfirm(cfg.ConfirmTitle, cfg.ConfirmMessage, func(b bool) {
+	onTap := func() {
+		message := cfg.ConfirmMessage
+		if cfg.ConfirmMessageFunc != nil {
+			message = cfg.ConfirmMessageFunc()
+		}
+		if cfg.ConfirmTitle != "" && message != "" {
+			showConfirmDialog(sm.prefsWindow, confirmSpec{
+				Title:       cfg.ConfirmTitle,
+				Message:     message,
+				ConfirmText: cfg.ConfirmButtonText,
+				Danger:      cfg.ConfirmDanger,
+			}, func(b bool) {
 				if b {
 					cfg.OnPressed()
 				}
-			}, sm.prefsWindow)
-			d.Show()
+			})
 		} else {
 			cfg.OnPressed()
 		}
-	})
-	button.Importance = cfg.Importance
-
-	label := cfg.Label
-	labelIsEmpty := true
-	if label != nil {
-		if l, ok := label.(*widget.Label); ok {
-			if l.Text != "" {
-				labelIsEmpty = false
-			}
-		} else {
-			labelIsEmpty = false
-		}
 	}
 
-	if !labelIsEmpty {
-		header.Add(NewSplitRow(cfg.Label, button, SplitProportion.OneThird))
+	// Destructive actions are red text buttons without a fill.
+	var button fyne.CanvasObject
+	if cfg.Importance == widget.DangerImportance {
+		button = newDangerButton(cfg.ButtonText, onTap)
 	} else {
-		header.Add(button)
+		b := widget.NewButtonWithIcon(cfg.ButtonText, sm.getIconResource(cfg.IconName), onTap)
+		b.Importance = cfg.Importance
+		button = b
 	}
+	sm.allWidgets[cfg.Name] = button
 
-	if cfg.HelpContent != nil {
-		header.Add(cfg.HelpContent)
-	}
-
-	// Track if it has an EnabledIf or VisibleIf condition
-	if cfg.EnabledIf != nil || cfg.VisibleIf != nil {
-		sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-			widget:    button,
-			enabledIf: cfg.EnabledIf,
-			visibleIf: cfg.VisibleIf,
+	help := cfg.HelpContent
+	if cfg.HelpAsync != nil && help == nil {
+		line := newSecondaryText(i18n.T("Calculating…"))
+		help = line
+		cfg.HelpAsync(func(text string) {
+			onUIThread(func() { setSecondaryText(line, text) })
 		})
 	}
+	row := sm.addButtonRow(header, cfg.Label, help, button)
+	sm.manageButton(button, row, cfg.EnabledIf, cfg.VisibleIf)
 }
 
-// renderButtonSetting creates a standard button setting widget.
+// renderButtonSetting renders a standard button setting.
 func (sm *SettingsManager) renderButtonSetting(cfg *buttonConfig, header *fyne.Container) {
-	icon := sm.getIconResource(cfg.IconName)
-	button := widget.NewButtonWithIcon(cfg.ButtonText, icon, cfg.OnPressed)
-	button.Importance = cfg.Importance
-
-	label := cfg.Label
-	labelIsEmpty := true
-	if label != nil {
-		if l, ok := label.(*widget.Label); ok {
-			if l.Text != "" {
-				labelIsEmpty = false
-			}
-		} else {
-			labelIsEmpty = false
-		}
-	}
-
-	// Keep a reference to the label row so we can manage its visibility
-	var labelRow fyne.CanvasObject
-
-	if !labelIsEmpty {
-		labelRow = NewSplitRow(cfg.Label, button, SplitProportion.OneThird)
-		header.Add(labelRow)
+	var button fyne.CanvasObject
+	if cfg.Importance == widget.DangerImportance { // red text, not Fyne's red fill (v43)
+		button = newDangerButton(cfg.ButtonText, cfg.OnPressed)
 	} else {
-		header.Add(button)
+		b := widget.NewButtonWithIcon(cfg.ButtonText, sm.getIconResource(cfg.IconName), cfg.OnPressed)
+		b.Importance = cfg.Importance
+		button = b
 	}
 
-	if cfg.HelpContent != nil {
-		header.Add(cfg.HelpContent)
-	}
+	row := sm.addButtonRow(header, cfg.Label, cfg.HelpContent, button)
+	sm.manageButton(button, row, cfg.EnabledIf, cfg.VisibleIf)
+}
 
-	// Track if it has an EnabledIf or VisibleIf condition.
-	// When VisibleIf is set, also register the label row and help text
-	// so they are hidden/shown together with the button.
-	if cfg.EnabledIf != nil || cfg.VisibleIf != nil {
-		sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-			widget:    button,
-			enabledIf: cfg.EnabledIf,
-			visibleIf: cfg.VisibleIf,
-		})
-		if cfg.VisibleIf != nil {
-			if labelRow != nil {
-				sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-					widget:    labelRow,
-					visibleIf: cfg.VisibleIf,
-				})
-			}
-			if cfg.HelpContent != nil {
-				sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-					widget:    cfg.HelpContent,
-					visibleIf: cfg.VisibleIf,
-				})
-			}
-		}
+// addButtonRow puts a labelled button at the right of a setting row, or an
+// unlabelled one at its natural width on the left.
+func (sm *SettingsManager) addButtonRow(header *fyne.Container, label, help fyne.CanvasObject, button fyne.CanvasObject) fyne.CanvasObject {
+	if hasLabel(label) {
+		return addRow(header, newSettingRow(label, help, button, false))
+	}
+	return addRow(header, hug(button), help)
+}
+
+func (sm *SettingsManager) manageButton(button fyne.CanvasObject, row fyne.CanvasObject, enabledIf, visibleIf func() bool) {
+	if enabledIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: button, enabledIf: enabledIf})
+	}
+	if visibleIf != nil {
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: row, visibleIf: visibleIf})
+		sm.managedWidgets = append(sm.managedWidgets, managedWidget{widget: button, visibleIf: visibleIf})
 	}
 }
 
@@ -996,17 +1128,9 @@ func (sm *SettingsManager) renderAsyncButton(cfg *asyncButtonConfig, header *fyn
 		}()
 	}
 
-	header.Add(btn)
+	row := addRow(header, hug(btn))
 	sm.allWidgets[cfg.Name] = btn
-
-	// Track if it has an EnabledIf or VisibleIf condition
-	if cfg.EnabledIf != nil || cfg.VisibleIf != nil {
-		sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-			widget:    btn,
-			enabledIf: cfg.EnabledIf,
-			visibleIf: cfg.VisibleIf,
-		})
-	}
+	sm.manageButton(btn, row, cfg.EnabledIf, cfg.VisibleIf)
 
 	return btn
 }
@@ -1098,15 +1222,20 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 
 	for _, section := range p.Sections {
 		sm.isRenderingCompact = section.Compact
+		// Rows collect here and are wrapped in a card once the section is complete.
 		sectionContainer := container.NewVBox()
 		sectionHasItems := false
 
-		if section.Title != "" {
-			sectionContainer.Add(sm.CreateSectionTitleLabel(section.Title))
+		var sectionHeader []fyne.CanvasObject
+		if section.SelectAll != nil {
+			sectionHeader = append(sectionHeader, sm.renderSelectAllHeader(section.Title, *section.SelectAll))
+			sectionHasItems = true
+		} else if section.Title != "" {
+			sectionHeader = append(sectionHeader, sm.CreateSectionTitleLabel(section.Title))
 			sectionHasItems = true
 		}
 		if section.Description != "" {
-			sectionContainer.Add(sm.CreateSettingDescriptionLabel(section.Description))
+			sectionHeader = append(sectionHeader, sm.CreateSettingDescriptionLabel(section.Description))
 			sectionHasItems = true
 		}
 
@@ -1134,70 +1263,31 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 				sectionHasItems = true
 
 			case schema.BoolItem:
-				if v.Help == "" {
-					check := widget.NewCheck(v.Label, nil)
-					check.SetChecked(v.InitialValue)
-					sm.registry[v.Name] = v.InitialValue
-					if v.ApplyFunc != nil {
-						sm.applyFuncs[v.Name] = func(val interface{}) {
-							v.ApplyFunc(val.(bool))
-						}
-					}
-					check.OnChanged = func(b bool) {
-						if b != sm.registry[v.Name].(bool) {
-							applyFunc := v.ApplyFunc
-							needsRefresh := v.NeedsRefresh
-							settingName := v.Name
-							sm.chgPrefsCallbacks[settingName] = func() {
-								if applyFunc != nil {
-									applyFunc(b)
-								}
-								if needsRefresh {
-									sm.refreshFlags[settingName] = true
-								}
-							}
-						} else {
-							delete(sm.chgPrefsCallbacks, v.Name)
-						}
-						if v.OnChanged != nil {
-							v.OnChanged(b)
-						}
-						sm.checkAndEnableApply()
-					}
-					sm.valueGetters[v.Name] = func() interface{} {
-						return check.Checked
-					}
-					if v.EnabledIf != nil || v.VisibleIf != nil {
-						sm.managedWidgets = append(sm.managedWidgets, managedWidget{
-							widget:    check,
-							enabledIf: v.EnabledIf,
-							visibleIf: v.VisibleIf,
-						})
-					}
-					sm.allWidgets[v.Name] = check
-
-					if v.ActionText != "" && v.ActionFunc != nil {
-						link := widget.NewHyperlink(v.ActionText, nil)
-						link.OnTapped = v.ActionFunc
-						hbox := container.NewHBox(check, layout.NewSpacer(), link)
-						sectionContainer.Add(hbox)
+				help := createHelp(v.Help)
+				if v.ActionText != "" && v.ActionFunc != nil && v.ActionIcon == "" {
+					link := newHyperlink(v.ActionText, nil)
+					link.OnTapped = v.ActionFunc
+					if help != nil {
+						help = container.New(&tightVBox{}, help, hug(link))
 					} else {
-						sectionContainer.Add(check)
+						help = hug(link)
 					}
-				} else {
-					sm.renderBoolSetting(&boolConfig{
-						Name:         v.Name,
-						InitialValue: v.InitialValue,
-						LabelText:    v.Label,
-						Label:        createLabel(v.Label),
-						HelpContent:  createHelp(v.Help),
-						OnChanged:    v.OnChanged,
-						ApplyFunc:    v.ApplyFunc,
-						NeedsRefresh: v.NeedsRefresh,
-						EnabledIf:    v.EnabledIf,
-						VisibleIf:    v.VisibleIf,
-					}, sectionContainer)
 				}
+				sm.renderBoolSetting(&boolConfig{
+					Name:         v.Name,
+					InitialValue: v.InitialValue,
+					LabelText:    v.Label,
+					Label:        createLabel(v.Label),
+					Note:         v.Note,
+					ActionIcon:   v.ActionIcon,
+					ActionFunc:   v.ActionFunc,
+					HelpContent:  help,
+					OnChanged:    v.OnChanged,
+					ApplyFunc:    v.ApplyFunc,
+					NeedsRefresh: v.NeedsRefresh,
+					EnabledIf:    v.EnabledIf,
+					VisibleIf:    v.VisibleIf,
+				}, sectionContainer)
 				sectionHasItems = true
 
 			case schema.TextItem:
@@ -1231,6 +1321,8 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 				sm.renderSelectSetting(&selectConfig{
 					Name:         v.Name,
 					Options:      v.Options,
+					Segmented:    v.Segmented,
+					Swatches:     v.Swatches,
 					InitialValue: v.InitialValue,
 					Label:        createLabel(v.Label),
 					HelpContent:  createHelp(v.Help),
@@ -1272,6 +1364,10 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 				}, sectionContainer)
 				sectionHasItems = true
 
+			case schema.BlockedImagesItem:
+				sm.renderBlockedImages(v, sectionContainer)
+				sectionHasItems = true
+
 			case schema.ConfirmButtonItem:
 				fyneImportance := widget.LowImportance
 				switch v.Importance {
@@ -1288,17 +1384,21 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 				}
 
 				sm.renderButtonWithConfirmationSetting(&buttonWithConfirmationConfig{
-					Name:           v.Name,
-					ButtonText:     v.ButtonText,
-					ConfirmTitle:   v.ConfirmTitle,
-					ConfirmMessage: v.ConfirmMessage,
-					Importance:     fyneImportance,
-					OnPressed:      v.OnPressed,
-					IconName:       v.IconName,
-					EnabledIf:      v.EnabledIf,
-					VisibleIf:      v.VisibleIf,
-					Label:          createLabel(v.Label),
-					HelpContent:    createHelp(v.Help),
+					Name:               v.Name,
+					ButtonText:         v.ButtonText,
+					ConfirmTitle:       v.ConfirmTitle,
+					ConfirmMessage:     v.ConfirmMessage,
+					ConfirmButtonText:  v.ConfirmButtonText,
+					ConfirmDanger:      v.ConfirmDanger,
+					ConfirmMessageFunc: v.ConfirmMessageFunc,
+					HelpAsync:          v.HelpAsync,
+					Importance:         fyneImportance,
+					OnPressed:          v.OnPressed,
+					IconName:           v.IconName,
+					EnabledIf:          v.EnabledIf,
+					VisibleIf:          v.VisibleIf,
+					Label:              createLabel(v.Label),
+					HelpContent:        createHelp(v.Help),
 				}, sectionContainer)
 				sectionHasItems = true
 
@@ -1333,37 +1433,40 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 			case schema.HyperlinkItem:
 				u, err := url.Parse(v.URL)
 				var hl fyne.CanvasObject
-				if err == nil {
-					hl = widget.NewHyperlink(v.Text, u)
+				if v.OnTapped != nil {
+					link := newHyperlink(v.Text, nil)
+					link.OnTapped = v.OnTapped
+					hl = link
+				} else if err == nil {
+					hl = newHyperlink(v.Text, u)
 				} else {
 					hl = widget.NewLabel(v.Text + " (" + v.URL + ")")
 				}
 				if v.ID != "" {
 					sm.allWidgets[v.ID] = hl
 				}
-				sectionContainer.Add(hl)
+				sectionContainer.Add(noInset(hug(hl)))
 				sectionHasItems = true
 
 			case schema.LabelItem:
 				var labelObj fyne.CanvasObject
-				if v.IsTitle {
+				switch {
+				case v.IsTitle:
 					labelObj = sm.CreateSectionTitleLabel(v.Text)
-				} else {
-					var content fyne.CanvasObject
-					if v.Importance == schema.ImportanceLow {
-						rich := widget.NewRichTextWithText(v.Text)
-						rich.Segments[0].(*widget.TextSegment).Style.ColorName = theme.ColorNamePlaceHolder
-						rich.Wrapping = fyne.TextWrapWord
-						content = rich
-					} else {
-						lbl := widget.NewLabel(v.Text)
-						lbl.Wrapping = fyne.TextWrapWord
-						content = lbl
-					}
-					padding := theme.Padding()
-					spacer := canvas.NewRectangle(nil)
-					spacer.SetMinSize(fyne.NewSize(padding, 0))
-					labelObj = container.NewBorder(nil, nil, spacer, nil, content)
+				case section.Flat && v.Importance == schema.ImportanceLow:
+					// A line under the page title, such as a museum's location (G6).
+					loc := newStyledText(v.Text, backLinkSize, false, theme.ColorNamePlaceHolder)
+					loc.lineHeight = 20
+					labelObj = loc
+				case v.Importance == schema.ImportanceLow:
+					rich := widget.NewRichTextWithText(v.Text)
+					rich.Segments[0].(*widget.TextSegment).Style.ColorName = theme.ColorNamePlaceHolder
+					rich.Wrapping = fyne.TextWrapWord
+					labelObj = noInset(rich)
+				default:
+					lbl := widget.NewLabel(v.Text)
+					lbl.Wrapping = fyne.TextWrapWord
+					labelObj = noInset(lbl)
 				}
 				if v.ID != "" {
 					sm.allWidgets[v.ID] = labelObj
@@ -1408,7 +1511,7 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 						sm.checkAndEnableApply()
 					})
 				})
-				sectionContainer.Add(btn)
+				sectionContainer.Add(hug(btn))
 				sm.allWidgets[v.Name] = btn
 				sectionHasItems = true
 
@@ -1418,7 +1521,7 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 				if val.ID != "" {
 					sm.allWidgets[val.ID] = row
 				}
-				sectionContainer.Add(row)
+				sectionContainer.Add(noInset(row)) // links and text start at the card's text edge (G3)
 				sectionHasItems = true
 
 			case schema.HorizontalRowItem:
@@ -1426,7 +1529,7 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 				if v.ID != "" {
 					sm.allWidgets[v.ID] = row
 				}
-				sectionContainer.Add(row)
+				sectionContainer.Add(noInset(row)) // links and text start at the card's text edge (G3)
 				sectionHasItems = true
 
 			case schema.SecretItem:
@@ -1436,21 +1539,32 @@ func (sm *SettingsManager) RenderSchema(p schema.PanelSchema) fyne.CanvasObject 
 		}
 
 		if sectionHasItems {
-			topItems = append(topItems, sectionContainer)
+			topItems = append(topItems, buildSection(sectionHeader, sectionContainer.Objects, section.Flat))
 		}
 	}
 
-	topContainer := container.NewVBox(topItems...)
+	topContainer := pageColumn(topItems...)
+	if len(p.Sections) > 0 && p.Sections[0].Flat {
+		// Lines of text under a source's title (location, links) sit 6 px lower.
+		topContainer = inset(topContainer, flatRowGap, 0, 0, 0)
+	}
+
+	for _, fn := range sm.afterRender {
+		fn()
+	}
+	sm.afterRender = nil
 
 	if expandingList != nil {
 		// ONLY use Border + VScroll for providers with editable query tables (Pexels, Wallhaven, etc.)
-		content := container.NewBorder(topContainer, nil, nil, nil, expandingList)
+		list := inset(expandingList, 0, contentMarginX, sectionGap, contentMarginX)
+		content := container.NewBorder(topContainer, nil, nil, nil, list)
 		return container.NewVScroll(content)
 	}
 
-	// For Museums (Met, ArtIC) and others without lists:
-	// Return the VBox directly. Do NOT wrap in VScroll. Do NOT wrap in Border.
-	return topContainer
+	// Wrap non-list panels (App tab, General accordion sections, Museums) in VScroll
+	// so content clips cleanly to its viewport and shows a vertical scrollbar when the
+	// window is shorter than the section's natural height (e.g. at 200% HiDPI scaling).
+	return container.NewVScroll(topContainer)
 }
 
 // renderSecretItem renders a high-density API key/credential item.
@@ -1478,13 +1592,13 @@ func (sm *SettingsManager) renderSecretItem(v schema.SecretItem) fyne.CanvasObje
 	entry.Password = true
 	entry.SetPlaceHolder(v.Placeholder)
 
-	saveBtn := widget.NewButtonWithIcon(i18n.T("Verify & Save"), theme.ConfirmIcon(), nil)
+	saveBtn := widget.NewButtonWithIcon(i18n.T("Verify & save"), theme.ConfirmIcon(), nil)
 	saveBtn.Importance = widget.HighImportance
 	saveBtn.OnTapped = func() {
 		saveBtn.Disable()
 		err := v.OnVerify(entry.Text)
 		if err != nil {
-			dialog.ShowError(err, sm.GetSettingsWindow())
+			sm.ShowError(err)
 			saveBtn.Enable()
 		} else {
 			// Temporarily override the value getter so CommitSetting picks up the
@@ -1504,11 +1618,11 @@ func (sm *SettingsManager) renderSecretItem(v schema.SecretItem) fyne.CanvasObje
 	var emptyRows []fyne.CanvasObject
 	if v.Label != "" {
 		label := sm.CreateSettingTitleLabel(v.Label)
-		emptyRows = append(emptyRows, NewSplitRow(label, entry, SplitProportion.OneThird))
+		emptyRows = append(emptyRows, newSettingRow(label, nil, entry, true))
 	} else {
 		emptyRows = append(emptyRows, entry)
 	}
-	emptyRows = append(emptyRows, saveBtn)
+	emptyRows = append(emptyRows, hug(saveBtn))
 	emptyState := container.NewVBox(emptyRows...)
 
 	// --- Saved State: Masked display + full-width Clear button ---
@@ -1516,19 +1630,18 @@ func (sm *SettingsManager) renderSecretItem(v schema.SecretItem) fyne.CanvasObje
 	display.SetText("********************************")
 	display.Disable()
 
-	clearBtn := widget.NewButtonWithIcon(i18n.T("Clear API Key"), theme.DeleteIcon(), func() {
+	clearBtn := newDangerButton(i18n.T("Clear API key"), func() {
 		v.OnClear() // OnClear implementations call ResetSettings which already calls Refresh()
 	})
-	clearBtn.Importance = widget.DangerImportance
 
 	var savedRows []fyne.CanvasObject
 	if v.Label != "" {
 		label := sm.CreateSettingTitleLabel(v.Label)
-		savedRows = append(savedRows, NewSplitRow(label, display, SplitProportion.OneThird))
+		savedRows = append(savedRows, newSettingRow(label, nil, display, true))
 	} else {
 		savedRows = append(savedRows, display)
 	}
-	savedRows = append(savedRows, clearBtn)
+	savedRows = append(savedRows, hug(clearBtn))
 	savedState := container.NewVBox(savedRows...)
 
 	// Stack them so we can toggle visibility easily
@@ -1557,38 +1670,36 @@ func (sm *SettingsManager) renderSecretItem(v schema.SecretItem) fyne.CanvasObje
 
 // renderOAuthPickerInline renders the full OAuth authorize/disconnect + picker UI for a provider.
 func (sm *SettingsManager) renderOAuthPickerInline(v schema.OAuthPickerItem) fyne.CanvasObject {
-	statusLabel := widget.NewLabel(i18n.T("Status: Checking..."))
+	statusLabel := widget.NewLabel(i18n.T("Status: checking..."))
 	var connectBtn *widget.Button
 	var safeFullRefresh func()
 
 	updateUI := func() {
 		isAuth, _ := v.CheckAuthStatus()
 		if isAuth {
-			statusLabel.SetText(i18n.T("Status: Authorized (Ready to Select)"))
-			connectBtn.SetText(i18n.T("Disconnect Authorisation"))
+			statusLabel.SetText(i18n.T("Status: authorized (ready to select)"))
+			connectBtn.SetText(i18n.T("Disconnect authorisation"))
 			connectBtn.Importance = widget.DangerImportance
 			connectBtn.OnTapped = func() {
 				err := v.OnDisconnect()
 				if err != nil {
-					dialog.ShowError(err, sm.GetSettingsWindow())
+					sm.ShowError(err)
 				}
 				if safeFullRefresh != nil {
 					safeFullRefresh()
 				}
 			}
 		} else {
-			statusLabel.SetText(i18n.T("Status: Not Authorized"))
-			connectBtn.SetText(i18n.T("Authorize Application"))
+			statusLabel.SetText(i18n.T("Status: not authorized"))
+			connectBtn.SetText(i18n.T("Authorize application"))
 			connectBtn.Importance = widget.MediumImportance
 			connectBtn.OnTapped = func() {
 				err := v.OnAuthorize()
 				if err != nil {
-					dialog.ShowError(err, sm.GetSettingsWindow())
-				} else {
-					dialog.ShowInformation(i18n.T("Success"), i18n.T("Authorized!"), sm.GetSettingsWindow())
-					if safeFullRefresh != nil {
-						safeFullRefresh()
-					}
+					sm.ShowError(err)
+				} else if safeFullRefresh != nil {
+					// The status line now says it is authorized; no extra dialog.
+					safeFullRefresh()
 				}
 			}
 		}
@@ -1597,11 +1708,7 @@ func (sm *SettingsManager) renderOAuthPickerInline(v schema.OAuthPickerItem) fyn
 
 	connectBtn = widget.NewButton("", nil)
 
-	authContainer := container.NewVBox(
-		statusLabel,
-		connectBtn,
-		widget.NewSeparator(),
-	)
+	authContainer := newSettingRow(statusLabel, nil, connectBtn, false)
 
 	pickerContainer := container.NewVBox()
 
@@ -1609,7 +1716,7 @@ func (sm *SettingsManager) renderOAuthPickerInline(v schema.OAuthPickerItem) fyn
 	progressBar.Hide()
 	pickerStatus := widget.NewLabel("")
 
-	addBtn := widget.NewButton(i18n.T("Select Photos via Web Picker"), nil)
+	addBtn := widget.NewButton(i18n.T("Select photos via web picker"), nil)
 	cancelBtn := widget.NewButton(i18n.T("Cancel"), nil)
 	cancelBtn.Importance = widget.LowImportance
 	cancelBtn.Hide()
@@ -1623,7 +1730,7 @@ func (sm *SettingsManager) renderOAuthPickerInline(v schema.OAuthPickerItem) fyn
 			pickerStatus.SetText("")
 		} else {
 			addBtn.Disable()
-			pickerStatus.SetText(i18n.T("Please Authorize above first."))
+			pickerStatus.SetText(i18n.T("Please authorize above first."))
 		}
 	}
 
@@ -1647,7 +1754,7 @@ func (sm *SettingsManager) renderOAuthPickerInline(v schema.OAuthPickerItem) fyn
 	addBtn.OnTapped = func() {
 		isAuth, _ := v.CheckAuthStatus()
 		if !isAuth {
-			dialog.ShowError(fmt.Errorf("please authorize first"), sm.GetSettingsWindow())
+			sm.ShowError(fmt.Errorf("please authorize first"))
 			return
 		}
 
@@ -1661,7 +1768,7 @@ func (sm *SettingsManager) renderOAuthPickerInline(v schema.OAuthPickerItem) fyn
 				pickerStatus.SetText(msg)
 			})
 		}
-		updateStatus(i18n.T("Creating Web Session..."))
+		updateStatus(i18n.T("Creating web session..."))
 
 		ctx, cancel := context.WithCancel(context.Background())
 		cancelFunc = cancel
@@ -1679,70 +1786,40 @@ func (sm *SettingsManager) renderOAuthPickerInline(v schema.OAuthPickerItem) fyn
 
 				if err != nil {
 					if ctx.Err() != context.Canceled {
-						dialog.ShowError(err, sm.GetSettingsWindow())
+						sm.ShowError(err)
 						pickerStatus.SetText(i18n.T("Error: ") + err.Error())
 					}
 					return
 				}
 
 				if count == 0 {
-					dialog.ShowError(fmt.Errorf("no photos selected"), sm.GetSettingsWindow())
+					sm.ShowError(fmt.Errorf("no photos selected"))
 					return
 				}
 
-				urlStr := "googlephotos://" + guid
-				defaultDesc := fmt.Sprintf(i18n.T("Collection %s (%d items)"), time.Now().Format("Jan 02 15:04"), count)
-
-				urlEntry := widget.NewEntry()
-				urlEntry.SetText(urlStr)
-				urlEntry.Disable()
-				descEntry := widget.NewEntry()
-				descEntry.SetText(defaultDesc)
-
-				activeCheck := widget.NewCheck(i18n.T("Active"), nil)
-				activeCheck.SetChecked(true)
-
-				form := container.NewVBox(
-					widget.NewLabel(i18n.T("Internal ID:")),
-					urlEntry,
-					widget.NewLabel(i18n.T("Description:")),
-					descEntry,
-					activeCheck,
-				)
-
-				d := dialog.NewCustomConfirm(
-					i18n.T("Save Collection"),
-					i18n.T("Save"),
-					i18n.T("Cancel"),
-					form,
-					func(save bool) {
-						if save {
-							if err := v.OnSaveCollection(guid, descEntry.Text, activeCheck.Checked); err != nil {
-								dialog.ShowError(err, sm.GetSettingsWindow())
-							} else {
-								sm.SetRefreshFlag("queries")
-								sm.GetCheckAndEnableApplyFunc()()
-								sm.fullRefresh()
-							}
-						} else {
-							if v.OnCancelCollection != nil {
-								v.OnCancelCollection(guid)
-							}
-						}
-					},
-					sm.GetSettingsWindow(),
-				)
-				d.Resize(fyne.NewSize(500, 350))
-				d.Show()
+				defaultName := fmt.Sprintf(i18n.T("Collection %s (%d items)"), time.Now().Format("Jan 02 15:04"), count)
+				sm.showSaveCollectionDialog(defaultName, func(name string, active bool) error {
+					if err := v.OnSaveCollection(guid, name, active); err != nil {
+						return err
+					}
+					sm.SetRefreshFlag("queries")
+					sm.GetCheckAndEnableApplyFunc()()
+					sm.fullRefresh()
+					return nil
+				}, func() {
+					if v.OnCancelCollection != nil {
+						v.OnCancelCollection(guid)
+					}
+				})
 			})
 		}()
 	}
 
-	pickerContainer.Add(container.NewStack(addBtn, cancelBtn))
+	pickerContainer.Add(hug(container.NewStack(addBtn, cancelBtn)))
 	pickerContainer.Add(progressBar)
 	pickerContainer.Add(pickerStatus)
 
-	mainStack := container.NewVBox(authContainer, pickerContainer)
+	mainStack := container.NewVBox(authContainer, widget.NewSeparator(), pickerContainer)
 	sm.allWidgets[v.Name] = mainStack
 	return mainStack
 }
@@ -1785,15 +1862,19 @@ func (sm *SettingsManager) renderHorizontalRow(v schema.HorizontalRowItem) fyne.
 			}, temp)
 		case schema.ConfirmButtonItem:
 			sm.renderButtonWithConfirmationSetting(&buttonWithConfirmationConfig{
-				Name:           item.Name,
-				ButtonText:     item.ButtonText,
-				ConfirmTitle:   item.ConfirmTitle,
-				ConfirmMessage: item.ConfirmMessage,
-				Importance:     sm.mapImportance(item.Importance),
-				OnPressed:      item.OnPressed,
-				IconName:       item.IconName,
-				EnabledIf:      item.EnabledIf,
-				VisibleIf:      item.VisibleIf,
+				Name:               item.Name,
+				ButtonText:         item.ButtonText,
+				ConfirmTitle:       item.ConfirmTitle,
+				ConfirmMessage:     item.ConfirmMessage,
+				ConfirmButtonText:  item.ConfirmButtonText,
+				ConfirmDanger:      item.ConfirmDanger,
+				ConfirmMessageFunc: item.ConfirmMessageFunc,
+				HelpAsync:          item.HelpAsync,
+				Importance:         sm.mapImportance(item.Importance),
+				OnPressed:          item.OnPressed,
+				IconName:           item.IconName,
+				EnabledIf:          item.EnabledIf,
+				VisibleIf:          item.VisibleIf,
 			}, temp)
 		case schema.BoolItem:
 			var hlp fyne.CanvasObject
@@ -1813,10 +1894,20 @@ func (sm *SettingsManager) renderHorizontalRow(v schema.HorizontalRowItem) fyne.
 				VisibleIf:    item.VisibleIf,
 			}, temp)
 		case schema.LabelItem:
-			if item.IsTitle {
+			switch {
+			case item.IsTitle:
 				temp.Add(sm.CreateSettingTitleLabel(item.Text))
-			} else {
+			case v.Layout == schema.RowLayoutInline:
+				// In a line of items a wrapping label would collapse to one character per line.
+				text := newSecondaryText(item.Text)
+				text.Wrapping = fyne.TextWrapOff
+				temp.Add(text)
+			default:
 				temp.Add(sm.CreateSettingDescriptionLabel(item.Text))
+			}
+		case schema.HyperlinkItem:
+			if u, err := url.Parse(item.URL); err == nil {
+				temp.Add(newHyperlink(item.Text, u))
 			}
 		}
 		temps[i] = temp
@@ -1825,6 +1916,13 @@ func (sm *SettingsManager) renderHorizontalRow(v schema.HorizontalRowItem) fyne.
 	var res fyne.CanvasObject
 	if v.Layout == schema.RowLayoutHBoxSpacer && len(temps) == 2 {
 		res = container.NewHBox(temps[0], layout.NewSpacer(), temps[1])
+	} else if v.Layout == schema.RowLayoutInline {
+		inline := container.New(&hstackLayout{gap: inlineGap})
+		for _, t := range temps {
+			// Centre each item so text and links of different heights share one line.
+			inline.Add(container.NewCenter(t))
+		}
+		res = inline
 	} else {
 		row := container.NewAdaptiveGrid(len(v.Items))
 		for _, t := range temps {
@@ -1879,157 +1977,9 @@ func (sm *SettingsManager) getIconResource(name string) fyne.Resource {
 	}
 }
 
-// ShowError displays a modal error dialog to the user.
-func (sm *SettingsManager) ShowError(err error) {
-	dialog.ShowError(err, sm.prefsWindow)
-}
-
 // ShowConfirm displays a modal confirmation dialog to the user.
 func (sm *SettingsManager) ShowConfirm(title, message string, callback func(bool)) {
-	d := dialog.NewConfirm(title, message, callback, sm.prefsWindow)
-	d.Show()
-}
-
-// ShowAddQueryDialog opens the modal for adding image queries.
-func (sm *SettingsManager) ShowAddQueryDialog(cfg schema.AddQueryConfig, initialURL, initialDesc string, onAdded func()) {
-	utilLog.Debugf("ShowAddQueryDialog: Triggered with URL: %s", initialURL)
-
-	urlEntry := widget.NewEntry()
-	urlEntry.SetPlaceHolder(cfg.URLPlaceholder)
-	urlEntry.SetText(initialURL)
-	if cfg.URLValidator != "" {
-		urlEntry.Validator = validation.NewRegexp(cfg.URLValidator, cfg.URLErrorMsg)
-	}
-
-	descEntry := widget.NewEntry()
-	descEntry.SetPlaceHolder(cfg.DescPlaceholder)
-	descEntry.SetText(initialDesc)
-	if cfg.DescValidator != "" {
-		descEntry.Validator = validation.NewRegexp(cfg.DescValidator, cfg.DescErrorMsg)
-	}
-
-	formStatus := widget.NewLabel("")
-	activeBool := widget.NewCheck(i18n.T("Active"), nil)
-	activeBool.SetChecked(true)
-
-	cancelButton := widget.NewButton(i18n.T("Cancel"), nil)
-	saveButton := widget.NewButton(i18n.T("Save"), nil)
-
-	if initialURL == "" {
-		saveButton.Disable()
-	} else {
-		saveButton.Enable()
-	}
-
-	// Validation logic
-	formValidator := func(who *widget.Entry) bool {
-		if urlEntry.Text == "" || descEntry.Text == "" {
-			return false
-		}
-		if err := urlEntry.Validate(); err != nil {
-			if who == urlEntry {
-				formStatus.SetText(err.Error())
-				formStatus.Importance = widget.DangerImportance
-				formStatus.Refresh()
-			}
-			return false
-		}
-		if err := descEntry.Validate(); err != nil {
-			if who == descEntry {
-				formStatus.SetText(err.Error())
-				formStatus.Importance = widget.DangerImportance
-				formStatus.Refresh()
-			}
-			return false
-		}
-		if cfg.ValidateFunc != nil {
-			if err := cfg.ValidateFunc(urlEntry.Text, descEntry.Text); err != nil {
-				if who == urlEntry || (who == descEntry && urlEntry.Text != "") {
-					formStatus.SetText(err.Error())
-					formStatus.Importance = widget.DangerImportance
-					formStatus.Refresh()
-				}
-				return false
-			}
-		}
-		formStatus.SetText(i18n.T("Everything looks good"))
-		formStatus.Importance = widget.SuccessImportance
-		formStatus.Refresh()
-		return true
-	}
-
-	// Entry listeners with max length enforcement
-	const maxURLLen = 500
-	const maxDescLen = 100
-	newChecker := func(entry *widget.Entry, maxLen int) func(string) {
-		return func(s string) {
-			if len(s) > maxLen {
-				entry.SetText(s[:maxLen])
-				return
-			}
-			if formValidator(entry) {
-				saveButton.Enable()
-			} else {
-				saveButton.Disable()
-			}
-		}
-	}
-	urlEntry.OnChanged = newChecker(urlEntry, maxURLLen)
-	descEntry.OnChanged = newChecker(descEntry, maxDescLen)
-
-	// Build dialog layout
-	inputContainer := container.NewVBox()
-	if cfg.Description != "" {
-		inputContainer.Add(widget.NewLabel(cfg.Description))
-	}
-	inputContainer.Add(sm.CreateSettingTitleLabel(i18n.T("URL / Search Term:")))
-	inputContainer.Add(urlEntry)
-	inputContainer.Add(sm.CreateSettingTitleLabel(i18n.T("Description:")))
-	inputContainer.Add(descEntry)
-	inputContainer.Add(formStatus)
-	inputContainer.Add(activeBool)
-	inputContainer.Add(widget.NewSeparator())
-	inputContainer.Add(container.NewHBox(cancelButton, layout.NewSpacer(), saveButton))
-
-	d := dialog.NewCustomWithoutButtons(cfg.Title, inputContainer, sm.prefsWindow)
-	d.Resize(fyne.NewSize(600, 200))
-
-	saveButton.OnTapped = func() {
-		if cfg.ValidateFunc != nil {
-			if err := cfg.ValidateFunc(urlEntry.Text, descEntry.Text); err != nil {
-				formStatus.SetText(err.Error())
-				formStatus.Importance = widget.DangerImportance
-				formStatus.Refresh()
-				return
-			}
-		}
-
-		newID, err := cfg.AddHandler(descEntry.Text, urlEntry.Text, activeBool.Checked)
-		if err != nil {
-			formStatus.SetText(err.Error())
-			formStatus.Importance = widget.DangerImportance
-			formStatus.Refresh()
-			return
-		}
-
-		if onAdded != nil {
-			onAdded()
-		}
-
-		if activeBool.Checked {
-			sm.SetRefreshFlag(newID)
-			sm.checkAndEnableApply()
-		}
-
-		d.Hide()
-	}
-
-	cancelButton.OnTapped = func() {
-		d.Hide()
-	}
-
-	utilLog.Debug("ShowAddQueryDialog: Calling d.Show()")
-	d.Show()
+	showConfirmDialog(sm.prefsWindow, confirmSpec{Title: title, Message: message}, callback)
 }
 
 // renderQueryList builds a scroll-safe widget.List for query management.
@@ -2046,7 +1996,7 @@ func (sm *SettingsManager) renderQueryList(v schema.QueryListItem) *widget.List 
 		func() fyne.CanvasObject {
 			urlLink := widget.NewHyperlink(i18n.T("Placeholder"), nil)
 			activeCheck := widget.NewCheck(i18n.T("Active"), nil)
-			deleteButton := widget.NewButton(i18n.T("Delete"), func() {})
+			deleteButton := newDangerButton(i18n.T("Delete"), nil) // red text, as every destructive button (v43)
 			return container.NewHBox(urlLink, layout.NewSpacer(), activeCheck, deleteButton)
 		},
 		// UpdateItem — binds data to a recycled cell (scroll-safe)
@@ -2061,13 +2011,13 @@ func (sm *SettingsManager) renderQueryList(v schema.QueryListItem) *widget.List 
 			c := o.(*fyne.Container)
 			urlLink := c.Objects[0].(*widget.Hyperlink)
 			activeCheck := c.Objects[2].(*widget.Check)
-			deleteButton := c.Objects[3].(*widget.Button)
+			deleteButton := c.Objects[3].(*dangerButton)
 
 			// Set display text
 			if v.GetDisplayText != nil {
 				urlLink.SetText(v.GetDisplayText(query))
 			} else {
-				urlLink.SetText(query.Description)
+				urlLink.SetText(queryDisplayName(query.Description))
 			}
 
 			// Set clickable URL
@@ -2129,18 +2079,12 @@ func (sm *SettingsManager) renderQueryList(v schema.QueryListItem) *widget.List 
 			deleteButton.SetText(label)
 
 			deleteButton.OnTapped = func() {
-				confirmTitle := i18n.T("Please Confirm")
-				confirmMsg := i18n.Tf("Are you sure you want to delete {{.Description}}?", map[string]any{"Description": query.Description})
+				// DQ: the question carries the name and there is no text under it (Favorites has no
+				// Clear button, so there is no clear dialog).
+				confirmTitle := i18n.Tf("Delete “{{.Name}}”?", map[string]any{"Name": queryDisplayName(query.Description)})
+				confirmMsg := v.DeleteConfirmMessage
 
-				if v.DeleteConfirmMessage != "" {
-					confirmMsg = v.DeleteConfirmMessage
-				} else if query.Managed || v.ForceActionEnabled {
-					if v.DeleteLabel == i18n.T("Clear") {
-						confirmMsg = i18n.T("Are you sure you want to delete all saved favorites?")
-					}
-				}
-
-				sm.ShowConfirm(confirmTitle, confirmMsg, func(b bool) {
+				showConfirmDialog(sm.prefsWindow, confirmSpec{Title: confirmTitle, Message: confirmMsg, ConfirmText: label, Danger: true}, func(b bool) {
 					if b {
 						if query.Active {
 							sm.SetRefreshFlag(queryKey)

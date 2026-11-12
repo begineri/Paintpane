@@ -90,6 +90,17 @@ const (
 	FrameOverrideForceOff
 )
 
+// DisplayOverride is how one image is shown, chosen in Tune Image. Inherit follows the global
+// display mode; the others are its three choices.
+type DisplayOverride int
+
+const (
+	DisplayInherit DisplayOverride = iota
+	DisplayFull                    // the whole image on the wall color
+	DisplayFramed                  // the whole image in the gallery frame
+	DisplayCrop                    // cropped to fill the screen
+)
+
 type MattingOverrideMode int
 
 const (
@@ -109,7 +120,10 @@ const (
 // TuningOptions encapsulates per-image, per-resolution overrides.
 type TuningOptions struct {
 	Anchor        CropAnchor            `json:",omitempty"`
-	FrameOverride FrameOverrideMode     `json:",omitempty"`
+	CropOffset    float64               `json:",omitempty"` // where the kept part sits along the cropped axis, 0-100 %; used when HasCropOffset
+	HasCropOffset bool                  `json:",omitempty"` // the picture was dragged: CropOffset replaces the automatic crop (and any Anchor)
+	Display       DisplayOverride       `json:",omitempty"` // this image's display mode; Inherit follows the global one
+	FrameOverride FrameOverrideMode     `json:",omitempty"` // the older per-image frame switch, read only when Display is Inherit
 	WallColor     WallColorOverrideMode `json:",omitempty"`
 	Matting       MattingOverrideMode   `json:",omitempty"`
 	FrameSize     float64               `json:",omitempty"` // 0 means inherit global default
@@ -142,6 +156,7 @@ type Image struct {
 	Tuning           map[string]TuningOptions `json:",omitempty"` // Per-resolution tuning overrides (key = "WxH", e.g. "3440x1440")
 	IsFavorited      bool                     // Flag to protect image from cache pruning
 	Seen             bool                     // Flag for pagination/history logic
+	Purity           string                   `json:",omitempty"` // Source content rating (Wallhaven: "sfw", "sketchy" or "nsfw")
 }
 
 // GetTuning returns the tuning options for a specific resolution key.
@@ -186,6 +201,11 @@ func (img *Image) MergeExistingMetadata(existing Image) {
 	}
 	for k, v := range existing.ProcessingFlags {
 		img.ProcessingFlags[k] = v
+	}
+
+	// Keep a known content rating if this fetch result did not carry one
+	if img.Purity == "" {
+		img.Purity = existing.Purity
 	}
 
 	// Preserve manual tuning options (don't overwrite user-set values)
@@ -344,6 +364,18 @@ type ResolutionAwareProvider interface {
 	WithResolution(apiURL string, width, height int) string
 }
 
+// ScaledDownloadProvider is an optional interface for providers whose image server can send an
+// image already scaled down (IIIF, Wikimedia thumbnails). While High-resolution originals is off,
+// originals are capped at about 4K, and these providers are asked for the smaller copy instead of
+// downloading the full image and shrinking it here.
+type ScaledDownloadProvider interface {
+	// ScaledDownloadURL returns where to download img at the size fit gives for its full size
+	// (fit keeps the proportions). It returns false when the server cannot scale the image, the
+	// full size is unknown, or the image is no larger than fit allows; the full image is then
+	// downloaded and shrunk after download if needed.
+	ScaledDownloadURL(ctx context.Context, img Image, fit func(w, h int) (int, int)) (string, bool)
+}
+
 // HeaderProvider is an optional interface for providers that need custom headers for image downloads.
 type HeaderProvider interface {
 	GetDownloadHeaders() map[string]string
@@ -353,6 +385,22 @@ type HeaderProvider interface {
 // for image downloads (e.g. for strict rate limiting or serialization).
 type CustomClientProvider interface {
 	GetClient() *http.Client
+}
+
+// DownloadAttemptsProvider is an optional interface for providers whose download client already
+// retries on its own (SMK's sends another request when one stalls), so the downloader tries each
+// image this many times instead of its default.
+type DownloadAttemptsProvider interface {
+	DownloadAttempts() int
+}
+
+// OutagePauseProvider is an optional interface for providers whose image server is known to stop
+// answering at certain times (SMK's during the Danish night). OutagePause returns, for the moment
+// an image fails to download, how long such an outage still lasts, or 0 outside it. Inside it the
+// downloader gives up on the image after one attempt and pauses the source's downloads until the
+// outage ends, instead of after several failed images.
+type OutagePauseProvider interface {
+	OutagePause(now time.Time) time.Duration
 }
 
 // Syncer is an optional interface for providers that support automated synchronization of managed queries.
@@ -371,6 +419,17 @@ type RemoteConfigSyncer interface {
 // static HTML virtual gallery walls for their curated collections.
 type GalleryProvider interface {
 	GenerateGalleries(ctx context.Context, destDir string) error
+}
+
+// PageCursorProvider is an optional interface for providers whose page N > 1 can only be fetched
+// with a continuation cursor that page N-1 returned (Wikimedia Commons' "continue" parameters).
+// The app saves the cursor of each query's next page with its page number and hands it back after
+// a restart, so the query resumes where it was instead of starting over.
+type PageCursorProvider interface {
+	// PageCursor returns the cursor for fetching page of query, if the provider has one.
+	PageCursor(query string, page int) (string, bool)
+	// SetPageCursor gives back a cursor that PageCursor returned in an earlier run.
+	SetPageCursor(query string, page int, cursor string)
 }
 
 // ThrottledProvider is an optional interface for providers that can signal

@@ -36,7 +36,7 @@ func acquireLock() (bool, error) {
 	file, err := os.OpenFile(lockFilePath, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
 		// Can't create lock file (sandbox/permissions). Proceed without lock.
-		fmt.Fprintf(os.Stderr, "[Spice] Warning: cannot create lock file %s: %v. Proceeding without single-instance lock.\n", lockFilePath, err)
+		fmt.Fprintf(os.Stderr, "[Paintpane] Warning: cannot create lock file %s: %v. Proceeding without single-instance lock.\n", lockFilePath, err)
 		return true, nil
 	}
 
@@ -55,7 +55,7 @@ func acquireLock() (bool, error) {
 			return false, nil
 		}
 		// Unexpected lock error (sandbox?). Proceed without lock.
-		fmt.Fprintf(os.Stderr, "[Spice] Warning: FcntlFlock failed: %v. Proceeding without single-instance lock.\n", err)
+		fmt.Fprintf(os.Stderr, "[Paintpane] Warning: FcntlFlock failed: %v. Proceeding without single-instance lock.\n", err)
 		file.Close()
 		return true, nil
 	}

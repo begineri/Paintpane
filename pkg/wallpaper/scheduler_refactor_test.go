@@ -156,6 +156,33 @@ func TestSetUpdateCallback_NilSafe(t *testing.T) {
 	})
 }
 
+// TestScheduler_StopsAfterFieldIsCleared verifies the loop exits once stopped, even though stopping
+// sets the field to nil. Waiting on the field itself could block forever.
+func TestScheduler_StopsAfterFieldIsCleared(t *testing.T) {
+	wp := newTestPlugin(t)
+	wp.ctx = context.Background()
+	wp.cfg.SetNightlyRefresh(false)
+
+	done := make(chan struct{})
+	go func() {
+		wp.StartNightlyRefresh()
+		close(done)
+	}()
+	assert.Eventually(t, func() bool {
+		wp.downloadMutex.Lock()
+		defer wp.downloadMutex.Unlock()
+		return wp.stopNightlyRefresh != nil
+	}, 5*time.Second, 10*time.Millisecond)
+
+	wp.StopNightlyRefresh()
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		t.Fatal("the nightly refresh loop must exit after being stopped")
+	}
+}
+
 // TestScheduler_AlwaysRunsUnconditionally verifies that StartNightlyRefresh
 // doesn't check GetNightlyRefresh() before starting — it always starts.
 func TestScheduler_AlwaysRunsUnconditionally(t *testing.T) {

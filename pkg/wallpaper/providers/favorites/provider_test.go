@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -299,17 +300,20 @@ func TestClearFavorites(t *testing.T) {
 		require.NoError(t, p.AddFavorite(provider.Image{ID: name, FilePath: srcPath, Attribution: "Author"}))
 	}
 
-	// Wait for all to be written
+	// Wait for the worker to finish. It writes each image and then its metadata, so checking only
+	// for images could clear the directory before the last metadata write put a file back.
 	assert.Eventually(t, func() bool {
-		entries, _ := os.ReadDir(rootDir)
-		imageCount := 0
-		for _, e := range entries {
-			if !e.IsDir() && filepath.Ext(e.Name()) != ".json" {
-				imageCount++
+		data, err := os.ReadFile(filepath.Join(rootDir, "metadata.json"))
+		if err != nil {
+			return false
+		}
+		for i := 0; i < 3; i++ {
+			if !strings.Contains(string(data), fmt.Sprintf("clear_img_%d", i)) {
+				return false
 			}
 		}
-		return imageCount >= 3
-	}, 3*time.Second, 50*time.Millisecond, "All 3 files should be written")
+		return true
+	}, 10*time.Second, 50*time.Millisecond, "All 3 favorites should be written")
 
 	// Now clear everything (extracted logic from CreateSettingsPanel)
 	os.RemoveAll(rootDir)

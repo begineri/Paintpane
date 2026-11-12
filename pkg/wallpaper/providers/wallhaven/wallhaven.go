@@ -204,10 +204,10 @@ func (p *Provider) DiscoverCollections(ctx context.Context, username string) ([]
 
 	if resp.StatusCode != http.StatusOK {
 		if resp.StatusCode == http.StatusForbidden {
-			return nil, errors.New("access denied: account might be private or API key invalid")
+			return nil, setting.Known(setting.ErrorUnknownUser, "wallhaven", errors.New("access denied: account might be private or API key invalid"))
 		}
 		if resp.StatusCode == http.StatusNotFound {
-			return nil, errors.New("user not found on Wallhaven")
+			return nil, setting.Known(setting.ErrorUnknownUser, "wallhaven", errors.New("user not found on Wallhaven"))
 		}
 		return nil, fmt.Errorf("wallhaven API error: status %d", resp.StatusCode)
 	}
@@ -359,6 +359,7 @@ func (p *Provider) FetchImages(ctx context.Context, apiURL string, page int) ([]
 			FileType:    item.FileType,
 			Width:       item.DimensionX,
 			Height:      item.DimensionY,
+			Purity:      item.Purity,
 		})
 	}
 
@@ -387,7 +388,7 @@ func (p *Provider) EnrichImage(ctx context.Context, img provider.Image) (provide
 	if err != nil {
 		return img, fmt.Errorf("failed to create enrichment request: %w", err)
 	}
-	req.Header.Set("User-Agent", "SpiceWallpaperManager/v0.1.0")
+	req.Header.Set("User-Agent", "Paintpane")
 
 	start := time.Now()
 	resp, err := p.httpClient.Do(req)
@@ -439,6 +440,7 @@ type ImgSrvcImage struct {
 	ID         string   `json:"id"`
 	ShortURL   string   `json:"short_url"`
 	FileType   string   `json:"file_type"`
+	Purity     string   `json:"purity"`
 	Ratio      string   `json:"ratio"`
 	DimensionX int      `json:"dimension_x"`
 	DimensionY int      `json:"dimension_y"`
@@ -494,17 +496,12 @@ func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.Panel
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title: i18n.T("wallhaven"),
 				Items: []schema.ItemSchema{
-					schema.LabelItem{
-						Text:       i18n.T("wallhaven is a repository for high-quality, high-resolution wallpapers."),
-						Importance: schema.ImportanceLow,
-					},
 					schema.SecretItem{
 						Name:         apiKeyIdent,
-						Label:        i18n.T("wallhaven API Key:"),
+						Label:        i18n.T("wallhaven API key"),
 						InitialValue: p.cfg.GetWallhavenAPIKey(),
-						Placeholder:  i18n.T("Enter your wallhaven API Key"),
+						Placeholder:  i18n.T("Enter your wallhaven API key"),
 						OnVerify: func(key string) error {
 							ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 							defer cancel()
@@ -535,8 +532,7 @@ func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.Panel
 					},
 					schema.TextItem{
 						Name:          userIdent,
-						Label:         i18n.T("wallhaven Username:"),
-						Help:          i18n.T("Please enter your wallhaven.cc username"),
+						Label:         i18n.T("wallhaven username"),
 						InitialValue:  p.cfg.GetWallhavenUsername(),
 						PlaceHolder:   i18n.T("Enter wallhaven.cc username"),
 						DisplayStatus: true,
@@ -552,7 +548,7 @@ func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.Panel
 					},
 					schema.AsyncButtonItem{
 						Name:            "VerifyUsername",
-						ButtonText:      i18n.T("Verify Username"),
+						ButtonText:      i18n.T("Verify username"),
 						LoadingText:     i18n.T("Verifying..."),
 						Style:           schema.ButtonStylePrimary,
 						TargetStatusKey: userIdent,
@@ -593,8 +589,7 @@ func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.Panel
 					},
 					schema.BoolItem{
 						Name:         syncIdent,
-						Label:        i18n.T("Keep Favorites (collections) Synced:"),
-						Help:         i18n.T("Automatically synchronize your wallhaven collections with Spice. New collections will be added as inactive queries."),
+						Label:        i18n.T("Keep favorites in sync"),
 						InitialValue: p.cfg.GetWallhavenSyncEnabled(),
 						NeedsRefresh: true,
 						EnabledIf: func() bool {
@@ -611,7 +606,7 @@ func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.Panel
 							p.cfg.SetWallhavenSyncEnabled(b)
 							go func() {
 								_ = p.Sync(context.Background())
-								sm.SetSettingStatus(syncIdent, i18n.T("Favorites Synced"), schema.ImportanceSuccess)
+								sm.SetSettingStatus(syncIdent, i18n.T("Favorites synced"), schema.ImportanceSuccess)
 								sm.RefreshUI()
 							}()
 						},
@@ -625,11 +620,12 @@ func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.Panel
 // CreateQueryPanel creates the image query management panel.
 func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, pendingUrl string) *schema.PanelSchema {
 	addCfg := schema.AddQueryConfig{
-		Title:           i18n.T("Add wallhaven Collection"),
-		URLPlaceholder:  "https://wallhaven.cc/search?q=...",
+		Title:           i18n.T("Add wallhaven collection"),
+		URLLabel:        i18n.T("wallhaven URL"),
+		URLPlaceholder:  "https://wallhaven.cc/search?q=…",
 		URLValidator:    WallhavenURLRegexp,
-		URLErrorMsg:     i18n.T("Invalid wallhaven URL"),
-		DescPlaceholder: i18n.T("Collection Description (e.g. Landscapes)"),
+		URLErrorMsg:     i18n.T("That isn't a wallhaven search or collection URL."),
+		DescPlaceholder: i18n.T("e.g. Landscapes"),
 		AddHandler: func(desc, url string, active bool) (string, error) {
 			apiURL, err := p.ParseURL(url)
 			if err != nil {
@@ -646,12 +642,12 @@ func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, pendingUrl strin
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title:       i18n.T("wallhaven Queries and Collections (Favorites)"),
-				Description: i18n.T("Manage your wallhaven.cc image queries and collections here. Paste your image search or collection URL and Spice will take care of the rest."),
+				Title:       i18n.T("wallhaven queries and collections (Favorites)"),
+				Description: i18n.T("Manage your wallhaven.cc image queries and collections here. Paste your image search or collection URL and Paintpane will take care of the rest."),
 				Items: []schema.ItemSchema{
 					schema.ButtonItem{
 						Name:       "wallhaven_add",
-						ButtonText: i18n.T("Add New Collection"),
+						ButtonText: i18n.T("Add new collection"),
 						IconName:   "add",
 						OnPressed: func() {
 							sm.ShowAddQueryDialog(addCfg, "", "", sm.RefreshUI)

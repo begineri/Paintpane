@@ -21,11 +21,12 @@ const (
 	WallpaperChgFreqPrefKey          = pluginPrefix + "wallpaper_chg_freq_key"          // Legacy enum key
 	WallpaperChgFreqMinsPrefKey      = pluginPrefix + "wallpaper_chg_freq_mins_key"     // New key for raw minutes
 	ImgShufflePrefKey                = pluginPrefix + "img_shuffle_key"                 // ImgShufflePrefKey is used to set and retrieve the boolean flag for wallpaper image shuffle
-	ChgImgOnStartPrefKey             = pluginPrefix + "chg_img_on_start_key"            // ChgImgOnStartPrefKey is used to set and retrieve the boolean flag for changing wallpaper on startup
 	NightlyRefreshPrefKey            = pluginPrefix + "nightly_refresh_key"             // NightlyRefreshPrefKey is used to set and retrieve the boolean flag for nightly refresh
+	ShowNudesPrefKey                 = pluginPrefix + "show_nudes_key"                  // ShowNudesPrefKey is used to set and retrieve the boolean flag for showing nude images
 	FaceBoostPrefKey                 = pluginPrefix + "face_boost_key"                  // FaceBoostPrefKey is used to set and retrieve the boolean flag for face boost
 	FaceCropPrefKey                  = pluginPrefix + "face_crop_key"                   // FaceCropPrefKey is used to set and retrieve the boolean flag for face crop
 	StaggerMonitorChangesPrefKey     = pluginPrefix + "stagger_changes_key"             // StaggerMonitorChangesPrefKey is used to set and retrieve the boolean flag for staggering wallpaper changes
+	HighResOriginalsPrefKey          = pluginPrefix + "high_res_originals"              // HighResOriginalsPrefKey keeps originals at full size; off (the default) caps them at about 4K
 	ShortcutsDisabledPrefKey         = pluginPrefix + "shortcuts_disabled_key"          // ShortcutsDisabledPrefKey is used to set and retrieve the boolean flag for disabling hotkeys
 	TargetedShortcutsDisabledPrefKey = pluginPrefix + "targeted_shortcuts_disabled_key" // TargetedShortcutsDisabledPrefKey is used to set and retrieve the boolean flag for disabling targeted hotkeys
 	LogLevelPrefKey                  = pluginPrefix + "log_level_key"
@@ -79,30 +80,38 @@ func (qt URLType) String() string {
 const (
 	// Cache Directory Segments
 	// Structure: FittedRootDir / [Quality|Flexibility] / [Standard|FaceBoost|FaceCrop]
+	// or, for the whole-image display modes: FittedRootDir / [Full|Framed] / Standard
 	FittedRootDir = "fitted"
+
+	// Processing flags that only select which derivative directory is used
+	flagDisplayFull   = "DisplayFull"
+	flagDisplayFramed = "DisplayFramed"
 
 	// Mode Segments
 	QualityDir     = "quality"
 	FlexibilityDir = "flexibility"
+	FullArtDir     = "full"
+	FramedArtDir   = "framed"
 
 	// Type Segments
-	StandardDir               = "standard"
-	FaceBoostDir              = "faceboost"
-	FaceCropDir               = "facecrop"
-	PrcntSeenTillDownload     = 0.8
-	MinSeenImagesForDownload  = 5
-	MinLocalImageBeforePulse  = 1
-	BucketStarvationThreshold = 5 // Trigger fetch if bucket size falls below this
-	MaxImageWaitRetry         = 10
-	ImageWaitRetryDelay       = 1 * time.Second
-	MaxDescLength             = 50
-	MaxURLLength              = 255
-	MaxFavoritesLimit         = 200
-	FavoritesNamespace        = "favorites" // API Namespace
-	FavoritesCollection       = "favorite_images"
-	FavoritesQueryID          = "favorites://" + FavoritesCollection
-	LocalFolderNamespace      = "local_folders" // API Namespace for user-selected local folders
-	LocalFolderProviderID     = "LocalFolder"   // Stable provider ID
+	StandardDir                    = "standard"
+	FaceBoostDir                   = "faceboost"
+	FaceCropDir                    = "facecrop"
+	PrcntSeenTillDownload          = 0.8
+	MinSeenImagesForDownload       = 5
+	MinLocalImageBeforePulse       = 1
+	BucketStarvationThreshold      = 5 // Trigger fetch if bucket size falls below this
+	MaxImageWaitRetry              = 10
+	DefaultMaxConcurrentProcessors = 4 // Images processed at once unless configured otherwise
+	ImageWaitRetryDelay            = 1 * time.Second
+	MaxDescLength                  = 50
+	MaxURLLength                   = 255
+	MaxFavoritesLimit              = 200
+	FavoritesNamespace             = "favorites" // API Namespace
+	FavoritesCollection            = "favorite_images"
+	FavoritesQueryID               = "favorites://" + FavoritesCollection
+	LocalFolderNamespace           = "local_folders" // API Namespace for user-selected local folders
+	LocalFolderProviderID          = "LocalFolder"   // Stable provider ID
 )
 
 // HashFolderPath generates a short, URL-safe hash for a folder path to use as a collectionID.
@@ -149,11 +158,16 @@ const (
 	Cache1000Images                   // 5
 	Cache5000Images                   // 6
 	Cache10000Images                  // 7
+	Cache150Images                    // 8 (the default since the lightweight pass; 2 stays retired, see GetCacheSize)
 )
+
+// DefaultCacheSize is the cache size of someone who never chose one: 150 images, about 1.3 GB.
+const DefaultCacheSize = Cache150Images
 
 // CacheSizeValues maps CacheSize to its integer representation.
 var CacheSizeValues = map[CacheSize]int{
 	Cache100Images:   100,
+	Cache150Images:   150,
 	Cache300Images:   300,
 	Cache500Images:   500,
 	Cache1000Images:  1000,
@@ -166,6 +180,8 @@ func (cs CacheSize) String() string {
 	switch cs {
 	case Cache100Images:
 		return "100"
+	case Cache150Images:
+		return "150"
 	case Cache300Images:
 		return "300"
 	case Cache500Images:
@@ -190,6 +206,7 @@ func (cs CacheSize) Size() int {
 func GetCacheSizes() []fmt.Stringer {
 	cacheSizes := []CacheSize{
 		Cache100Images,
+		Cache150Images,
 		Cache300Images,
 		Cache500Images,
 		Cache1000Images,

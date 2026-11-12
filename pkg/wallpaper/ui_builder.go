@@ -2,7 +2,6 @@ package wallpaper
 
 import (
 	"errors"
-	"fmt"
 	"sort"
 	"strconv"
 
@@ -29,284 +28,291 @@ func NewPrefsPanelBuilder(p *Plugin, sm setting.SettingsManager) *PrefsPanelBuil
 	}
 }
 
-// BuildGeneralTabSchema creates the General settings tab schema.
-func (b *PrefsPanelBuilder) BuildGeneralTabSchema() *schema.PanelSchema {
+// isSmartCropSelected reports whether the pending artwork display mode is Smart Crop. The
+// settings that only affect cropping are disabled otherwise.
+func (b *PrefsPanelBuilder) isSmartCropSelected() bool {
+	val := b.sm.GetValue("artworkDisplayMode")
+	if val == nil {
+		return b.plugin.cfg.GetArtworkDisplayMode() == ArtworkDisplaySmartCrop
+	}
+	return artworkDisplayModeAt(val.(int)) == ArtworkDisplaySmartCrop
+}
+
+// frequencyChoices are the rotation intervals offered in the select, in display order.
+// Any other saved value shows as Custom.
+var frequencyChoices = []Frequency{
+	FrequencyNever, Frequency30Minutes, FrequencyHourly, Frequency3Hours,
+	Frequency6Hours, Frequency(720), FrequencyDaily,
+}
+
+func frequencyLabel(f Frequency) string {
+	switch f {
+	case FrequencyNever:
+		return i18n.T("Never")
+	case Frequency30Minutes:
+		return i18n.T("Every 30 minutes")
+	case FrequencyHourly:
+		return i18n.T("Every hour")
+	case Frequency3Hours:
+		return i18n.T("Every 3 hours")
+	case Frequency6Hours:
+		return i18n.T("Every 6 hours")
+	case Frequency(720):
+		return i18n.T("Every 12 hours")
+	case FrequencyDaily:
+		return i18n.T("Daily")
+	}
+	return ""
+}
+
+// frequencyIndex returns the select index of a frequency; values not in the list map to Custom.
+func frequencyIndex(f Frequency) int {
+	for i, c := range frequencyChoices {
+		if c == f {
+			return i
+		}
+	}
+	return len(frequencyChoices)
+}
+
+func (b *PrefsPanelBuilder) pendingDisplayMode() ArtworkDisplayMode {
+	if val, ok := b.sm.GetValue("artworkDisplayMode").(int); ok {
+		return artworkDisplayModeAt(val)
+	}
+	return b.plugin.cfg.GetArtworkDisplayMode()
+}
+
+// framesVisible reports whether frame settings apply: only in Museum Frame. Smart crop fills
+// the screen and never frames.
+func (b *PrefsPanelBuilder) framesVisible() bool {
+	return b.pendingDisplayMode() == ArtworkDisplayFramed
+}
+
+// wallVisible reports whether the wall colour shows anywhere.
+func (b *PrefsPanelBuilder) wallVisible() bool {
+	return b.pendingDisplayMode() != ArtworkDisplaySmartCrop
+}
+
+// BuildWallpaperPage creates the Wallpaper page: rotation, display and content.
+func (b *PrefsPanelBuilder) BuildWallpaperPage() *schema.PanelSchema {
+	cfg := b.plugin.cfg
+	customIndex := len(frequencyChoices)
+	freqOptions := make([]string, 0, customIndex+1)
+	for _, f := range frequencyChoices {
+		freqOptions = append(freqOptions, frequencyLabel(f))
+	}
+	freqOptions = append(freqOptions, i18n.T("Custom…"))
+
+	isCustomFrequency := func() bool {
+		val, ok := b.sm.GetValue("changeFrequencyChoice").(int)
+		if !ok {
+			return frequencyIndex(cfg.GetWallpaperChangeFrequency()) == customIndex
+		}
+		return val == customIndex
+	}
+
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title:       i18n.T("Wallpaper Cycle & Cache"),
-				Description: i18n.T("Configure how often wallpapers change and how many images are kept locally."),
+				Title: i18n.T("Rotation"),
 				Items: []schema.ItemSchema{
+					schema.SelectItem{
+						Name:         "changeFrequencyChoice",
+						Label:        i18n.T("Change wallpaper"),
+						Options:      freqOptions,
+						InitialValue: frequencyIndex(cfg.GetWallpaperChangeFrequency()),
+						ApplyFunc: func(val interface{}) {
+							if i, ok := val.(int); ok && i >= 0 && i < customIndex {
+								b.plugin.ChangeWallpaperFrequency(frequencyChoices[i], true)
+							}
+						},
+						NeedsRefresh: true,
+					},
 					schema.TextItem{
 						Name:         "changeFrequency",
-						Label:        i18n.T("Wallpaper Change Frequency (Minutes):"),
-						Help:         i18n.T("Set how often the wallpaper changes in minutes. Set to 0 for Never."),
-						InitialValue: fmt.Sprintf("%d", b.plugin.cfg.GetWallpaperChangeFrequency()),
+						Label:        i18n.T("Custom interval (minutes)"),
+						InitialValue: strconv.Itoa(int(cfg.GetWallpaperChangeFrequency())),
 						IsNumeric:    true,
 						Validator: func(s string) error {
 							val, err := strconv.Atoi(s)
-							if err != nil || val < 0 {
-								return errors.New(i18n.T("Must be a positive integer or 0"))
+							if err != nil || val < 1 {
+								return errors.New(i18n.T("Enter a number of minutes, 1 or more"))
 							}
 							return nil
 						},
 						ApplyFunc: func(val string) {
-							freq, _ := strconv.Atoi(val)
-							b.plugin.ChangeWallpaperFrequency(Frequency(freq), true)
+							if !isCustomFrequency() {
+								return
+							}
+							if minutes, err := strconv.Atoi(val); err == nil && minutes > 0 {
+								b.plugin.ChangeWallpaperFrequency(Frequency(minutes), true)
+							}
 						},
+						VisibleIf:    isCustomFrequency,
 						NeedsRefresh: true,
 					},
-					schema.HorizontalRowItem{
-						ID: "freq_shortcuts",
-						Items: []schema.ItemSchema{
-							schema.ButtonItem{
-								Name:       "freqNever",
-								ButtonText: i18n.T("Never"),
-								OnPressed: func() {
-									b.sm.SetValue("changeFrequency", "0")
-								},
-							},
-							schema.ButtonItem{
-								Name:       "freq1h",
-								ButtonText: i18n.T("1 Hour"),
-								OnPressed: func() {
-									b.sm.SetValue("changeFrequency", "60")
-								},
-							},
-							schema.ButtonItem{
-								Name:       "freq3h",
-								ButtonText: i18n.T("3 Hours"),
-								OnPressed: func() {
-									b.sm.SetValue("changeFrequency", "180")
-								},
-							},
-							schema.ButtonItem{
-								Name:       "freq6h",
-								ButtonText: i18n.T("6 Hours"),
-								OnPressed: func() {
-									b.sm.SetValue("changeFrequency", "360")
-								},
-							},
-							schema.ButtonItem{
-								Name:       "freq12h",
-								ButtonText: i18n.T("12 Hours"),
-								OnPressed: func() {
-									b.sm.SetValue("changeFrequency", "720")
-								},
-							},
-							schema.ButtonItem{
-								Name:       "freqDaily",
-								ButtonText: i18n.T("Daily"),
-								OnPressed: func() {
-									b.sm.SetValue("changeFrequency", "1440")
-								},
-							},
-						},
-					},
-					schema.SelectItem{
-						Name:         "cacheSize",
-						Label:        i18n.T("Cache Size:"),
-						Help:         i18n.T("Set how many images to cache for faster startup and less network usage. Set to \"None\" to disable caching."),
-						Options:      setting.StringOptions(GetCacheSizes()),
-						InitialValue: int(b.plugin.cfg.GetCacheSize()),
-						ApplyFunc: func(val interface{}) {
-							size := CacheSize(val.(int))
-							b.plugin.cfg.SetCacheSize(size)
-						},
+					schema.BoolItem{
+						Name:         "nightlyRefresh",
+						Label:        i18n.T("Refresh wallpapers nightly"),
+						InitialValue: cfg.GetNightlyRefresh(),
+						ApplyFunc:    cfg.SetNightlyRefresh,
 					},
 				},
 			},
 			{
-				Title:       i18n.T("Smart Fit & Face Detection"),
-				Description: i18n.T("Control how images are fitted to your screen and optimized for faces."),
+				Title: i18n.T("Picture"),
 				Items: []schema.ItemSchema{
 					schema.SelectItem{
-						Name:         "smartFitMode",
-						Label:        i18n.T("Smart Fit Mode:"),
-						Help:         i18n.T("Control how images are fitted to your screen:\n- Disabled: Original image.\n- Quality: Rejects images with mismatched aspect ratio.\n- Flexibility: Allows high-res images to crop aggressively."),
-						Options:      GetSmartFitModes(),
-						InitialValue: int(b.plugin.cfg.GetSmartFitMode()),
+						Name:      "artworkDisplayMode",
+						Label:     i18n.T("Display mode"),
+						Options:   GetArtworkDisplayModes(),
+						Segmented: true,
+						// The value is a position in the list, not the saved mode.
+						InitialValue: artworkDisplayModeIndex(cfg.GetArtworkDisplayMode()),
 						ApplyFunc: func(val interface{}) {
-							mode := SmartFitMode(val.(int))
-							b.plugin.cfg.SetSmartFitMode(mode)
+							cfg.SetArtworkDisplayMode(artworkDisplayModeAt(val.(int)))
 						},
 						NeedsRefresh: true,
-					},
-					schema.BoolItem{
-						Name:         "faceCrop",
-						Label:        i18n.T("Enable Face Crop:"),
-						Help:         i18n.T("Aggressively crops the image to center on the largest face found. Good for portraits."),
-						InitialValue: b.plugin.cfg.GetFaceCropEnabled(),
-						NeedsRefresh: true,
-						EnabledIf: func() bool {
-							val := b.sm.GetValue("smartFitMode")
-							if val == nil {
-								return true
-							}
-							return SmartFitMode(val.(int)) != SmartFitOff
-						},
-						OnChanged: func(val bool) {
-							if val {
-								b.sm.SetValue("faceBoost", false)
-							}
-						},
-						ApplyFunc: func(val bool) {
-							b.plugin.cfg.SetFaceCropEnabled(val)
-							if val {
-								b.plugin.cfg.SetFaceBoostEnabled(false)
-							}
-						},
-					},
-					schema.BoolItem{
-						Name:         "faceBoost",
-						Label:        i18n.T("Enable Face Boost:"),
-						Help:         i18n.T("Uses face detection to hint the smart cropper. Keeps faces in frame but balances with other image details."),
-						InitialValue: b.plugin.cfg.GetFaceBoostEnabled(),
-						NeedsRefresh: true,
-						EnabledIf: func() bool {
-							val := b.sm.GetValue("smartFitMode")
-							if val == nil {
-								return true
-							}
-							return SmartFitMode(val.(int)) != SmartFitOff
-						},
-						OnChanged: func(val bool) {
-							if val {
-								b.sm.SetValue("faceCrop", false)
-							}
-						},
-						ApplyFunc: func(val bool) {
-							b.plugin.cfg.SetFaceBoostEnabled(val)
-							if val {
-								b.plugin.cfg.SetFaceCropEnabled(false)
-							}
-						},
-					},
-				},
-			},
-			{
-				Title:       i18n.T("Virtual Museum Framing"),
-				Description: i18n.T("Dynamically generate a museum-style frame and matting for artwork."),
-				Items: []schema.ItemSchema{
-					schema.BoolItem{
-						Name:         "virtualFramingFallback",
-						Label:        i18n.T("Download & Frame Mismatched Images"),
-						Help:         i18n.T("Expand your wallpaper rotation by accepting images that do not naturally fit your screen and presenting them in a gallery frame instead of skipping them."),
-						InitialValue: b.plugin.cfg.VirtualFramingFallback,
-						ApplyFunc: func(val bool) {
-							b.plugin.cfg.VirtualFramingFallback = val
-						},
-						NeedsRefresh: false,
-					},
-					schema.SelectItem{
-						Name:         "virtualWallColor",
-						Label:        i18n.T("Virtual Wall Color:"),
-						Help:         i18n.T("Control the background wall behind the frame."),
-						Options:      []string{"Dynamic Algorithmic", "Neutral Gallery"},
-						InitialValue: int(b.plugin.cfg.VirtualWallColor),
-						ApplyFunc: func(val interface{}) {
-							b.plugin.cfg.VirtualWallColor = VirtualWallMode(val.(int))
-						},
-						NeedsRefresh: true,
-					},
-					schema.BoolItem{
-						Name:         "virtualPaperMatting",
-						Label:        i18n.T("Virtual Paper Matting:"),
-						Help:         i18n.T("Add a white paper mat between the frame and the artwork."),
-						InitialValue: b.plugin.cfg.VirtualPaperMatting,
-						ApplyFunc: func(val bool) {
-							b.plugin.cfg.VirtualPaperMatting = val
-						},
 					},
 					schema.SliderItem{
 						Name:         "virtualFrameSize",
-						Label:        i18n.T("Frame Size (%):"),
-						Help:         i18n.T("The size of the framed artwork relative to the total screen height."),
+						Label:        i18n.T("Frame size"),
 						Min:          50,
 						Max:          100,
 						Step:         1,
 						Format:       "%.0f%%",
-						InitialValue: b.plugin.cfg.VirtualFrameSize * 100.0,
+						InitialValue: cfg.VirtualFrameSize * 100.0,
 						ApplyFunc: func(val float64) {
-							b.plugin.cfg.VirtualFrameSize = val / 100.0
+							cfg.VirtualFrameSize = val / 100.0
 						},
+						VisibleIf: b.framesVisible,
+					},
+					schema.BoolItem{
+						Name:         "virtualPaperMatting",
+						Label:        i18n.T("Paper mat"),
+						InitialValue: cfg.VirtualPaperMatting,
+						ApplyFunc: func(val bool) {
+							cfg.VirtualPaperMatting = val
+						},
+						VisibleIf: b.framesVisible,
+					},
+					schema.SelectItem{
+						Name:         "virtualWallColor",
+						Label:        i18n.T("Wall color"),
+						Options:      []string{i18n.T("Matches the artwork"), i18n.T("Neutral gray")},
+						InitialValue: int(cfg.VirtualWallColor),
+						ApplyFunc: func(val interface{}) {
+							cfg.VirtualWallColor = VirtualWallMode(val.(int))
+						},
+						VisibleIf:    b.wallVisible,
+						NeedsRefresh: true,
 					},
 				},
 			},
 			{
-				Title:       i18n.T("Toggles"),
-				Description: i18n.T("Miscellaneous behavioral settings."),
+				Title: i18n.T("Content"),
+				Items: []schema.ItemSchema{
+					schema.BoolItem{
+						Name:         "showNudes",
+						Label:        i18n.T("Show NSFW images"),
+						InitialValue: cfg.GetShowNudes(),
+						ApplyFunc:    b.plugin.SetShowNudes,
+					},
+				},
+			},
+		},
+	}
+}
+
+// BuildAdvancedPage creates the plugin's part of the Advanced page: storage and behavior.
+func (b *PrefsPanelBuilder) BuildAdvancedPage() *schema.PanelSchema {
+	cfg := b.plugin.cfg
+	var usage cacheUsageCache
+	var setCacheHelp func(string)
+	return &schema.PanelSchema{
+		Sections: []schema.SectionSchema{
+			{
+				Title: i18n.T("Storage"),
+				Items: []schema.ItemSchema{
+					schema.SelectItem{
+						Name:         "cacheSize",
+						Label:        i18n.T("Cache size"),
+						Options:      cacheSizeOptions(),
+						InitialValue: cacheSizeIndex(cfg.GetCacheSize()),
+						ApplyFunc: func(val interface{}) {
+							cfg.SetCacheSize(cacheSizeAt(val.(int)))
+						},
+					},
+					// S4-3H (prototype v37/v40): off caps originals at about 4K (master_cap.go).
+					schema.BoolItem{
+						Name:         "highResOriginals",
+						Label:        i18n.T("High-resolution originals"),
+						Help:         i18n.T("Turn on if images look soft on a 5K or 8K screen. Uses more disk space."),
+						InitialValue: cfg.GetHighResOriginals(),
+						ApplyFunc:    cfg.SetHighResOriginals,
+					},
+					schema.ConfirmButtonItem{
+						Name:              "clearCache",
+						Label:             i18n.T("Downloaded wallpapers"),
+						ButtonText:        i18n.T("Clear cache"),
+						ConfirmTitle:      i18n.T("Clear cache?"),
+						ConfirmButtonText: i18n.T("Clear cache"),
+						ConfirmDanger:     true,
+						Importance:        schema.ImportanceDanger,
+						// What the cache holds is measured in the background when the page opens,
+						// and the dialog says how much will be deleted.
+						HelpAsync: func(set func(string)) {
+							setCacheHelp = set
+							go func() {
+								u := b.plugin.CacheUsage()
+								usage.set(u)
+								set(u.Summary())
+							}()
+						},
+						ConfirmMessageFunc: func() string {
+							u, ok := usage.get()
+							if !ok {
+								u = b.plugin.CacheUsage()
+							}
+							return u.ClearMessage()
+						},
+						OnPressed: func() {
+							b.plugin.ClearCache()
+							usage.set(CacheUsage{})
+							if setCacheHelp != nil {
+								setCacheHelp(CacheUsage{}.Summary())
+							}
+						},
+					},
+					// S4-5: the count, View (the thumbnails, S4-B) and Reset.
+					schema.BlockedImagesItem{
+						Name:              "resetAvoidSet",
+						Label:             i18n.T("Blocked images"),
+						ResetText:         i18n.T("Reset"),
+						ConfirmTitle:      i18n.T("Please confirm"),
+						ConfirmMessage:    i18n.T("This cannot be undone. Are you sure?"),
+						ConfirmButtonText: i18n.T("Reset"),
+						ConfirmDanger:     true,
+						List:              b.plugin.BlockedImageList,
+						Unblock:           b.plugin.UnblockImage,
+						Reset:             b.plugin.ResetBlockedImages,
+					},
+				},
+			},
+			{
+				Title: i18n.T("Behavior"),
 				Items: []schema.ItemSchema{
 					schema.BoolItem{
 						Name:         "staggerChanges",
-						Label:        i18n.T("Stagger monitor changes:"),
-						Help:         i18n.T("Introduces a random delay when changing wallpapers across multiple screens to prevent a jarring simultaneous flash."),
-						InitialValue: b.plugin.cfg.GetStaggerMonitorChanges(),
-						ApplyFunc: func(val bool) {
-							b.plugin.cfg.SetStaggerMonitorChanges(val)
-						},
+						Label:        i18n.T("Stagger display changes"),
+						InitialValue: cfg.GetStaggerMonitorChanges(),
+						ApplyFunc:    cfg.SetStaggerMonitorChanges,
 					},
 					schema.BoolItem{
 						Name:         "museumCollectionOTA",
-						Label:        i18n.T("Museum Collection OTA:"),
-						Help:         i18n.T("Over-the-Air updates for museum collections. If enabled, occasionally synchronizes curation files from the cloud to receive new curated collections without updating the app."),
-						InitialValue: b.plugin.cfg.GetMuseumCollectionOTA(),
-						ApplyFunc: func(val bool) {
-							b.plugin.cfg.SetMuseumCollectionOTA(val)
-						},
-					},
-					schema.BoolItem{
-						Name:         "chgImgOnStart",
-						Label:        i18n.T("Change wallpaper on start:"),
-						Help:         i18n.T("Disable if you prefer the wallpaper to change only based on its timer or a manual refresh."),
-						InitialValue: b.plugin.cfg.GetChgImgOnStart(),
-						ApplyFunc: func(val bool) {
-							b.plugin.cfg.SetChgImgOnStart(val)
-						},
-					},
-					schema.BoolItem{
-						Name:         "nightlyRefresh",
-						Label:        i18n.T("Refresh wallpapers nightly:"),
-						Help:         i18n.T("Controls whether Spice automatically downloads new wallpapers each night. Background maintenance tasks (cache cleanup, metadata sync) always run regardless of this setting."),
-						InitialValue: b.plugin.cfg.GetNightlyRefresh(),
-						ApplyFunc: func(val bool) {
-							b.plugin.cfg.SetNightlyRefresh(val)
-						},
-					},
-				},
-			},
-			{
-				Title:       i18n.T("Actions"),
-				Description: i18n.T("Manual maintenance and display synchronization."),
-				Items: []schema.ItemSchema{
-					schema.ButtonItem{
-						Name:       "refreshDisplays",
-						Label:      i18n.T("Display Configuration:"),
-						Help:       i18n.T("Synchronize Spice with currently connected monitors. Use this if you plugged or unplugged a monitor while Spice was running."),
-						ButtonText: i18n.T("Refresh Displays"),
-						OnPressed: func() {
-							b.plugin.SyncMonitors(true)
-						},
-					},
-					schema.ConfirmButtonItem{
-						Name:           "clearCache",
-						Label:          i18n.T("Clear Wallpaper Cache:"),
-						Help:           i18n.T("Delete all downloaded wallpapers (Source and Derivatives). This is a safety feature."),
-						ButtonText:     i18n.T("Clear Cache"),
-						ConfirmTitle:   i18n.T("Clear Cache?"),
-						ConfirmMessage: i18n.T("Are you sure? This will delete ALL downloaded images from disk. You will need internet to see new wallpapers."),
-						Importance:     schema.ImportanceDanger,
-						OnPressed:      b.plugin.ClearCache,
-					},
-					schema.ConfirmButtonItem{
-						Name:           "resetAvoidSet",
-						Label:          i18n.T("Blocked Images:"),
-						Help:           i18n.T("Clear the blocked images list. Blocked images may be downloaded next time wallpapers are refreshed."),
-						ButtonText:     i18n.T("Reset"),
-						ConfirmTitle:   i18n.T("Please Confirm"),
-						ConfirmMessage: i18n.T("This cannot be undone. Are you sure?"),
-						Importance:     schema.ImportanceMedium,
-						OnPressed:      b.plugin.cfg.ResetAvoidSet,
+						Label:        i18n.T("Update curated collections automatically"),
+						InitialValue: cfg.GetMuseumCollectionOTA(),
+						ApplyFunc:    cfg.SetMuseumCollectionOTA,
 					},
 				},
 			},
@@ -314,113 +320,111 @@ func (b *PrefsPanelBuilder) BuildGeneralTabSchema() *schema.PanelSchema {
 	}
 }
 
-// BuildGeneralTabAccordion splits the general settings schema into accordion items.
-func (b *PrefsPanelBuilder) BuildGeneralTabAccordion() schema.AccordionSchema {
-	generalSchema := b.BuildGeneralTabSchema()
-	var items []schema.AccordionItemSchema
-
-	sectionIcons := []string{
-		"history",
-		"fullscreen",
-		"color_palette",
-		"computer",
-		"refresh",
-	}
-
-	for i, section := range generalSchema.Sections {
-		title := section.Title
-		sectionCopy := section
-		sectionCopy.Title = ""
-		sectionCopy.Description = ""
-
-		sectionPanel := &schema.PanelSchema{Sections: []schema.SectionSchema{sectionCopy}}
-
-		var icon string
-		if i < len(sectionIcons) {
-			icon = sectionIcons[i]
-		}
-
-		items = append(items, schema.AccordionItemSchema{
-			Title:    title,
-			Content:  sectionPanel,
-			Open:     i == 0,
-			IconName: icon,
-		})
-	}
-
-	return schema.AccordionSchema{Items: items}
-}
-
-// BuildPrefsTabsSchema constructs the full preferences navigation schema.
+// BuildPrefsTabsSchema returns the plugin's preferences pages: Sources, Wallpaper
+// and its part of Advanced. Selected points at Sources when a source should open.
 func (b *PrefsPanelBuilder) BuildPrefsTabsSchema() *schema.TabsSchema {
-	generalAccordion := b.BuildGeneralTabAccordion()
-	onlineAccordion, localAccordion, museumAccordion, targetTabIndex := b.BuildProviderTabs()
-
+	sources := b.BuildSources()
+	selected := 1
+	if sources.OpenSourceID != "" {
+		selected = 0
+	}
 	return &schema.TabsSchema{
-		Location: schema.TabLocationLeading,
-		Selected: targetTabIndex,
+		Selected: selected,
 		Items: []schema.TabItemSchema{
-			{
-				Title:     i18n.T("General"),
-				IconName:  "settings",
-				Accordion: &generalAccordion,
-			},
-			{
-				Title:     i18n.T("Museums"),
-				IconName:  "color_palette",
-				Accordion: &museumAccordion,
-			},
-			{
-				Title:     i18n.T("Community"),
-				IconName:  "grid",
-				Accordion: &onlineAccordion,
-			},
-			{
-				Title:     i18n.T("Personal"),
-				IconName:  "folder",
-				Accordion: &localAccordion,
-			},
+			{ID: "sources", Title: i18n.T("Sources"), IconName: "color_palette", Sources: &sources},
+			{ID: "wallpaper", Title: i18n.T("Wallpaper"), IconName: "settings", Panel: b.BuildWallpaperPage()},
+			{ID: "advanced", Title: i18n.T("Advanced"), IconName: "computer", Panel: b.BuildAdvancedPage()},
 		},
 	}
 }
 
-// BuildProviderTabs creates the provider accordions (Community, Personal, Museums).
-func (b *PrefsPanelBuilder) BuildProviderTabs() (schema.AccordionSchema, schema.AccordionSchema, schema.AccordionSchema, int) {
-	var onlineItems []schema.AccordionItemSchema
-	var localItems []schema.AccordionItemSchema
-	var museumItems []schema.AccordionItemSchema
-	targetTabIndex := 0
+// hiddenSources are registered providers that the Sources page does not list,
+// so they can be neither found nor opened there. Google Photos needs OAuth
+// credentials that release builds do not have, so its page could never work
+// (ui_refresh.md §12, P10). The provider itself stays registered.
+var hiddenSources = map[string]bool{
+	"GooglePhotos": true,
+}
 
-	names := b.getSortedProviderIDs()
+// BuildSources lists every provider in three groups: museums first, then the
+// user's own sources, then community sources (collapsed).
+func (b *PrefsPanelBuilder) BuildSources() schema.SourcesSchema {
+	var museums, yours, community []schema.SourceSchema
+	openID := ""
 
-	for _, name := range names {
+	for _, name := range b.getSortedProviderIDs() {
 		p := b.plugin.providers[name]
-		if p == nil {
+		if p == nil || hiddenSources[p.ID()] {
 			continue
 		}
 
-		item, tabIdx := b.createProviderAccordionItem(p)
-		if tabIdx > 0 {
-			targetTabIndex = tabIdx
+		pendingURL := ""
+		if b.plugin.pendingAddUrl != "" {
+			if _, err := p.ParseURL(b.plugin.pendingAddUrl); err == nil {
+				pendingURL = b.plugin.pendingAddUrl
+				b.plugin.pendingAddUrl = ""
+				openID = p.ID()
+			}
 		}
-		if item == nil {
+		if b.plugin.focusProviderName == p.ID() {
+			b.plugin.focusProviderName = ""
+			openID = p.ID()
+		}
+
+		content := b.buildProviderContent(p, pendingURL)
+		if content == nil {
 			continue
+		}
+
+		item := schema.SourceSchema{
+			ID:           p.ID(),
+			Title:        p.Name(),
+			SubtitleFunc: b.createSubtitleFunc(p),
+			IconName:     p.ID(),
+			Detail:       content,
+		}
+		if iconStr, ok := p.GetProviderIcon().(string); ok {
+			item.IconName = iconStr
+		} else if bytes, ok := p.GetProviderIcon().([]byte); ok {
+			item.IconBytes = bytes
 		}
 
 		switch p.Type() {
-		case provider.TypePersonal:
-			localItems = append(localItems, *item)
 		case provider.TypeMuseum:
-			museumItems = append(museumItems, *item)
+			museums = append(museums, item)
+		case provider.TypePersonal:
+			yours = append(yours, item)
 		default:
-			onlineItems = append(onlineItems, *item)
+			community = append(community, item)
 		}
 	}
 
-	return schema.AccordionSchema{Items: onlineItems, EmptyMessage: i18n.T("No providers in this category.")},
-		schema.AccordionSchema{Items: localItems, EmptyMessage: i18n.T("No providers in this category.")},
-		schema.AccordionSchema{Items: museumItems, EmptyMessage: i18n.T("No providers in this category.")},
-		targetTabIndex
+	sortByTitle := func(items []schema.SourceSchema) {
+		sort.SliceStable(items, func(i, j int) bool { return items[i].Title < items[j].Title })
+	}
+	sortByTitle(museums)
+	sortByTitle(yours)
+	sortByTitle(community)
+
+	return schema.SourcesSchema{
+		OpenSourceID: openID,
+		Groups: []schema.SourceGroupSchema{
+			{ID: "museums", Title: i18n.T("Museums"), Items: museums},
+			{ID: "yours", Title: i18n.T("Yours"), Items: yours},
+			{ID: "community", Title: i18n.T("Community"), Items: community, Collapsed: true},
+		},
+	}
+}
+
+// createSubtitleFunc describes how many of a source's collections are on.
+func (b *PrefsPanelBuilder) createSubtitleFunc(p provider.ImageProvider) func() string {
+	return func() string {
+		n := b.activeCount(p)
+		if n == 0 {
+			return i18n.T("None on")
+		}
+		return i18n.Tf("{{.Count}} on", map[string]any{"Count": n})
+	}
 }
 
 func (b *PrefsPanelBuilder) getSortedProviderIDs() []string {
@@ -430,60 +434,6 @@ func (b *PrefsPanelBuilder) getSortedProviderIDs() []string {
 	}
 	sort.Strings(names)
 	return names
-}
-
-func (b *PrefsPanelBuilder) createProviderAccordionItem(p provider.ImageProvider) (*schema.AccordionItemSchema, int) {
-	tabIndex := 0
-	isPending := false
-	pendingURL := ""
-
-	// Check pending state
-	if b.plugin.pendingAddUrl != "" {
-		if _, err := p.ParseURL(b.plugin.pendingAddUrl); err == nil {
-			pendingURL = b.plugin.pendingAddUrl
-			isPending = true
-			b.plugin.pendingAddUrl = ""
-		}
-	}
-	if b.plugin.focusProviderName == p.ID() {
-		isPending = true
-		b.plugin.focusProviderName = ""
-	}
-
-	if isPending {
-		switch p.Type() {
-		case provider.TypeMuseum:
-			tabIndex = 1
-		case provider.TypePersonal:
-			tabIndex = 3
-		default:
-			tabIndex = 2
-		}
-	}
-
-	content := b.buildProviderContent(p, pendingURL)
-	if content == nil {
-		return nil, tabIndex
-	}
-
-	titleFunc := b.createTitleFunc(p)
-
-	iconName := p.ID()
-	var iconBytes []byte
-	if iconStr, ok := p.GetProviderIcon().(string); ok {
-		iconName = iconStr
-	} else if b, ok := p.GetProviderIcon().([]byte); ok {
-		iconBytes = b
-	}
-
-	return &schema.AccordionItemSchema{
-		Title:     titleFunc(),
-		TitleFunc: titleFunc,
-		Content:   content,
-		Open:      isPending,
-		IconName:  iconName,
-		IconBytes: iconBytes,
-	}, tabIndex
 }
 
 func (b *PrefsPanelBuilder) buildProviderContent(p provider.ImageProvider, pendingURL string) *schema.PanelSchema {
@@ -502,57 +452,75 @@ func (b *PrefsPanelBuilder) buildProviderContent(p provider.ImageProvider, pendi
 	return nil
 }
 
-func (b *PrefsPanelBuilder) createTitleFunc(p provider.ImageProvider) func() string {
-	return func() string {
-		title := p.Title()
-		if title == "" {
-			title = i18n.Tf("Image Sources ({{.Name}})", map[string]any{"Name": p.Name()}) + "..."
-		}
-		activeCount := 0
-
-		col := curation.GetManager().GetCollection(p.ID())
-		if col != nil {
-			// Curated museum provider: count active curated collection entries
-			queries := b.plugin.cfg.GetQueries()
-			for _, entry := range col.Entries {
-				settingKey := p.ID() + "_" + entry.Key
-				isActive := false
-				for _, q := range queries {
-					if q.Provider == p.ID() && q.URL == entry.Key {
-						if q.Active {
-							isActive = true
-							break
-						}
-					}
-				}
-				if b.sm.HasPendingChange(settingKey) {
-					isActive = !isActive
-				}
-				if isActive {
-					activeCount++
+// activeCount counts a source's collections that are on, counting changes that
+// have not been applied yet.
+func (b *PrefsPanelBuilder) activeCount(p provider.ImageProvider) int {
+	count := 0
+	queries := b.plugin.cfg.GetQueries()
+	if col := curation.GetManager().GetCollection(p.ID()); col != nil {
+		// Curated museum provider: count active curated collection entries
+		for _, entry := range col.Entries {
+			isActive := false
+			for _, q := range queries {
+				if q.Provider == p.ID() && q.URL == entry.Key && q.Active {
+					isActive = true
+					break
 				}
 			}
-		} else {
-			// General query list provider (Wallhaven, Pexels, etc.)
-			for _, q := range b.plugin.cfg.GetQueries() {
-				if q.Provider == p.ID() {
-					isActive := q.Active
-					if b.sm.HasPendingChange(q.ID) {
-						isActive = !q.Active
-					}
-					if isActive {
-						activeCount++
-					}
-				}
+			if b.sm.HasPendingChange(p.ID() + "_" + entry.Key) {
+				isActive = !isActive
+			}
+			if isActive {
+				count++
 			}
 		}
-
-		if activeCount > 0 {
-			if activeCount == 1 {
-				return i18n.Tf("{{.Title}} (1 active)", map[string]any{"Title": title})
-			}
-			return i18n.Tf("{{.Title}} ({{.Count}} active)", map[string]any{"Title": title, "Count": activeCount})
-		}
-		return title
+		return count
 	}
+	// Query list provider (Wallhaven, Pexels, etc.)
+	for _, q := range queries {
+		if q.Provider != p.ID() {
+			continue
+		}
+		isActive := q.Active
+		if b.sm.HasPendingChange(q.ID) {
+			isActive = !q.Active
+		}
+		if isActive {
+			count++
+		}
+	}
+	return count
+}
+
+// The drop-down works with the position of a size in GetCacheSizes, not with the saved CacheSize
+// number (which has gaps: 0 and 2 are retired). Using the saved number as the position showed the
+// default 300 as "1000 images" and saved the wrong size for most choices.
+
+// cacheSizeIndex is the drop-down position of a cache size.
+func cacheSizeIndex(size CacheSize) int {
+	for i, s := range GetCacheSizes() {
+		if s.(CacheSize) == size {
+			return i
+		}
+	}
+	return cacheSizeIndex(DefaultCacheSize)
+}
+
+// cacheSizeAt is the cache size at a drop-down position.
+func cacheSizeAt(index int) CacheSize {
+	sizes := GetCacheSizes()
+	if index < 0 || index >= len(sizes) {
+		return DefaultCacheSize
+	}
+	return sizes[index].(CacheSize)
+}
+
+// cacheSizeOptions are the cache sizes with a unit, e.g. "1000 images".
+func cacheSizeOptions() []string {
+	sizes := GetCacheSizes()
+	options := make([]string, len(sizes))
+	for i, size := range sizes {
+		options[i] = i18n.Tf("{{.Count}} images", map[string]any{"Count": size.String()})
+	}
+	return options
 }

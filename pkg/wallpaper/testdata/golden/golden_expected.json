@@ -55,9 +55,9 @@
     "face_rect": "(0,0)-(0,0)"
   },
   "wallhaven-5ym5x8.jpg": {
-    "hash": "1018181818381818",
-    "face_found": false,
-    "face_rect": "(0,0)-(0,0)"
+    "hash": "9191919181d1d3d3",
+    "face_found": true,
+    "face_rect": "(249,266)-(1071,1088)"
   },
   "wallhaven-e86w3w.jpg": {
     "hash": "1684c484848f8fdf",

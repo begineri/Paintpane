@@ -20,13 +20,13 @@ func (sa *SpiceApp) verifyEULA() {
 		util.MarkEULAAccepted(sa.Preferences())
 	}
 
-	// We specifically do NOT call CreateSplashScreen here.
+	// There is no startup splash screen.
 	// This ensures the app starts silently in the tray, avoiding OpenGL window creation
 	// until the user (or reviewer) explicitly requests a windowed feature.
 
 	// Hide the Dock icon after Fyne/GLFW finishes initialization.
 	// GLFW forces the activation policy to Regular during startup, overriding LSUIElement.
-	// In the standard build, CreateSplashScreen handles this via TransformToBackground()
+	// The standard build calls TransformToBackground() once the EULA is accepted.
 	// after the splash timer. Since we skip splash, we use the lifecycle hook instead.
 	sa.Lifecycle().SetOnStarted(func() {
 		go func() {

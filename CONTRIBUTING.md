@@ -1,30 +1,17 @@
-# Contributing to Spice
+# Contributing to Paintpane
 
-First off, thank you for considering contributing to Spice! It's people like you that make Spice such a great tool.
+Bug reports, ideas and pull requests are welcome here, at
+https://github.com/begineri/Paintpane.
 
-## Code of Conduct
+Paintpane is an unofficial modified version of Spice. Please do not file
+Paintpane issues with the Spice project.
 
-By participating in this project, you agree to abide by the same respectful and professional standards expected in all open-source communities.
+## Pull requests
 
-## How Can I Contribute?
-
-### Reporting Bugs
-Before creating bug reports, please check the [existing issues](https://github.com/dixieflatline76/Spice/issues) to see if the problem has already been reported.
-
-When you are creating a bug report, please include as many details as possible (macOS version, hardware, Spice version).
-
-### Suggesting Enhancements
-Feature requests are welcome! Please open an issue using the "Feature Request" template.
-
-### Pull Requests
-- Fill in the Pull Request template.
-- Ensure all tests pass (`make test`).
-- Follow the existing code style.
-- Include unit tests for new functionality.
+- Run `go test ./...` and make sure it passes.
+- Follow the existing code style, and add tests for new behaviour.
 
 ## License
-By contributing, you agree that your contributions will be licensed under the project's **PolyForm Noncommercial License 1.0.0**.
 
----
-
-*Spice is a labor of love by Karl Kwong.*
+By contributing, you agree that your contributions are licensed under the
+project's **PolyForm Noncommercial License 1.0.0**, the same license as Spice.

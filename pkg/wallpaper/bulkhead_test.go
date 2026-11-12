@@ -30,10 +30,6 @@ func TestBulkhead_LaneSeparation(t *testing.T) {
 		os:                 &MockOS{},
 	}
 
-	// Mock manager expectations (FetchNewImages calls NotifyUser at the end)
-	mockManager := wp.manager.(*MockPluginManager)
-	mockManager.On("NotifyUser", mock.Anything, mock.Anything).Maybe()
-
 	// Mock Store to return false for GetByID (always new images)
 	mockStore := wp.store.(*MockImageStore)
 	mockStore.On("GetByID", mock.Anything).Return(provider.Image{}, false)
@@ -58,6 +54,7 @@ func TestBulkhead_LaneSeparation(t *testing.T) {
 
 	// 2. Setup Queries: 2 Wikimedia (Competing for 1 slot), 1 Wallhaven (Dedicated global slot)
 	wp.cfg = &Config{
+		Preferences: NewMockPreferences(),
 		Queries: []ImageQuery{
 			{ID: "wik1", Provider: "Wikimedia", Active: true, URL: "cat1", Description: "wik1"},
 			{ID: "wik2", Provider: "Wikimedia", Active: true, URL: "cat2", Description: "wik2"},
@@ -128,11 +125,6 @@ func TestBulkhead_CircuitBreakerRejection(t *testing.T) {
 		os:                 &MockOS{},
 	}
 
-	// Mock manager expectations
-	if mp, ok := wp.manager.(*MockPluginManager); ok {
-		mp.On("NotifyUser", mock.Anything, mock.Anything).Maybe()
-	}
-
 	// Mock OS for resolutions
 	wp.os.(*MockOS).On("GetMonitors").Return([]Monitor{}, nil).Maybe()
 
@@ -145,6 +137,7 @@ func TestBulkhead_CircuitBreakerRejection(t *testing.T) {
 
 	// 2. Setup Query
 	wp.cfg = &Config{
+		Preferences: NewMockPreferences(),
 		Queries: []ImageQuery{
 			{ID: "wik1", Provider: "Wikimedia", Active: true, URL: "cat1"},
 		},
@@ -174,11 +167,6 @@ func TestBulkhead_Deduplication(t *testing.T) {
 		os:                 &MockOS{},
 	}
 
-	// Mock manager expectations
-	if mp, ok := wp.manager.(*MockPluginManager); ok {
-		mp.On("NotifyUser", mock.Anything, mock.Anything).Maybe()
-	}
-
 	// Mock OS for resolutions
 	wp.os.(*MockOS).On("GetMonitors").Return([]Monitor{}, nil).Maybe()
 
@@ -187,6 +175,7 @@ func TestBulkhead_Deduplication(t *testing.T) {
 	wikimedia.On("ID").Return("Wikimedia").Maybe()
 	wp.providers["Wikimedia"] = wikimedia
 	wp.cfg = &Config{
+		Preferences: NewMockPreferences(),
 		Queries: []ImageQuery{
 			{ID: "wik1", Provider: "Wikimedia", Active: true, URL: "cat1"},
 		},

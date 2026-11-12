@@ -6,15 +6,21 @@ import (
 	"fmt"
 	"image"
 	"io"
+	"net"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/disintegration/imaging"
 	"github.com/dixieflatline76/Spice/v2/pkg/provider"
 	"github.com/dixieflatline76/Spice/v2/util/log"
 )
+
+// ErrInAvoidSet is returned for a job whose image has been blocked. Skipping it
+// is expected, so it is not logged as a failed job.
+var ErrInAvoidSet = errors.New("image is in avoid set")
 
 // ProcessImageJob processes a single image download job.
 // It implements the Source + Derivative architecture:
@@ -24,18 +30,44 @@ func (wp *Plugin) ProcessImageJob(ctx context.Context, job DownloadJob) (resultI
 	img := job.Image
 	downloadProvider := job.Provider
 
+	// One job per image at a time (A2 phase 5 #4). A second download of an image in progress is
+	// dropped, as it would be once the image is in the store; a local rebuild waits its turn. The
+	// claim is given back after the clean-up below, so no other job sees files being deleted.
+	if downloadProvider != nil {
+		release, ok := wp.jobClaims.tryClaim(img.ID)
+		if !ok {
+			return provider.Image{}, fmt.Errorf("%w: %s", ErrImageInProgress, img.ID)
+		}
+		defer release()
+	} else {
+		release, err := wp.jobClaims.claim(ctx, img.ID)
+		if err != nil {
+			return provider.Image{}, err
+		}
+		defer release()
+	}
+
 	// Prevent orphaned files from leaking by ensuring partial processing artifacts are scrubbed.
 	// If context is cancelled midway through downloading/processing, we aggressively clean up
 	// any master or derivative files we just wrote instead of waiting for the nightly sweep.
 	defer func() {
+		if errors.Is(finalErr, ErrInAvoidSet) {
+			// Expected after blocking an image; nothing was written (A2 §12.9 #5).
+			return
+		}
 		if finalErr != nil && wp.fm != nil {
 			log.Debugf("Job failed for %s (Err: %v), cleaning up artifacts...", img.ID, finalErr)
+			if downloadProvider == nil {
+				// A local rebuild downloaded nothing, its master may be the only copy, and the
+				// derivatives kept for other display modes are still good.
+				return
+			}
 			_ = wp.fm.DeepDelete(img.ID)
 		}
 	}()
 
 	if wp.cfg.InAvoidSet(img.ID) {
-		return provider.Image{}, fmt.Errorf("image %s is in avoid set", img.ID)
+		return provider.Image{}, fmt.Errorf("%w: %s", ErrInAvoidSet, img.ID)
 	}
 
 	// 0. Early Filtering (Optimization)
@@ -50,6 +82,13 @@ func (wp *Plugin) ProcessImageJob(ctx context.Context, job DownloadJob) (resultI
 	}
 	img = wp.enrichImage(ctx, img, downloadProvider)
 
+	// 1.5 Oversized originals: decoding a 200 MP JPEG takes gigabytes of memory, so an image the
+	// source reports as larger than MaxMasterPixels is skipped before anything is downloaded.
+	// (Providers that can serve a smaller version, like Wikimedia, hand us that version instead.)
+	if err := checkMasterSize(img); err != nil {
+		return provider.Image{}, err
+	}
+
 	// 2. Ensure Master (Raw Image)
 	// (Download pacing is automatically handled upstream by the Fair Scheduler Dispatcher)
 	if downloadProvider != nil {
@@ -62,6 +101,24 @@ func (wp *Plugin) ProcessImageJob(ctx context.Context, job DownloadJob) (resultI
 			providerName = downloadProvider.ID()
 		}
 		return provider.Image{}, fmt.Errorf("failed to ensure master (%s): %w", providerName, err)
+	}
+
+	// 2.3 Originals are capped at about 4K unless High-resolution originals is on (master_cap.go).
+	// An original larger than that (downloaded in full, or kept from before) is shrunk here, and
+	// the image takes the size of the file on disk: a scaled download is smaller than the size the
+	// source reported.
+	if wp.capOriginals() {
+		w, h, err := capMaster(ctx, masterPath)
+		switch {
+		case err == nil:
+			if w > 0 && h > 0 {
+				img.Width, img.Height = w, h
+			}
+		case ctx.Err() != nil:
+			return provider.Image{}, ctx.Err()
+		default:
+			log.Printf("Warning: could not cap the original of %s: %v", img.ID, err)
+		}
 	}
 
 	// 2.5 Resolution Probing & Persistence (Fixes "Ghost Dimensions")
@@ -109,40 +166,14 @@ func (wp *Plugin) ProcessImageJob(ctx context.Context, job DownloadJob) (resultI
 	}
 
 	// 3. Ensure Derivative (Processed Image)
-	mode := wp.cfg.GetSmartFitMode()
-	isFlex := mode == SmartFitAggressive
-	isQuality := mode == SmartFitNormal
-
-	if img.ProcessingFlags == nil {
-		img.ProcessingFlags = make(map[string]bool)
-	}
-
-	// Update flags with current session settings
-	img.ProcessingFlags["SmartFit"] = wp.cfg.GetSmartFit()
-	img.ProcessingFlags["FitFlexibility"] = isFlex
-	img.ProcessingFlags["FitQuality"] = isQuality
-	img.ProcessingFlags["FaceCrop"] = wp.cfg.GetFaceCropEnabled()
-	img.ProcessingFlags["FaceBoost"] = wp.cfg.GetFaceBoostEnabled()
+	stampProcessingFlags(&img, wp.targetProcessingFlags())
 
 	derivativePaths, err := wp.ensureDerivative(ctx, img, masterPath)
 	if err != nil {
 		return img, fmt.Errorf("failed to ensure derivative: %w", err)
 	}
 
-	// Return updated image pointing to the derivative (for display)
-	// but flagged with how it was processed.
-	img.DerivativePaths = derivativePaths
-
-	// Set a default FilePath for legacy compatibility (Monitor 0)
-	if path, ok := derivativePaths["primary"]; ok {
-		img.FilePath = path
-	} else {
-		// Fallback to first available
-		for _, path := range derivativePaths {
-			img.FilePath = path
-			break
-		}
-	}
+	applyDerivativePaths(&img, derivativePaths)
 
 	if wp.favoriter != nil && wp.favoriter.IsFavorited(img) {
 		img.IsFavorited = true
@@ -155,6 +186,9 @@ func (wp *Plugin) checkImageCompatibility(img provider.Image) error {
 	if img.Width <= 0 || img.Height <= 0 {
 		return nil // Cannot check without dimensions
 	}
+	// Check the size the original will have on disk: a capped original has less to spare when
+	// cropped (Smart Fit's Flexibility mode allows more for a larger original).
+	img.Width, img.Height = wp.expectedMasterSize(img.Width, img.Height)
 
 	var resolutions []Resolution
 	monitors, err := wp.os.GetMonitors()
@@ -247,7 +281,8 @@ func (wp *Plugin) enrichImage(ctx context.Context, img provider.Image, p provide
 
 // ensureMaster ensures the raw image is on disk.
 // Returns absolute path.
-func (wp *Plugin) ensureMaster(ctx context.Context, img provider.Image, imgProvider provider.ImageProvider) (string, error) {
+// masterPathFor returns where an image's master file is stored.
+func (wp *Plugin) masterPathFor(img provider.Image) (string, error) {
 	// Determine extension. We prefer what's in URL or Content-Type.
 	ext := filepath.Ext(extractFilenameFromURL(img.Path))
 	if ext == "" {
@@ -261,6 +296,14 @@ func (wp *Plugin) ensureMaster(ctx context.Context, img provider.Image, imgProvi
 	masterPath, err := wp.fm.GetMasterPath(img.ID, ext)
 	if err != nil {
 		return "", fmt.Errorf("security check failed for master path: %w", err)
+	}
+	return masterPath, nil
+}
+
+func (wp *Plugin) ensureMaster(ctx context.Context, img provider.Image, imgProvider provider.ImageProvider) (string, error) {
+	masterPath, err := wp.masterPathFor(img)
+	if err != nil {
+		return "", err
 	}
 
 	// Check existence
@@ -285,10 +328,137 @@ func (wp *Plugin) ensureMaster(ctx context.Context, img provider.Image, imgProvi
 		}
 	}
 
+	// While originals are capped, ask a server that can scale for the smaller copy.
+	if wp.capOriginals() {
+		if sp, ok := imgProvider.(provider.ScaledDownloadProvider); ok {
+			if scaledURL, ok := sp.ScaledDownloadURL(ctx, img, cappedSize); ok {
+				path, err := wp.downloadMasterFile(ctx, client, scaledURL, masterPath, imgProvider)
+				var se *statusError
+				if err == nil || ctx.Err() != nil || !errors.As(err, &se) || se.code < 400 || se.code >= 500 {
+					return path, err
+				}
+				// The server refused that size: take the full image and shrink it here.
+				log.Printf("Scaled download of %s refused (%v); downloading the full image", img.ID, err)
+			}
+		}
+	}
+
 	return wp.downloadMasterFile(ctx, client, reqUrl, masterPath, imgProvider)
 }
 
+// MaxMasterPixels is the largest original (width x height, as reported by the source) that is
+// downloaded. A 200 MP JPEG decodes to roughly a gigabyte per worker, and four workers run at once.
+// It applies whether or not originals are capped: a source that reports the size and cannot scale
+// would send the whole file, which has to be decoded to be shrunk.
+const MaxMasterPixels = 100_000_000
+
+// checkMasterSize rejects an image whose reported size exceeds MaxMasterPixels. Images without a
+// reported size pass; they are measured after download.
+func checkMasterSize(img provider.Image) error {
+	if img.Width <= 0 || img.Height <= 0 {
+		return nil
+	}
+	if px := int64(img.Width) * int64(img.Height); px > MaxMasterPixels {
+		return fmt.Errorf("oversized image skipped (%dx%d, %d MP; limit %d MP)", img.Width, img.Height, px/1_000_000, MaxMasterPixels/1_000_000)
+	}
+	return nil
+}
+
+const (
+	// downloadAttempts is how many times one image download is tried in total. Some image servers
+	// (SMK's iip.smk.dk was seen hanging about half of its requests while the retry returned in
+	// seconds) stall at random, so a second try usually works. The per-request timeouts stay as
+	// they are; only the number of tries grows.
+	downloadAttempts = 4
+	// downloadRetryDelay is the pause between tries.
+	downloadRetryDelay = 1500 * time.Millisecond
+)
+
+// downloadRetryWait is the pause between download attempts. A variable so tests can shorten it.
+var downloadRetryWait = downloadRetryDelay
+
+// statusError is returned for an unexpected HTTP status, so the retry logic can tell a server
+// hiccup (502/503/504) from an answer that will not change (404, 403, ...).
+type statusError struct {
+	provider string
+	code     int
+}
+
+func (e *statusError) Error() string {
+	return fmt.Sprintf("failed to ensure master (%s): status %d", e.provider, e.code)
+}
+
+// isRetryableDownloadError reports whether a failed download attempt is worth repeating: a timeout,
+// a dropped or refused connection, a body cut short, or a 502/503/504. A cancelled context, a 4xx
+// answer and errors raised by a provider's own client (such as a rate-limit circuit breaker) are not.
+func isRetryableDownloadError(ctx context.Context, err error) bool {
+	if err == nil || ctx.Err() != nil {
+		return false
+	}
+	var se *statusError
+	if errors.As(err, &se) {
+		return se.code == http.StatusBadGateway || se.code == http.StatusServiceUnavailable || se.code == http.StatusGatewayTimeout
+	}
+	var ne net.Error
+	if errors.As(err, &ne) && ne.Timeout() {
+		return true
+	}
+	var oe *net.OpError
+	if errors.As(err, &oe) {
+		return true
+	}
+	return errors.Is(err, io.ErrUnexpectedEOF) || errors.Is(err, io.EOF)
+}
+
+// downloadMasterFile downloads reqUrl to masterPath, trying again after a timeout or a dropped
+// connection (see downloadAttempts).
 func (wp *Plugin) downloadMasterFile(ctx context.Context, client *http.Client, reqUrl, masterPath string, imgProvider provider.ImageProvider) (string, error) {
+	source := ""
+	if imgProvider != nil {
+		source = imgProvider.ID()
+	}
+	backoff := wp.downloadBackoff()
+	attempts := downloadAttempts
+	if ap, ok := imgProvider.(provider.DownloadAttemptsProvider); ok && ap.DownloadAttempts() > 0 {
+		attempts = ap.DownloadAttempts()
+	}
+	var err error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		var path string
+		path, err = wp.downloadMasterFileOnce(ctx, client, reqUrl, masterPath, imgProvider)
+		if err == nil {
+			backoff.succeeded(source)
+			return path, nil
+		}
+		if !isRetryableDownloadError(ctx, err) {
+			return "", err
+		}
+		if op, ok := imgProvider.(provider.OutagePauseProvider); ok {
+			if pause := op.OutagePause(backoff.now()); pause > 0 {
+				// The source says its server is down at this time: do not try again, wait it out.
+				backoff.pauseForOutage(source, pause)
+				break
+			}
+		}
+		if attempt == attempts {
+			backoff.failed(source)
+			break
+		}
+		if backoff.pausedFor(source) > 0 {
+			// Other images already showed the server is unreachable; stop trying this one.
+			break
+		}
+		log.Printf("Download attempt %d/%d failed for %s: %v; trying again", attempt, attempts, reqUrl, err)
+		select {
+		case <-ctx.Done():
+			return "", err
+		case <-time.After(downloadRetryWait):
+		}
+	}
+	return "", err
+}
+
+func (wp *Plugin) downloadMasterFileOnce(ctx context.Context, client *http.Client, reqUrl, masterPath string, imgProvider provider.ImageProvider) (string, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl, nil)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
@@ -315,20 +485,35 @@ func (wp *Plugin) downloadMasterFile(ctx context.Context, client *http.Client, r
 		if imgProvider != nil {
 			providerName = imgProvider.ID()
 		}
-		return "", fmt.Errorf("failed to ensure master (%s): status %d", providerName, resp.StatusCode)
+		return "", &statusError{provider: providerName, code: resp.StatusCode}
 	}
 
-	file, err := os.Create(masterPath)
+	// Write to a temporary file and rename it when complete, so nothing ever reads half a master
+	// (A2 phase 5 #4). The name ends in the image extension, so the orphan sweep removes one left
+	// behind by a crash.
+	dir, base := filepath.Split(masterPath)
+	ext := filepath.Ext(base)
+	file, err := os.CreateTemp(dir, strings.TrimSuffix(base, ext)+".part-*"+ext)
 	if err != nil {
 		return "", err
 	}
-	defer file.Close()
-
+	tmpPath := file.Name()
+	discard := func() {
+		if err := os.Remove(tmpPath); err != nil && !os.IsNotExist(err) {
+			log.Printf("Failed to clean up aborted download %s: %v", tmpPath, err)
+		}
+	}
 	if _, err := io.Copy(file, resp.Body); err != nil {
 		file.Close() // Close before attempting removal
-		if err := os.Remove(masterPath); err != nil && !os.IsNotExist(err) {
-			log.Printf("Failed to clean up aborted download %s: %v", masterPath, err)
-		}
+		discard()
+		return "", err
+	}
+	if err := file.Close(); err != nil {
+		discard()
+		return "", err
+	}
+	if err := os.Rename(tmpPath, masterPath); err != nil {
+		discard()
 		return "", err
 	}
 
@@ -337,7 +522,16 @@ func (wp *Plugin) downloadMasterFile(ctx context.Context, client *http.Client, r
 
 // getBaseDerivativeDir returns the relative path segment for derivatives based on current settings.
 // Format: fitted / [quality|flexibility] / [standard|faceboost|facecrop]
+// or fitted / [full|framed] / standard. The display mode comes first because a whole-image
+// mode must still process images when Smart Fit is disabled, or the OS would crop the master.
 func (wp *Plugin) getBaseDerivativeDir() string {
+	switch wp.cfg.GetArtworkDisplayMode() {
+	case ArtworkDisplayFull:
+		return filepath.Join(FittedRootDir, FullArtDir, StandardDir)
+	case ArtworkDisplayFramed:
+		return filepath.Join(FittedRootDir, FramedArtDir, StandardDir)
+	}
+
 	mode := wp.cfg.GetSmartFitMode()
 	if mode == SmartFitOff {
 		return ""
@@ -377,6 +571,7 @@ func (wp *Plugin) ensureDerivative(ctx context.Context, img provider.Image, mast
 
 	// 1. Check if all exist
 	paths, allExist := wp.checkExistingDerivatives(img.ID, ext, derivativeDir, resolutions)
+	wp.recordFramedFlagsForReuse(img, resolutions, paths)
 	if allExist && len(paths) > 0 {
 		return wp.ensurePrimaryPath(paths), nil
 	}
@@ -400,6 +595,63 @@ func (wp *Plugin) getResolutionsForDerivatives() []Resolution {
 		monitors = []Monitor{{ID: 0, Name: "Fallback", Rect: image.Rect(0, 0, 1920, 1080)}}
 	}
 	return GetUniqueResolutions(monitors)
+}
+
+// applyDerivativePaths points an image at its derivatives for display.
+func applyDerivativePaths(img *provider.Image, derivativePaths map[string]string) {
+	img.DerivativePaths = derivativePaths
+
+	// Set a default FilePath for legacy compatibility (Monitor 0)
+	if path, ok := derivativePaths["primary"]; ok {
+		img.FilePath = path
+		return
+	}
+	// Fallback to first available
+	for _, path := range derivativePaths {
+		img.FilePath = path
+		break
+	}
+}
+
+// frameDecider is implemented by processors that can say whether they would draw a frame.
+type frameDecider interface {
+	WouldFrame(providerID string, imgWidth, imgHeight, targetWidth, targetHeight int, opts provider.TuningOptions) bool
+}
+
+// recordFramedFlagsForReuse sets the framed flag for derivatives that are reused rather than
+// rendered, since that flag is otherwise only written while rendering.
+func (wp *Plugin) recordFramedFlagsForReuse(img provider.Image, resolutions []Resolution, paths map[string]string) {
+	decider, ok := wp.imgProcessor.(frameDecider)
+	if !ok || img.ProcessingFlags == nil {
+		return
+	}
+	for _, res := range resolutions {
+		resDir := fmt.Sprintf("%dx%d", res.Width, res.Height)
+		if _, reused := paths[resDir]; !reused {
+			continue
+		}
+		if decider.WouldFrame(img.Provider, img.Width, img.Height, res.Width, res.Height, img.GetTuning(resDir)) {
+			img.ProcessingFlags["VirtualFramed:"+resDir] = true
+		} else {
+			delete(img.ProcessingFlags, "VirtualFramed:"+resDir)
+		}
+	}
+}
+
+// saveDerivative writes a derivative under a temporary name and renames it into place. Derivatives
+// are kept and reused, so a file cut short by a crash must never appear at the final path.
+func saveDerivative(img image.Image, targetPath string) error {
+	ext := filepath.Ext(targetPath)
+	tmpPath := strings.TrimSuffix(targetPath, ext) + ".tmp" + ext
+	if err := imaging.Save(img, tmpPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := os.Rename(tmpPath, targetPath); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	return nil
 }
 
 func (wp *Plugin) checkExistingDerivatives(imgID, ext, derivativeDir string, resolutions []Resolution) (map[string]string, bool) {
@@ -432,7 +684,14 @@ func (wp *Plugin) checkExistingDerivatives(imgID, ext, derivativeDir string, res
 }
 
 func (wp *Plugin) generateMissingDerivatives(ctx context.Context, img provider.Image, masterPath, derivativeDir, ext string, resolutions []Resolution, paths map[string]string) error {
-	srcImg, err := imaging.Open(masterPath)
+	// Large originals are decoded one at a time (A2 §12.9 #8).
+	release, err := acquireMasterDecode(ctx, masterPath)
+	if err != nil {
+		return err
+	}
+	defer release()
+
+	srcImg, err := openMaster(masterPath)
 	if err != nil {
 		return fmt.Errorf("failed to open master %s: %w", masterPath, err)
 	}
@@ -500,7 +759,7 @@ func (wp *Plugin) generateMissingDerivatives(ctx context.Context, img provider.I
 			continue
 		}
 
-		if err := imaging.Save(processedImg, targetPath); err != nil {
+		if err := saveDerivative(processedImg, targetPath); err != nil {
 			log.Printf("Error saving derivative %s: %v", targetPath, err)
 			continue
 		}

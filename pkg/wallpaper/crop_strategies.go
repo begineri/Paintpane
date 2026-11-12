@@ -65,6 +65,16 @@ type EntropyCropStrategy struct {
 func (s *EntropyCropStrategy) Name() string { return "EntropyCrop" }
 
 func (s *EntropyCropStrategy) Apply(ctx context.Context, img image.Image, targetW, targetH int, proc *SmartImageProcessor) (image.Image, error) {
+	center, err := s.center(ctx, img, targetW, targetH, proc)
+	if err != nil {
+		return nil, err
+	}
+	return proc.smartPanAndResize(ctx, img, center, targetW, targetH)
+}
+
+// center is the point the kept part is centred on: the best crop smartcrop finds, or the middle of
+// the image when the feet guard rejects it.
+func (s *EntropyCropStrategy) center(ctx context.Context, img image.Image, targetW, targetH int, proc *SmartImageProcessor) (image.Point, error) {
 	log.Debugf("SmartFit: Using Entropy Crop.")
 	r := &resizer{resampler: proc.resampler}
 	analyzer := smartcrop.NewAnalyzer(r)
@@ -82,23 +92,21 @@ func (s *EntropyCropStrategy) Apply(ctx context.Context, img image.Image, target
 
 	select {
 	case <-ctx.Done():
-		return nil, ctx.Err()
+		return image.Point{}, ctx.Err()
 	case result := <-resultChan:
 		if result.err != nil {
-			return nil, fmt.Errorf("finding best crop: %w", result.err)
+			return image.Point{}, fmt.Errorf("finding best crop: %w", result.err)
 		}
 
 		// Feet Guard Logic
 		if proc.config.GetSmartFitMode() == SmartFitAggressive && !s.FaceFound {
 			if s.checkFeetGuard(img.Bounds(), result.crop, proc) {
 				log.Debugf("SmartFit [Flexibility]: Feet Guard Triggered. Fallback to Center.")
-				center := image.Point{X: img.Bounds().Dx() / 2, Y: img.Bounds().Dy() / 2}
-				return proc.smartPanAndResize(ctx, img, center, targetW, targetH)
+				return image.Point{X: img.Bounds().Dx() / 2, Y: img.Bounds().Dy() / 2}, nil
 			}
 		}
 
-		smartCenter := result.crop.Min.Add(result.crop.Size().Div(2))
-		return proc.smartPanAndResize(ctx, img, smartCenter, targetW, targetH)
+		return result.crop.Min.Add(result.crop.Size().Div(2)), nil
 	}
 }
 

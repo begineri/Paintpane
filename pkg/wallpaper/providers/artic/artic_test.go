@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dixieflatline76/Spice/v2/pkg/wallpaper"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -57,11 +58,11 @@ func TestGetIIIFURL(t *testing.T) {
 	// This tests the dynamic aspect ratio URL construction
 	imageID := "e9667990-97ee-173f-29f9-55d9aff5d918"
 
-	// We want a high-res landscape URL
-	got := getIIIFURL(imageID, 1920, 1080)
+	// AIC only serves documented widths, in the "w," form
+	got := getIIIFURL(imageID, FullImageWidth)
 
-	// Expected format using the ! notation for "fit within"
-	expected := "https://www.artic.edu/iiif/2/e9667990-97ee-173f-29f9-55d9aff5d918/full/!1920,1080/0/default.jpg"
+	// Expected format uses the documented width
+	expected := "https://www.artic.edu/iiif/2/e9667990-97ee-173f-29f9-55d9aff5d918/full/3000,/0/default.jpg"
 	assert.Equal(t, expected, got)
 }
 
@@ -127,10 +128,34 @@ func TestFetchThumbnails_TDD(t *testing.T) {
 
 	assert.Len(t, thumbnails, 2)
 	assert.Equal(t, "123", thumbnails[0].ID)
-	assert.Equal(t, "https://www.artic.edu/iiif/2/img-123/full/!800,800/0/default.jpg", thumbnails[0].URL)
+	assert.Equal(t, "https://www.artic.edu/iiif/2/img-123/full/843,/0/default.jpg", thumbnails[0].URL)
 	assert.Equal(t, "https://www.artic.edu/artworks/123", thumbnails[0].ViewURL)
 
 	assert.Equal(t, "456", thumbnails[1].ID)
-	assert.Equal(t, "https://www.artic.edu/iiif/2/img-456/full/!800,800/0/default.jpg", thumbnails[1].URL)
+	assert.Equal(t, "https://www.artic.edu/iiif/2/img-456/full/843,/0/default.jpg", thumbnails[1].URL)
 	assert.Equal(t, "https://www.artic.edu/artworks/456", thumbnails[1].ViewURL)
+}
+
+type headerRecorder struct{ got http.Header }
+
+func (r *headerRecorder) RoundTrip(req *http.Request) (*http.Response, error) {
+	r.got = req.Header.Clone()
+	return &http.Response{StatusCode: http.StatusOK, Body: http.NoBody, Header: http.Header{}, Request: req}, nil
+}
+
+func TestClientIdentifiesItselfInsteadOfPosingAsABrowser(t *testing.T) {
+	recorder := &headerRecorder{}
+	shared := &http.Client{Transport: &wallpaper.UserAgentTransport{RoundTripper: recorder, UserAgent: "Mozilla/5.0 Chrome/120"}}
+	p := NewProvider(nil, shared)
+
+	req, err := http.NewRequest(http.MethodGet, "https://www.artic.edu/iiif/2/x/full/1686,/0/default.jpg", nil)
+	assert.NoError(t, err)
+	req.Header.Set("User-Agent", "Mozilla/5.0 set by the downloader")
+
+	resp, err := p.GetClient().Do(req)
+	assert.NoError(t, err)
+	assert.NoError(t, resp.Body.Close())
+
+	assert.Equal(t, ClientUserAgent, recorder.got.Get("User-Agent"))
+	assert.Equal(t, ClientIdentity, recorder.got.Get("AIC-User-Agent"))
 }

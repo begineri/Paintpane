@@ -1,6 +1,6 @@
 ---
 name: Question / Support
-about: Ask a question or request help with Spice
+about: Ask a question or request help with Paintpane
 title: '[QUESTION] '
 labels: question
 assignees: ''
@@ -16,4 +16,4 @@ If applicable, add screenshots to help explain your question.
 **Environment (please complete the following information):**
 - macOS Version: [e.g. 14.2.1]
 - Hardware: [e.g. M1 MacBook Air]
-- Spice Version: [e.g. 1.0.0]
+- Paintpane Version: [e.g. 1.0.0]

@@ -54,6 +54,19 @@ func (v *VirtualFramer) EncodeImage(ctx context.Context, img image.Image, conten
 	return v.next.EncodeImage(ctx, img, contentType)
 }
 
+// autoCropper is implemented by processors that can say where the automatic crop keeps a picture.
+type autoCropper interface {
+	AutoCropPercent(ctx context.Context, img image.Image, targetW, targetH int) (float64, bool)
+}
+
+// AutoCropPercent asks the underlying processor where the automatic crop keeps the picture.
+func (v *VirtualFramer) AutoCropPercent(ctx context.Context, img image.Image, targetW, targetH int) (float64, bool) {
+	if ac, ok := v.next.(autoCropper); ok {
+		return ac.AutoCropPercent(ctx, img, targetW, targetH)
+	}
+	return 0, false
+}
+
 // CheckCompatibility intercepts the compatibility check to "rescue" images that would be rejected
 // by SmartFit Quality mode, IF those images are eligible for Virtual Framing.
 func (v *VirtualFramer) CheckCompatibility(imgWidth, imgHeight, targetWidth, targetHeight int) error {
@@ -65,23 +78,13 @@ func (v *VirtualFramer) CheckCompatibility(imgWidth, imgHeight, targetWidth, tar
 			return err
 		}
 
-		if v.cfg.VirtualFramingFallback {
-			return ErrRequiresVirtualFraming // Rescue aspect ratio mismatches
+		// The whole-image display modes fit any aspect ratio, so there is nothing to rescue.
+		if v.cfg.GetArtworkDisplayMode() != ArtworkDisplaySmartCrop {
+			return nil
 		}
 
-		v.cfg.mu.RLock()
-		hasMuseumMode := false
-		for _, enabled := range v.cfg.MuseumFraming {
-			if enabled {
-				hasMuseumMode = true
-				break
-			}
-		}
-		v.cfg.mu.RUnlock()
-
-		if hasMuseumMode {
-			return ErrRequiresVirtualFraming
-		}
+		// Smart crop never rescues an image by framing it: the crop strategy decides, and
+		// Quality skips what it cannot crop well.
 	}
 
 	return err
@@ -93,49 +96,23 @@ func (v *VirtualFramer) FitImage(ctx context.Context, img image.Image, targetWid
 		return v.next.FitImage(ctx, img, targetWidth, targetHeight, opts)
 	}
 
-	shouldFrame := false
-	frameReason := ""
-
-	// 1. User Override (Tune Image Popup)
-	switch opts.FrameOverride {
-	case provider.FrameOverrideForceOn:
-		shouldFrame = true
-		frameReason = "User Override Force On"
-	case provider.FrameOverrideForceOff:
-		shouldFrame = false
-		frameReason = "User Override Force Off"
-	default:
-		// 2. Museum Mode (Always Frame for specific providers)
-		if providerID, ok := ctx.Value(provider.ProviderIDKey).(string); ok && providerID != "" {
-			if v.cfg.GetMuseumFraming(providerID) {
-				shouldFrame = true
-				frameReason = "Museum Mode for provider " + providerID
-			}
-		}
-
-		// 3. Fallback Mode (Rescue Misfit Images)
-		if !shouldFrame && v.cfg.VirtualFramingFallback {
-			// Ask the next processor (SmartFit) if it WOULD reject this image.
-			// Since SmartFit's CheckCompatibility is permissive for Quality mode, we must
-			// also do an explicit aspect ratio check here to prevent it from throwing away images later.
-			imageAspect := float64(img.Bounds().Dx()) / float64(img.Bounds().Dy())
-			systemAspect := float64(targetWidth) / float64(targetHeight)
-			aspectDiff := math.Abs(systemAspect - imageAspect)
-
-			if aspectDiff > v.cfg.Tuning.AspectThreshold {
-				shouldFrame = true
-				frameReason = fmt.Sprintf("Aspect Diff %.2f > Threshold %.2f", aspectDiff, v.cfg.Tuning.AspectThreshold)
-			} else {
-				err := v.next.CheckCompatibility(img.Bounds().Dx(), img.Bounds().Dy(), targetWidth, targetHeight)
-				if err != nil {
-					shouldFrame = true
-					frameReason = "SmartFit CheckCompatibility rejected it: " + err.Error()
-				}
-			}
+	// The image's own display mode (Tune Image) wins over the global one.
+	mode := displayModeFor(v.cfg.GetArtworkDisplayMode(), opts)
+	if mode != ArtworkDisplaySmartCrop {
+		if err := checkContext(ctx); err != nil {
+			return nil, err
 		}
 	}
 
+	providerID, _ := ctx.Value(provider.ProviderIDKey).(string)
+	shouldFrame, frameReason := v.decideFrame(providerID, img.Bounds().Dx(), img.Bounds().Dy(), targetWidth, targetHeight, opts)
+
 	if !shouldFrame {
+		// An image shown whole never reaches the cropper, even when a frame is turned off.
+		if mode != ArtworkDisplaySmartCrop {
+			log.Debugf("VirtualFramer: Rendering full artwork (Reason: %s)", frameReason)
+			return v.renderFullArtwork(img, targetWidth, targetHeight, opts), nil
+		}
 		log.Debugf("VirtualFramer: Bypassing framing, passing to SmartFit. (Reason: %s)", frameReason)
 		return v.next.FitImage(ctx, img, targetWidth, targetHeight, opts)
 	}
@@ -145,6 +122,61 @@ func (v *VirtualFramer) FitImage(ctx context.Context, img image.Image, targetWid
 		*ptr = true
 	}
 	return v.renderGalleryWall(img, targetWidth, targetHeight, opts)
+}
+
+// WouldFrame reports whether FitImage would draw a frame for an image of the given size. It lets
+// a reused derivative report the same outcome as a freshly rendered one without decoding anything.
+func (v *VirtualFramer) WouldFrame(providerID string, imgWidth, imgHeight, targetWidth, targetHeight int, opts provider.TuningOptions) bool {
+	if targetWidth <= 0 || targetHeight <= 0 || imgWidth <= 10 || imgHeight <= 10 {
+		return false
+	}
+	frame, _ := v.decideFrame(providerID, imgWidth, imgHeight, targetWidth, targetHeight, opts)
+	return frame
+}
+
+// decideFrame is the single decision on whether an image gets a frame: when it is shown in Museum
+// frame, its own choice from Tune Image or else the global mode. See the decision table in
+// docs/artwork_display_modes.md.
+func (v *VirtualFramer) decideFrame(_ string, _, _, _, _ int, opts provider.TuningOptions) (bool, string) {
+	global := v.cfg.GetArtworkDisplayMode()
+	mode := displayModeFor(global, opts)
+	return mode == ArtworkDisplayFramed, fmt.Sprintf("Display mode %d, image %d (display %d, frame override %d)", global, mode, opts.Display, opts.FrameOverride)
+}
+
+// displayModeFor is how one image is shown under the global mode: its own choice from Tune Image
+// when it has one, otherwise the global mode. Tuning saved before that choice existed has only a
+// frame switch: on frames the image, off shows it without a frame (whole, or cropped under Smart
+// crop).
+func displayModeFor(global ArtworkDisplayMode, opts provider.TuningOptions) ArtworkDisplayMode {
+	switch opts.Display {
+	case provider.DisplayFull:
+		return ArtworkDisplayFull
+	case provider.DisplayFramed:
+		return ArtworkDisplayFramed
+	case provider.DisplayCrop:
+		return ArtworkDisplaySmartCrop
+	}
+	switch opts.FrameOverride {
+	case provider.FrameOverrideForceOn:
+		return ArtworkDisplayFramed
+	case provider.FrameOverrideForceOff:
+		if global == ArtworkDisplayFramed {
+			return ArtworkDisplayFull
+		}
+	}
+	return global
+}
+
+// displayOverride is mode as a per-image choice.
+func displayOverride(mode ArtworkDisplayMode) provider.DisplayOverride {
+	switch mode {
+	case ArtworkDisplayFull:
+		return provider.DisplayFull
+	case ArtworkDisplayFramed:
+		return provider.DisplayFramed
+	default:
+		return provider.DisplayCrop
+	}
 }
 
 func (v *VirtualFramer) determineFrameStyle(avgColor color.Color) FrameStyle {
@@ -264,6 +296,20 @@ func (v *VirtualFramer) calculateWallColor(img image.Image, opts provider.Tuning
 	valB := uint8(math.Min(255, domB*scale))
 
 	return color.RGBA{valR, valG, valB, 255}
+}
+
+// renderFullArtwork scales the whole image to fit the target, enlarging it if needed, and centers
+// it on the wall color. Nothing is cropped.
+func (v *VirtualFramer) renderFullArtwork(img image.Image, targetW, targetH int, opts provider.TuningOptions) image.Image {
+	imgW, imgH := float64(img.Bounds().Dx()), float64(img.Bounds().Dy())
+	scale := math.Min(float64(targetW)/imgW, float64(targetH)/imgH)
+
+	artW := int(math.Min(math.Max(math.Round(imgW*scale), 1), float64(targetW)))
+	artH := int(math.Min(math.Max(math.Round(imgH*scale), 1), float64(targetH)))
+
+	canvas := imaging.New(targetW, targetH, v.calculateWallColor(img, opts))
+	art := imaging.Resize(img, artW, artH, imaging.Lanczos)
+	return imaging.OverlayCenter(canvas, art, 1.0)
 }
 
 func (v *VirtualFramer) renderGalleryWall(img image.Image, targetW, targetH int, opts provider.TuningOptions) (image.Image, error) {

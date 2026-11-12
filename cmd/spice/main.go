@@ -19,6 +19,7 @@ import (
 	"github.com/dixieflatline76/Spice/v2/pkg/gallery"
 	"github.com/dixieflatline76/Spice/v2/pkg/hotkey"
 	"github.com/dixieflatline76/Spice/v2/pkg/wallpaper"
+	"github.com/dixieflatline76/Spice/v2/util"
 )
 
 var version = "0.0.0"
@@ -27,7 +28,7 @@ var version = "0.0.0"
 // These bypass the file logger and appear in Console.app, allowing DTS engineers
 // to see exactly where the app dies during App Store review.
 func breadcrumb(msg string) {
-	fmt.Fprintf(os.Stderr, "[Spice:%s] %s\n", version, msg)
+	fmt.Fprintf(os.Stderr, "[Paintpane:%s] %s\n", version, msg)
 }
 
 func init() {
@@ -38,7 +39,7 @@ func main() {
 	if len(os.Args) > 1 && os.Args[1] == "-probe-gl" {
 		// Suppress Windows Error Reporting crash dialogs for this subprocess.
 		// When OpenGL is broken, Fyne calls os.Exit(1) — we want that to happen
-		// silently without showing "Spice has stopped working" to the user.
+		// silently without showing "Paintpane has stopped working" to the user.
 		suppressCrashDialogs()
 
 		// Run a bare minimum Fyne window creation.
@@ -60,11 +61,28 @@ func main() {
 	}
 	if !ok {
 		breadcrumb("acquireLock returned false — another instance detected")
-		fmt.Println("Another instance of Spice is already running.")
+		fmt.Println("Another instance of Paintpane is already running.")
 		return
 	}
 	defer releaseLock() // Make sure to release the lock when done
 	breadcrumb("lock acquired")
+
+	// Keep the heap near what is live while large originals are processed (A2 phase 5 #1).
+	wallpaper.ApplyMemoryLimit()
+
+	// Run below normal priority so background fetching and processing never slow down what the
+	// person is doing, least of all right after logon.
+	if err := util.LowerProcessPriority(); err != nil {
+		log.Printf("Could not lower the process priority: %v", err)
+	}
+
+	// Fyne cannot read a preferences file with a byte order mark and would replace the person's
+	// settings with defaults (A2 §14.9 #4); fix the file before Fyne loads it.
+	if note, err := config.RepairPreferencesFile(config.FynePreferencesPath(config.AppName)); err != nil {
+		log.Printf("Preferences file check failed: %v", err)
+	} else if note != "" {
+		log.Print(note)
+	}
 
 	spiceApp := ui.GetApplication() // Create a new Fyne application
 	breadcrumb("UI application initialized")
@@ -73,7 +91,7 @@ func main() {
 
 	// Unpack embedded virtual galleries into the working cache directory
 	// so the providers can link to them via file:// URLs in the UI.
-	cacheDir := filepath.Join(config.GetWorkingDir(), "cache")
+	cacheDir := config.GetCacheDir()
 	if err := gallery.UnpackAll(cacheDir); err != nil {
 		breadcrumb(fmt.Sprintf("gallery.UnpackAll failed: %v", err))
 		log.Printf("Failed to unpack embedded galleries: %v", err)
@@ -85,6 +103,7 @@ func main() {
 	// --- BROWSER INTEGRATION START ---
 	// Start the Local API Server
 	apiServer := api.NewServer()
+	ui.RegisterDebugHandlers(apiServer) // dev builds only; no-op in release builds
 
 	// Register Add Handler
 	apiServer.SetAddCollectionHandler(func(url string) error {

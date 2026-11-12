@@ -7,7 +7,6 @@ import (
 
 	"sync"
 
-	"github.com/dixieflatline76/Spice/v2/pkg/i18n"
 	"github.com/dixieflatline76/Spice/v2/pkg/provider"
 	"github.com/dixieflatline76/Spice/v2/pkg/ui"
 	"github.com/dixieflatline76/Spice/v2/pkg/wallpaper"
@@ -48,8 +47,21 @@ const (
 // So we should define a Stub for it in hotkey_darwin.go, NOT here.
 // Or define it here as a var that can be overridden? No.
 
+// combo is a hotkey before it is registered: modifiers plus one key.
+type combo struct {
+	mods []hotkey.Modifier
+	key  hotkey.Key
+}
+
+func newCombo(mods []hotkey.Modifier, key hotkey.Key) combo { return combo{mods: mods, key: key} }
+
+// registration is a registered hotkey; registerHotkey (per platform) creates it.
+type registration interface {
+	Unregister() error
+}
+
 var (
-	registeredHotkeys []*hotkey.Hotkey
+	registeredHotkeys []registration
 	hkMu              sync.Mutex
 
 	// Debouncing and Background Work
@@ -139,67 +151,58 @@ func doStartListeners(mgr ui.PluginManager) {
 
 	// --- 2. Global Handlers (Base + Extra Modifier + Key) ---
 	// These apply to ALL monitors simultaneously.
-	hkGlobalNext := hotkey.New([]hotkey.Modifier{modBase, modExtra}, keyRight)
-	hkGlobalPrev := hotkey.New([]hotkey.Modifier{modBase, modExtra}, keyLeft)
-	hkGlobalSync := hotkey.New([]hotkey.Modifier{modBase, modExtra}, keyD)
-	hkOpts := hotkey.New([]hotkey.Modifier{modBase, modExtra}, keyO)
+	hkGlobalNext := newCombo([]hotkey.Modifier{modBase, modExtra}, keyRight)
+	hkGlobalPrev := newCombo([]hotkey.Modifier{modBase, modExtra}, keyLeft)
+	hkGlobalSync := newCombo([]hotkey.Modifier{modBase, modExtra}, keyD)
+	hkOpts := newCombo([]hotkey.Modifier{modBase, modExtra}, keyO)
 
 	// --- 1. Targeted Handlers (Base Modifier + [1-9] + Key) ---
 	// These only trigger if a number key 1-9 is held.
-	hkTargetedNext := hotkey.New([]hotkey.Modifier{modBase}, keyRight)
-	hkTargetedPrev := hotkey.New([]hotkey.Modifier{modBase}, keyLeft)
-	hkTargetedTrash := hotkey.New([]hotkey.Modifier{modBase}, keyDown)
-	hkTargetedFav := hotkey.New([]hotkey.Modifier{modBase}, keyUp)
-	hkTargetedPause := hotkey.New([]hotkey.Modifier{modBase}, keyP)
-	hkGlobalPause := hotkey.New([]hotkey.Modifier{modBase, modExtra}, keyP)
+	hkTargetedNext := newCombo([]hotkey.Modifier{modBase}, keyRight)
+	hkTargetedPrev := newCombo([]hotkey.Modifier{modBase}, keyLeft)
+	hkTargetedTrash := newCombo([]hotkey.Modifier{modBase}, keyDown)
+	hkTargetedFav := newCombo([]hotkey.Modifier{modBase}, keyUp)
+	hkTargetedPause := newCombo([]hotkey.Modifier{modBase}, keyP)
+	hkGlobalPause := newCombo([]hotkey.Modifier{modBase, modExtra}, keyP)
 
 	// Register Targeted listeners
 	registerAndListenTargeted(hkTargetedNext, "Targeted Next", func() {
-		handleTargeted(mgr, func(mid int) string {
+		handleTargeted(func(mid int) {
 			if wp != nil {
 				wp.SetNextWallpaper(mid, true)
-				return i18n.Tf("Display {{.ID}}: Next Wallpaper", map[string]any{"ID": mid + 1})
 			}
-			return ""
 		})
 	})
 
 	registerAndListenTargeted(hkTargetedPrev, "Targeted Previous", func() {
-		handleTargeted(mgr, func(mid int) string {
+		handleTargeted(func(mid int) {
 			if wp != nil {
 				wp.SetPreviousWallpaper(mid, true)
-				return i18n.Tf("Display {{.ID}}: Previous Wallpaper", map[string]any{"ID": mid + 1})
 			}
-			return ""
 		})
 	})
 
 	registerAndListenTargeted(hkTargetedTrash, "Targeted Trash", func() {
-		handleTargeted(mgr, func(mid int) string {
+		handleTargeted(func(mid int) {
 			if wp != nil {
 				wp.DeleteCurrentImage(mid)
-				return i18n.Tf("Display {{.ID}}: Image Blocked", map[string]any{"ID": mid + 1})
 			}
-			return ""
 		})
 	})
 
 	registerAndListenTargeted(hkTargetedFav, "Targeted Favorite", func() {
-		handleTargeted(mgr, func(mid int) string {
+		handleTargeted(func(mid int) {
 			if wp != nil {
 				wp.TriggerFavorite(mid)
-				return "" // Plugin handles its own notifications
 			}
-			return ""
 		})
 	})
 
 	registerAndListenTargeted(hkTargetedPause, "Targeted Pause", func() {
-		handleTargeted(mgr, func(mid int) string {
+		handleTargeted(func(mid int) {
 			if wp != nil {
 				wp.TogglePauseMonitorAction(mid)
 			}
-			return ""
 		})
 	})
 
@@ -235,43 +238,41 @@ func doStartListeners(mgr ui.PluginManager) {
 	})
 
 	// --- 3. Anchor Shortcuts (Targeted: modBase + WASD/QE) ---
-	hkAnchorQ := hotkey.New([]hotkey.Modifier{modBase}, keyQ)
-	hkAnchorW := hotkey.New([]hotkey.Modifier{modBase}, keyW)
-	hkAnchorE := hotkey.New([]hotkey.Modifier{modBase}, keyE)
-	hkAnchorA := hotkey.New([]hotkey.Modifier{modBase}, keyA)
-	hkAnchorS := hotkey.New([]hotkey.Modifier{modBase}, keyS)
-	hkAnchorD := hotkey.New([]hotkey.Modifier{modBase}, keyD)
+	hkAnchorQ := newCombo([]hotkey.Modifier{modBase}, keyQ)
+	hkAnchorW := newCombo([]hotkey.Modifier{modBase}, keyW)
+	hkAnchorE := newCombo([]hotkey.Modifier{modBase}, keyE)
+	hkAnchorA := newCombo([]hotkey.Modifier{modBase}, keyA)
+	hkAnchorS := newCombo([]hotkey.Modifier{modBase}, keyS)
+	hkAnchorD := newCombo([]hotkey.Modifier{modBase}, keyD)
 
 	registerAndListenTargeted(hkAnchorQ, "Anchor Auto", func() {
-		handleAnchor(mgr, provider.AnchorAuto)
+		handleAnchor(provider.AnchorAuto)
 	})
 	registerAndListenTargeted(hkAnchorW, "Anchor Up", func() {
-		handleAnchor(mgr, provider.AnchorTopCenter)
+		handleAnchor(provider.AnchorTopCenter)
 	})
 	registerAndListenTargeted(hkAnchorE, "Anchor Center", func() {
-		handleAnchor(mgr, provider.AnchorMiddleCenter)
+		handleAnchor(provider.AnchorMiddleCenter)
 	})
 	registerAndListenTargeted(hkAnchorA, "Anchor Left", func() {
-		handleAnchor(mgr, provider.AnchorMiddleLeft)
+		handleAnchor(provider.AnchorMiddleLeft)
 	})
 	registerAndListenTargeted(hkAnchorS, "Anchor Down", func() {
-		handleAnchor(mgr, provider.AnchorBottomCenter)
+		handleAnchor(provider.AnchorBottomCenter)
 	})
 	registerAndListenTargeted(hkAnchorD, "Anchor Right", func() {
-		handleAnchor(mgr, provider.AnchorMiddleRight)
+		handleAnchor(provider.AnchorMiddleRight)
 	})
 
 	// --- 4. Shuffle Shortcuts ---
-	hkTargetedShuffle := hotkey.New([]hotkey.Modifier{modBase}, keyR)
-	hkGlobalShuffle := hotkey.New([]hotkey.Modifier{modBase, modExtra}, keyR)
+	hkTargetedShuffle := newCombo([]hotkey.Modifier{modBase}, keyR)
+	hkGlobalShuffle := newCombo([]hotkey.Modifier{modBase, modExtra}, keyR)
 
 	registerAndListenTargeted(hkTargetedShuffle, "Targeted Shuffle", func() {
-		handleTargeted(mgr, func(mid int) string {
+		handleTargeted(func(mid int) {
 			if wp != nil {
 				wp.TriggerShuffle(mid)
-				return i18n.Tf("Display {{.ID}}: Shuffled", map[string]any{"ID": mid + 1})
 			}
-			return ""
 		})
 	})
 
@@ -282,15 +283,14 @@ func doStartListeners(mgr ui.PluginManager) {
 	})
 
 	// --- 5. Info Shortcuts ---
-	hkTargetedInfo := hotkey.New([]hotkey.Modifier{modBase}, keyI)
-	hkGlobalInfo := hotkey.New([]hotkey.Modifier{modBase, modExtra}, keyI)
+	hkTargetedInfo := newCombo([]hotkey.Modifier{modBase}, keyI)
+	hkGlobalInfo := newCombo([]hotkey.Modifier{modBase, modExtra}, keyI)
 
 	registerAndListenTargeted(hkTargetedInfo, "Targeted Info", func() {
-		handleTargeted(mgr, func(mid int) string {
+		handleTargeted(func(mid int) {
 			if wp != nil {
 				wp.ViewCurrentImageOnWeb(mid)
 			}
-			return ""
 		})
 	})
 
@@ -301,95 +301,61 @@ func doStartListeners(mgr ui.PluginManager) {
 	})
 }
 
-func registerAndListen(hk *hotkey.Hotkey, name string, action func()) {
-	if err := hk.Register(); err != nil {
+func registerAndListen(hk combo, name string, action func()) {
+	reg, err := registerHotkey(hk.mods, hk.key, name, func() {
+		if wp := wallpaper.GetInstance(); wp != nil && wp.GetShortcutsDisabled() {
+			return
+		}
+		now := time.Now().Format("15:04:05.000")
+		log.Debugf("[%s] Hotkey triggered: %s", now, name)
+		action()
+	})
+	if err != nil {
 		log.Printf("Failed to register hotkey %s: %v", name, err)
 		return
 	}
 	log.Printf("[Hotkey] Registered: %s", name)
-	registeredHotkeys = append(registeredHotkeys, hk)
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[Hotkey] PANIC in listener loop for %s: %v", name, r)
-			}
-		}()
-
-		for range hk.Keydown() {
-			if wp := wallpaper.GetInstance(); wp != nil && wp.GetShortcutsDisabled() {
-				continue
-			}
-			now := time.Now().Format("15:04:05.000")
-			log.Debugf("[%s] Hotkey triggered: %s", now, name)
-			action()
-		}
-		log.Printf("[Hotkey] Listener loop exited for %s", name)
-	}()
+	registeredHotkeys = append(registeredHotkeys, reg)
 }
 
-func registerAndListenTargeted(hk *hotkey.Hotkey, name string, action func()) {
+func registerAndListenTargeted(hk combo, name string, action func()) {
 	wp := wallpaper.GetInstance()
 	if wp != nil && (wp.GetTargetedShortcutsDisabled() || wp.GetShortcutsDisabled()) {
 		log.Printf("[Hotkey] Skipping targeted registration for %s (Disabled in Preferences)", name)
 		return
 	}
 
-	if err := hk.Register(); err != nil {
+	reg, err := registerHotkey(hk.mods, hk.key, name, func() {
+		wp := wallpaper.GetInstance()
+		if wp != nil && (wp.GetShortcutsDisabled() || wp.GetTargetedShortcutsDisabled()) {
+			return
+		}
+		now := time.Now().Format("15:04:05.000")
+		log.Debugf("[%s] Targeted hotkey triggered: %s", now, name)
+		action()
+	})
+	if err != nil {
 		log.Printf("Failed to register hotkey %s: %v", name, err)
 		return
 	}
 	log.Printf("[Hotkey] Registered Targeted: %s", name)
-	registeredHotkeys = append(registeredHotkeys, hk)
-
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("[Hotkey] PANIC in listener loop for %s: %v", name, r)
-			}
-		}()
-
-		for range hk.Keydown() {
-			wp := wallpaper.GetInstance()
-			if wp != nil && (wp.GetShortcutsDisabled() || wp.GetTargetedShortcutsDisabled()) {
-				continue
-			}
-			now := time.Now().Format("15:04:05.000")
-			log.Debugf("[%s] Targeted hotkey triggered: %s", now, name)
-			action()
-		}
-		log.Printf("[Hotkey] Targeted Listener loop exited for %s", name)
-	}()
+	registeredHotkeys = append(registeredHotkeys, reg)
 }
 
-func handleTargeted(mgr ui.PluginManager, action func(mid int) string) {
+func handleTargeted(action func(mid int)) {
 	mid := GetMonitorIDFromKey()
-	title := i18n.T("Wallpaper Action")
-	msg := ""
-
-	if mid != -1 {
-		msg = action(mid)
-	} else {
+	if mid == -1 {
 		log.Debugf("[Hotkey] Suppression: Base modifier combination detected but no number key held. Skipping.")
 		return
 	}
-
-	if mgr != nil && msg != "" {
-		go func() {
-			log.Debugf("[Hotkey] Dispatching async notification: %s - %s", title, msg)
-			mgr.NotifyUser(title, msg)
-		}()
-	}
+	action(mid)
 }
 
-// handleAnchor sets a crop anchor on the targeted monitor and sends a notification.
-func handleAnchor(mgr ui.PluginManager, anchor provider.CropAnchor) {
-	handleTargeted(mgr, func(mid int) string {
-		wp := wallpaper.GetInstance()
-		if wp != nil {
+// handleAnchor sets a crop anchor on the targeted monitor.
+func handleAnchor(anchor provider.CropAnchor) {
+	handleTargeted(func(mid int) {
+		if wp := wallpaper.GetInstance(); wp != nil {
 			wp.SetTuningOptions(mid, provider.TuningOptions{Anchor: anchor})
-			return i18n.Tf("Display {{.ID}}: Anchor {{.Anchor}}", map[string]any{"ID": mid + 1, "Anchor": anchor.String()})
 		}
-		return ""
 	})
 }

@@ -49,6 +49,13 @@ func getMachineID() string {
 	return hostname
 }
 
+// HasEverAcceptedEULA reports whether any version of the EULA was accepted with these preferences
+// before, valid for this version or not. Every version asks again, so a person who upgrades sees
+// the agreement once more; this tells them apart from a first run.
+func HasEverAcceptedEULA(prefs PreferenceStore) bool {
+	return prefs.String(EULAPreferenceKey) != ""
+}
+
 // HasAcceptedEULA checks if the EULA has been accepted
 func HasAcceptedEULA(prefs PreferenceStore) bool {
 	eulaData := prefs.String(EULAPreferenceKey)

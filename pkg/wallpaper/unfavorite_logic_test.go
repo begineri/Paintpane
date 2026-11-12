@@ -47,7 +47,6 @@ func TestToggleFavorite_DeepDeleteLogic(t *testing.T) {
 
 		mf := wp.favoriter.(*mockDeepDeleteFavoriter)
 		ms := wp.store.(*MockImageStore)
-		mm := wp.manager.(*mockManager)
 
 		img := provider.Image{
 			ID:          "fav_123",
@@ -57,7 +56,6 @@ func TestToggleFavorite_DeepDeleteLogic(t *testing.T) {
 
 		mf.On("RemoveFavorite", img).Return(nil)
 		ms.On("Remove", img.ID).Return(img, true)
-		mm.On("NotifyUser", mock.Anything, mock.Anything).Return()
 
 		// Background telemetry calls should be ignored
 		ms.On("SeenCount").Return(0).Maybe()
@@ -82,7 +80,6 @@ func TestToggleFavorite_DeepDeleteLogic(t *testing.T) {
 
 		mf := wp.favoriter.(*mockDeepDeleteFavoriter)
 		ms := wp.store.(*MockImageStore)
-		mm := wp.manager.(*mockManager)
 
 		img := provider.Image{
 			ID:          "wallhaven_456",
@@ -92,7 +89,6 @@ func TestToggleFavorite_DeepDeleteLogic(t *testing.T) {
 
 		mf.On("RemoveFavorite", img).Return(nil)
 		ms.On("SetFavorited", "wallhaven_456", false).Return(true)
-		mm.On("NotifyUser", mock.Anything, mock.Anything).Return()
 
 		// Background telemetry calls should be ignored
 		ms.On("SeenCount").Return(0).Maybe()
@@ -119,7 +115,6 @@ func TestToggleFavorite_DeepDeleteLogic(t *testing.T) {
 
 		mf := wp.favoriter.(*mockDeepDeleteFavoriter)
 		ms := wp.store.(*MockImageStore)
-		mm := wp.manager.(*mockManager)
 
 		img := provider.Image{
 			ID:          "wallhaven_789",
@@ -129,7 +124,6 @@ func TestToggleFavorite_DeepDeleteLogic(t *testing.T) {
 
 		mf.On("AddFavorite", img).Return(nil)
 		ms.On("SetFavorited", "wallhaven_789", true).Return(true)
-		mm.On("NotifyUser", mock.Anything, mock.Anything).Return()
 
 		// Background telemetry calls should be ignored
 		ms.On("SeenCount").Return(0).Maybe()

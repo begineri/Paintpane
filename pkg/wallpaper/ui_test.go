@@ -260,6 +260,15 @@ func (m *MockSettingsManager) RenderTabs(tabs schema.TabsSchema) fyne.CanvasObje
 		if item.Panel != nil {
 			box.Add(m.RenderSchema(*item.Panel))
 		}
+		if item.Sources != nil {
+			for _, g := range item.Sources.Groups {
+				for _, src := range g.Items {
+					if src.Detail != nil {
+						box.Add(m.RenderSchema(*src.Detail))
+					}
+				}
+			}
+		}
 	}
 	return box
 }
@@ -295,57 +304,44 @@ func (m *MockSettingsManager) refreshWidgetStates() {
 	}
 }
 
-func TestSmartFitEnablesFaceOptions(t *testing.T) {
-	// Initialize Fyne test app
+// Smart crop has no options left: neither the crop strategy (S2-9, v31) nor Face priority
+// (S2-10, v33) is on the page.
+func TestSmartCropHasNoOptions(t *testing.T) {
 	test.NewApp()
 
-	// Setup
 	ResetConfig()
-	prefs := NewMockPreferences()
-	cfg := GetConfig(prefs)
+	cfg := GetConfig(NewMockPreferences())
+	cfg.SetArtworkDisplayMode(ArtworkDisplaySmartCrop)
 
-	// Ensure we start with SmartFit Disabled
-	cfg.SetSmartFitMode(SmartFitOff)
-	cfg.SetFaceBoostEnabled(false)
-	cfg.SetFaceCropEnabled(false)
-
-	// Create Plugin and Mock Manager
 	wp := &Plugin{cfg: cfg}
 	sm := NewMockSettingsManager()
+	sm.RenderTabs(*wp.CreatePrefsSchema(sm))
 
-	// Execute: Create Panel (this builds the UI and wires the logic)
-	tabsSchema := wp.CreatePrefsSchema(sm)
-	sm.RenderTabs(*tabsSchema)
-
-	// Verify Check Widgets exist
-	faceCrop := sm.allWidgets["faceCrop"].(*widget.Check)
-	faceBoost := sm.allWidgets["faceBoost"].(*widget.Check)
-	assert.NotNil(t, faceCrop, "Face Crop Check should be created")
-	assert.NotNil(t, faceBoost, "Face Boost Check should be created")
-
-	// Trigger initial state evaluation (in real SM this happens on create)
-	sm.refreshWidgetStates()
-
-	// Initial State: Should be Disabled
-	assert.True(t, faceCrop.Disabled(), "Face Crop should be disabled initially (SmartFitOff)")
-	assert.True(t, faceBoost.Disabled(), "Face Boost should be disabled initially (SmartFitOff)")
-
-	// Action: Change Smart Fit to Quality (Normal) via SetValue (simulates UI change)
-	sm.SetValue("smartFitMode", int(SmartFitNormal))
-
-	// Assertions: Should be Enabled
-	assert.False(t, faceCrop.Disabled(), "Face Crop should be enabled after switching to Quality")
-	assert.False(t, faceBoost.Disabled(), "Face Boost should be enabled after switching to Quality")
-
-	// Action: Change back to Disabled
-	sm.SetValue("smartFitMode", int(SmartFitOff))
-
-	// Assertions: Should be Disabled again
-	assert.True(t, faceCrop.Disabled(), "Face Crop should be disabled after switching to Disabled")
-	assert.True(t, faceBoost.Disabled(), "Face Boost should be disabled after switching to Disabled")
+	assert.NotContains(t, sm.allWidgets, "smartFitMode")
+	assert.NotContains(t, sm.allWidgets, "facePriority")
 }
 
-func TestReactiveAccordionTitle(t *testing.T) {
+// The face setting is fixed at Balanced, Face Crop on and Face Boost off, whatever was saved.
+func TestSavedFacePriorityIsReplacedByBalanced(t *testing.T) {
+	for _, saved := range [][2]bool{{false, false}, {false, true}, {true, true}} {
+		ResetConfig()
+		prefs := NewMockPreferences()
+		prefs.SetBool(FaceCropPrefKey, saved[0])
+		prefs.SetBool(FaceBoostPrefKey, saved[1])
+
+		cfg := GetConfig(prefs)
+		assert.True(t, cfg.GetFaceCropEnabled(), "saved %v", saved)
+		assert.False(t, cfg.GetFaceBoostEnabled(), "saved %v", saved)
+	}
+}
+
+func TestFrequencyChoiceIndex(t *testing.T) {
+	assert.Equal(t, 0, frequencyIndex(FrequencyNever))
+	assert.Equal(t, 2, frequencyIndex(FrequencyHourly))
+	assert.Equal(t, len(frequencyChoices), frequencyIndex(Frequency(45)), "Unlisted values map to Custom")
+}
+
+func TestSourceSubtitleCountsPendingChanges(t *testing.T) {
 	ResetConfig()
 	prefs := NewMockPreferences()
 	cfg := GetConfig(prefs)
@@ -355,30 +351,21 @@ func TestReactiveAccordionTitle(t *testing.T) {
 	id, _ := cfg.AddImageQuery("Wallhaven Default", "http://wallhaven.cc/1", true)
 
 	wp := &Plugin{cfg: cfg, providers: make(map[string]provider.ImageProvider)}
-	// Mock provider
 	p := &MockProvider{IDVal: "Wallhaven", TitleVal: "Wallhaven"}
 	wp.providers["Wallhaven"] = p
 
 	sm := NewMockSettingsManager()
 	builder := NewPrefsPanelBuilder(wp, sm)
+	subtitle := builder.createSubtitleFunc(p)
 
-	// Execute: Create Title Func
-	titleFunc := builder.createTitleFunc(p)
+	assert.Equal(t, "1 on", subtitle())
 
-	// Initial State: Should show (1 active)
-	assert.Contains(t, titleFunc(), "(1 active)")
+	// A pending untoggle counts as off until it is reverted.
+	sm.SetPendingChange(id, true)
+	assert.Equal(t, "None on", subtitle())
 
-	// Action: Simulate user untoggling the query in the UI (pending change)
-	sm.SetPendingChange(id, true) // baseline was 'true', so pending change makes it 'false' in the title logic
-
-	// Verify Reactivity: Title should update immediately when func is called (provided Refresh was triggered)
-	// In the real app, sm.RefreshUI() is called on toggle, which calls the accordion refreshers, which call the titleFunc.
-	assert.NotContains(t, titleFunc(), "(1 active)", "Title should no longer show active count after pending untoggle")
-	assert.Equal(t, "Wallhaven", titleFunc())
-
-	// Action: Reset pending change
 	sm.SetPendingChange(id, false)
-	assert.Contains(t, titleFunc(), "(1 active)")
+	assert.Equal(t, "1 on", subtitle())
 }
 
 // Minimal MockProvider for testing

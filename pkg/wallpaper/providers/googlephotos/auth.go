@@ -67,13 +67,12 @@ func (a *Authenticator) StartOAuthFlow(openURLFunc func(*url.URL) error) error {
 			<html>
 			<head>
 				<meta charset="UTF-8">
-				<title>Spice Connected</title>
-				<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+				<title>Paintpane: Connected</title>
 				<style>
 					body {
-						background: linear-gradient(135deg, #FFC107 0%, #FF9800 100%);
-						font-family: 'Press Start 2P', cursive;
-						color: #5D4037;
+						background: #f7f5f0;
+						font-family: "Segoe UI", system-ui, sans-serif;
+						color: #1d1b18;
 						text-align: center;
 						display: flex;
 						flex-direction: column;
@@ -81,79 +80,22 @@ func (a *Authenticator) StartOAuthFlow(openURLFunc func(*url.URL) error) error {
 						justify-content: center;
 						height: 100vh;
 						margin: 0;
-						overflow: hidden;
 					}
-					h1 {
-						font-size: 48px;
-						color: #FFF;
-						text-shadow: 4px 4px 0px #3E2723;
-						margin-bottom: 20px;
-						z-index: 10;
+					.box {
+						background: #fff;
+						border: 1px solid #e6e1d8;
+						border-radius: 12px;
+						padding: 32px 40px;
 					}
-					.subtitle {
-						font-size: 18px;
-						margin-bottom: 40px;
-						line-height: 1.5;
-					}
-					.success-box {
-						background: rgba(255, 255, 255, 0.9);
-						padding: 30px;
-						border-radius: 4px;
-						box-shadow: 8px 8px 0px #3E2723;
-						border: 4px solid #3E2723;
-						z-index: 10;
-						position: relative;
-					}
-					.btn {
-						background: #D32F2F;
-						color: white;
-						border: none;
-						padding: 15px 30px;
-						font-family: 'Press Start 2P', cursive;
-						font-size: 14px;
-						cursor: pointer;
-						margin-top: 20px;
-						box-shadow: 4px 4px 0px #3E2723;
-						text-decoration: none;
-						display: inline-block;
-					}
-					.btn:active {
-						transform: translate(2px, 2px);
-						box-shadow: 2px 2px 0px #3E2723;
-					}
-					/* Floating Chilies */
-					.chili {
-						position: absolute;
-						font-family: "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif;
-						font-size: 40px;
-						opacity: 0.8;
-						animation: float 6s ease-in-out infinite;
-						z-index: 1;
-					}
-					@keyframes float {
-						0% { transform: translateY(0px) rotate(0deg); }
-						50% { transform: translateY(-20px) rotate(10deg); }
-						100% { transform: translateY(0px) rotate(0deg); }
-					}
+					h1 { font-size: 22px; margin: 0 0 12px; }
+					p { margin: 0; color: #6b665e; line-height: 1.6; }
 				</style>
 			</head>
 			<body>
-				<!-- Floating Chilies -->
-				<div class="chili" style="top: 10%; left: 10%; animation-delay: 0s;">🌶️</div>
-				<div class="chili" style="top: 20%; right: 15%; animation-delay: 1s;">🌶️</div>
-				<div class="chili" style="bottom: 15%; left: 20%; animation-delay: 2s; font-size: 30px;">🌶️</div>
-				<div class="chili" style="bottom: 25%; right: 10%; animation-delay: 3s; font-size: 50px;">🌶️</div>
-				<div class="chili" style="top: 50%; left: 5%; animation-delay: 4s; font-size: 25px;">🌶️</div>
-
-				<h1>Spice</h1>
-				<div class="success-box">
-					<div style="font-size: 24px; color: #388E3C; margin-bottom: 20px;">Connected!</div>
-					<div class="subtitle">Successfully linked to<br>Google Photos</div>
-					<div style="font-size: 14px; opacity: 0.9; margin-top: 20px; font-weight: bold; color: #5D4037;">
-						Please close this tab<br>and return to Spice.
-					</div>
+				<div class="box">
+					<h1>Connected to Google Photos</h1>
+					<p>You can close this tab and return to Paintpane.</p>
 				</div>
-				<p style="margin-top: 50px; font-size: 12px; color: #FFF; text-shadow: 2px 2px 0px #3E2723; z-index: 10;">Add a little Spice to your screen.</p>
 			</body>
 			</html>
 		`)); err != nil {

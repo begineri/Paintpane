@@ -269,6 +269,7 @@ func TestProvider_FetchImages(t *testing.T) {
 					"path": "https://w.wallhaven.cc/full/img1.jpg",
 					"short_url": "https://wh.cc/img1",
 					"file_type": "image/jpeg",
+					"purity": "sketchy",
 					"uploader": { "username": "User1" }
 				},
 				{
@@ -276,6 +277,7 @@ func TestProvider_FetchImages(t *testing.T) {
 					"path": "https://w.wallhaven.cc/full/img2.png",
 					"short_url": "https://wh.cc/img2",
 					"file_type": "image/png",
+					"purity": "sfw",
 					"uploader": { "username": "User2" }
 				}
 			]
@@ -305,6 +307,8 @@ func TestProvider_FetchImages(t *testing.T) {
 	assert.Len(t, images, 2)
 	assert.Equal(t, "img1", images[0].ID)
 	assert.Equal(t, "User1", images[0].Attribution)
+	assert.Equal(t, "sketchy", images[0].Purity)
+	assert.Equal(t, "sfw", images[1].Purity)
 
 	// Test Error Case: Bad API Key (401)
 	pBad := NewProvider(&wallpaper.Config{}, client)

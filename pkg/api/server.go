@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"log"
+	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -47,8 +49,10 @@ func NewServer() *Server {
 	s := &Server{
 		mux: http.NewServeMux(),
 		upgrader: websocket.Upgrader{
+			// The program's own clients send no Origin; of browsers, only an extension may connect.
 			CheckOrigin: func(r *http.Request) bool {
-				return true
+				origin := r.Header.Get("Origin")
+				return origin == "" || isExtensionOrigin(origin)
 			},
 		},
 		clients:    make(map[*websocket.Conn]bool),
@@ -59,11 +63,64 @@ func NewServer() *Server {
 	return s
 }
 
+// Who may call the local API. Any program of the person's can reach 127.0.0.1, so the guards are
+// about browsers: a web page the person has open must not list or read their pictures (/local/),
+// add collections (/add) or listen to the wallpaper feed (/ws).
+//
+//   - /local/ serves the program's own sources (Favorites, Local Folder, Google Photos), which call
+//     it with Go's HTTP client: no Origin, no Fetch Metadata. Every browser request is refused.
+//   - /health, /add and /ws are the Spice browser extension's. Paintpane does not ship it, and the
+//     program itself never calls them, but a person may load it from extension/. Its manifest has
+//     host permissions for 127.0.0.1:49452, so it needs no CORS headers: requests from an
+//     extension origin are accepted, those from web pages are not.
+//   - Every route requires a loopback Host header, which shuts out a page that rebinds its own
+//     domain to 127.0.0.1 (its same-origin requests carry neither Origin nor Fetch Metadata).
 func (s *Server) setupRoutes() {
-	s.mux.HandleFunc("/health", s.enableCORS(s.handleHealth))
-	s.mux.HandleFunc("/ws", s.handleWebSocket)
-	s.mux.HandleFunc("/add", s.enableCORS(s.handleAdd))
-	s.mux.HandleFunc("/local/", s.enableCORS(s.handleLocal))
+	s.mux.HandleFunc("/health", localOrExtension(s.handleHealth))
+	s.mux.HandleFunc("/ws", localOrExtension(s.handleWebSocket))
+	s.mux.HandleFunc("/add", localOrExtension(s.handleAdd))
+	s.mux.HandleFunc("/local/", localOnly(s.handleLocal))
+}
+
+// localOnly lets through requests from local programs, refusing browsers altogether.
+func localOnly(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !isLoopbackHost(r.Host) || fromBrowserPage(r) {
+			http.Error(w, "this route is for Paintpane only", http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	}
+}
+
+// localOrExtension lets through requests from local programs and from browser extensions.
+func localOrExtension(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if !isLoopbackHost(r.Host) || (fromBrowserPage(r) && !isExtensionOrigin(r.Header.Get("Origin"))) {
+			http.Error(w, "this route is for Paintpane and its browser extension only", http.StatusForbidden)
+			return
+		}
+		next(w, r)
+	}
+}
+
+// fromBrowserPage reports whether a browser sent the request: it names an Origin (also "null", from
+// a file:// page) or Fetch Metadata other than "none" (typed into the address bar). Browsers send
+// Fetch Metadata to loopback addresses, so a cross-site request without an Origin (an image, a
+// no-cors fetch) is caught too.
+func fromBrowserPage(r *http.Request) bool {
+	site := r.Header.Get("Sec-Fetch-Site")
+	return r.Header.Get("Origin") != "" || (site != "" && site != "none")
+}
+
+// isExtensionOrigin reports whether origin belongs to a browser extension.
+func isExtensionOrigin(origin string) bool {
+	for _, scheme := range []string{"chrome-extension://", "moz-extension://", "safari-web-extension://"} {
+		if strings.HasPrefix(origin, scheme) && len(origin) > len(scheme) {
+			return true
+		}
+	}
+	return false
 }
 
 // RegisterNamespace registers a local directory to be served under /local/{name}.
@@ -77,22 +134,33 @@ func (s *Server) SetDynamicResolver(resolver NamespaceResolver) {
 	s.resolver = resolver
 }
 
-// enableCORS adds CORS headers to the handler.
-func (s *Server) enableCORS(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		// Allow extensions to access localhost
-		w.Header().Set("Access-Control-Allow-Origin", "*")
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
-
-		// Handle preflight requests
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
+// HandleDebug registers a dev-tooling handler under /debug/<path>. Requests that
+// come from a web page (they carry an Origin or a cross-site Sec-Fetch-Site
+// header, or name another host, as a page that rebinds its domain to
+// 127.0.0.1 does) are refused, so only local tools such as curl can use these
+// routes. Release builds do not register any.
+func (s *Server) HandleDebug(path string, h http.HandlerFunc) {
+	s.mux.HandleFunc("/debug/"+path, func(w http.ResponseWriter, r *http.Request) {
+		if !isLoopbackHost(r.Host) || fromBrowserPage(r) {
+			http.Error(w, "debug routes are for local tools only", http.StatusForbidden)
 			return
 		}
+		h(w, r)
+	})
+}
 
-		next(w, r)
+// isLoopbackHost reports whether a Host header names this machine by "localhost" or a loopback
+// address, with or without a port.
+func isLoopbackHost(host string) bool {
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
 	}
+	host = strings.TrimSuffix(strings.TrimPrefix(host, "["), "]")
+	if strings.EqualFold(host, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
 
 // SetAddCollectionHandler sets the callback for adding a collection.

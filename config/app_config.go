@@ -2,9 +2,6 @@ package config
 
 import "fyne.io/fyne/v2"
 
-// AppNotificationsEnabledKey is the key for the app notifications enabled preference
-const AppNotificationsEnabledKey = "app_notifications_enabled"
-
 // AppConfig holds the application-wide configuration
 type AppConfig struct {
 	prefs fyne.Preferences
@@ -13,16 +10,6 @@ type AppConfig struct {
 // NewAppConfig creates a new AppConfig instance
 func NewAppConfig(p fyne.Preferences) *AppConfig {
 	return &AppConfig{prefs: p}
-}
-
-// GetAppNotificationsEnabled returns whether system notifications are enabled
-func (c *AppConfig) GetAppNotificationsEnabled() bool {
-	return c.prefs.BoolWithFallback(AppNotificationsEnabledKey, true)
-}
-
-// SetAppNotificationsEnabled sets whether system notifications are enabled
-func (c *AppConfig) SetAppNotificationsEnabled(enabled bool) {
-	c.prefs.SetBool(AppNotificationsEnabledKey, enabled)
 }
 
 // AppUpdateCheckEnabledKey is the key for the app update check enabled preference
@@ -49,6 +36,19 @@ func (c *AppConfig) GetTheme() string {
 // SetTheme sets the application theme
 func (c *AppConfig) SetTheme(theme string) {
 	c.prefs.SetString(AppThemeKey, theme)
+}
+
+// AppAccentKey is the key for the accent colour preference
+const AppAccentKey = "app_accent"
+
+// GetAccent returns the saved accent colour key; "graphite" when none is saved.
+func (c *AppConfig) GetAccent() string {
+	return c.prefs.StringWithFallback(AppAccentKey, "graphite")
+}
+
+// SetAccent saves the accent colour key.
+func (c *AppConfig) SetAccent(key string) {
+	c.prefs.SetString(AppAccentKey, key)
 }
 
 // DebugLoggingEnabledKey is the key for the debug logging preference

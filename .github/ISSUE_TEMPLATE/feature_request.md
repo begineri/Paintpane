@@ -1,6 +1,6 @@
 ---
 name: Feature request
-about: Suggest an idea for Spice
+about: Suggest an idea for Paintpane
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''

@@ -25,9 +25,7 @@ func createColoredTestImage(width, height int, col color.Color) image.Image {
 
 func TestVirtualFramer_Passthrough(t *testing.T) {
 	mockProcessor := new(MockImageProcessor)
-	cfg := &Config{
-		VirtualFramingFallback: false,
-	}
+	cfg := &Config{}
 
 	framer := NewVirtualFramer(mockProcessor, cfg)
 
@@ -45,7 +43,7 @@ func TestVirtualFramer_Passthrough(t *testing.T) {
 
 func TestVirtualFramer_Passthrough_TinyImage(t *testing.T) {
 	mockProcessor := new(MockImageProcessor)
-	cfg := &Config{VirtualFramingFallback: true}
+	cfg := &Config{}
 
 	framer := NewVirtualFramer(mockProcessor, cfg)
 
@@ -61,6 +59,8 @@ func TestVirtualFramer_Passthrough_TinyImage(t *testing.T) {
 	mockProcessor.AssertExpectations(t)
 }
 
+// Smart crop never frames an image by itself, however large the mismatch: the crop strategy decides
+// (docs/ui_refresh.md section 12, v19).
 func TestVirtualFramer_ThresholdLogic(t *testing.T) {
 	tests := []struct {
 		name             string
@@ -70,11 +70,11 @@ func TestVirtualFramer_ThresholdLogic(t *testing.T) {
 		shouldFrame      bool
 	}{
 		{
-			name:            "Square on Ultrawide with 0.9 Threshold -> Frames",
+			name:            "Square on Ultrawide with 0.9 Threshold -> still passes to the cropper",
 			aspectThreshold: 0.9,
 			srcW:            1000, srcH: 1000, // 1.0 ratio
 			targetW: 3440, targetH: 1440, // 2.38 ratio (mismatch = 1.38)
-			shouldFrame: true,
+			shouldFrame: false,
 		},
 		{
 			name:            "Square on Ultrawide with 1.5 Threshold -> Bypasses",
@@ -96,7 +96,6 @@ func TestVirtualFramer_ThresholdLogic(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockProcessor := new(MockImageProcessor)
 			cfg := &Config{
-				VirtualFramingFallback: true,
 				Tuning: TuningConfig{
 					AspectThreshold: tt.aspectThreshold,
 				},
@@ -107,7 +106,6 @@ func TestVirtualFramer_ThresholdLogic(t *testing.T) {
 			srcImg := createNoisyImage(tt.srcW, tt.srcH)
 
 			if !tt.shouldFrame {
-				mockProcessor.On("CheckCompatibility", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 				mockProcessor.On("FitImage", mock.Anything, srcImg, tt.targetW, tt.targetH, provider.TuningOptions{Anchor: provider.AnchorAuto}).Return(createColoredTestImage(tt.targetW, tt.targetH, color.Black), nil)
 			} else {
 				// With the new logic, CheckCompatibility might not even be called if aspectDiff > threshold!
@@ -152,7 +150,6 @@ func createNoisyImage(width, height int) image.Image {
 func TestVirtualFramer_ObjectHeuristic(t *testing.T) {
 	// Set threshold to 1.5 so that AspectDiff doesn't force framing automatically (1000/2000 vs 1920/1080 diff is 1.27)
 	cfg := &Config{
-		VirtualFramingFallback: true,
 		Tuning: TuningConfig{
 			AspectThreshold: 1.5,
 		},
@@ -163,7 +160,6 @@ func TestVirtualFramer_ObjectHeuristic(t *testing.T) {
 		framer := NewVirtualFramer(mockProcessor, cfg)
 
 		studioImg := createColoredTestImage(1000, 2000, color.RGBA{128, 128, 128, 255})
-		mockProcessor.On("CheckCompatibility", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(nil)
 		mockProcessor.On("FitImage", mock.Anything, studioImg, 1920, 1080, provider.TuningOptions{Anchor: provider.AnchorAuto}).Return(createColoredTestImage(1920, 1080, color.Black), nil)
 
 		_, err := framer.FitImage(context.Background(), studioImg, 1920, 1080, provider.TuningOptions{Anchor: provider.AnchorAuto})
@@ -171,17 +167,16 @@ func TestVirtualFramer_ObjectHeuristic(t *testing.T) {
 		mockProcessor.AssertExpectations(t)
 	})
 
-	t.Run("Noisy Paint Strokes -> Frames", func(t *testing.T) {
+	t.Run("Noisy Paint Strokes -> Bypasses too: Smart crop does not frame by itself", func(t *testing.T) {
 		mockProcessor := new(MockImageProcessor)
 		framer := NewVirtualFramer(mockProcessor, cfg)
 
 		noisyImg := createNoisyImage(1000, 2000)
-		mockProcessor.On("CheckCompatibility", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("incompatible"))
+		mockProcessor.On("FitImage", mock.Anything, noisyImg, 1920, 1080, provider.TuningOptions{Anchor: provider.AnchorAuto}).Return(createColoredTestImage(1920, 1080, color.Black), nil)
 
-		outImg, err := framer.FitImage(context.Background(), noisyImg, 1920, 1080, provider.TuningOptions{Anchor: provider.AnchorAuto})
+		_, err := framer.FitImage(context.Background(), noisyImg, 1920, 1080, provider.TuningOptions{Anchor: provider.AnchorAuto})
 		assert.NoError(t, err)
-		assert.NotNil(t, outImg)
-		mockProcessor.AssertNotCalled(t, "FitImage", mock.Anything, mock.Anything, mock.Anything, mock.Anything, mock.Anything)
+		mockProcessor.AssertExpectations(t)
 	})
 }
 
@@ -208,40 +203,39 @@ func TestVirtualFramer_FrameStyleSelection(t *testing.T) {
 func TestVirtualFramer_Integration(t *testing.T) {
 	mockProcessor := new(MockImageProcessor)
 	cfg := &Config{
-		VirtualFramingFallback: true,
-		VirtualWallColor:       WallAlgorithmic,
+		VirtualWallColor: WallAlgorithmic,
 	}
 
 	framer := NewVirtualFramer(mockProcessor, cfg)
 
 	srcImg := createNoisyImage(1000, 2000) // Portrait noisy image
-	mockProcessor.On("CheckCompatibility", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(fmt.Errorf("incompatible"))
 
-	// Should frame.
-	outImg, err := framer.FitImage(context.Background(), srcImg, 1920, 1080, provider.TuningOptions{Anchor: provider.AnchorAuto})
+	// Framed only because the person chose to frame this image (Tune Image).
+	outImg, err := framer.FitImage(context.Background(), srcImg, 1920, 1080, provider.TuningOptions{Anchor: provider.AnchorAuto, FrameOverride: provider.FrameOverrideForceOn})
 	assert.NoError(t, err)
 	assert.NotNil(t, outImg)
 	assert.Equal(t, 1920, outImg.Bounds().Dx())
 	assert.Equal(t, 1080, outImg.Bounds().Dy())
 }
 
-func TestVirtualFramer_CheckCompatibility_ReturnsSentinelError(t *testing.T) {
+func TestVirtualFramer_CheckCompatibility_DoesNotRescueInSmartCrop(t *testing.T) {
 	mockProcessor := new(MockImageProcessor)
-	cfg := &Config{VirtualFramingFallback: true}
+	cfg := &Config{}
 	framer := NewVirtualFramer(mockProcessor, cfg)
 
-	// SmartFit says incompatible
-	mockProcessor.On("CheckCompatibility", 1000, 2000, 1920, 1080).Return(fmt.Errorf("incompatible aspect ratio"))
+	// SmartFit says incompatible: Smart crop keeps that answer (Quality skips the image).
+	incompatible := fmt.Errorf("incompatible aspect ratio")
+	mockProcessor.On("CheckCompatibility", 1000, 2000, 1920, 1080).Return(incompatible)
 
 	err := framer.CheckCompatibility(1000, 2000, 1920, 1080)
-	assert.Error(t, err)
-	assert.ErrorIs(t, err, ErrRequiresVirtualFraming)
+	assert.Equal(t, incompatible, err)
+	assert.NotErrorIs(t, err, ErrRequiresVirtualFraming)
 	mockProcessor.AssertExpectations(t)
 }
 
 func TestVirtualFramer_CheckCompatibility_PassesThroughSizeError(t *testing.T) {
 	mockProcessor := new(MockImageProcessor)
-	cfg := &Config{VirtualFramingFallback: true}
+	cfg := &Config{}
 	framer := NewVirtualFramer(mockProcessor, cfg)
 
 	// SmartFit says too small
@@ -256,7 +250,7 @@ func TestVirtualFramer_CheckCompatibility_PassesThroughSizeError(t *testing.T) {
 
 func TestVirtualFramer_CheckCompatibility_PassesThroughCompatible(t *testing.T) {
 	mockProcessor := new(MockImageProcessor)
-	cfg := &Config{VirtualFramingFallback: true}
+	cfg := &Config{}
 	framer := NewVirtualFramer(mockProcessor, cfg)
 
 	mockProcessor.On("CheckCompatibility", 1920, 1080, 1920, 1080).Return(nil)

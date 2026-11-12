@@ -7,7 +7,6 @@ import (
 	"github.com/dixieflatline76/Spice/v2/pkg/provider"
 	"github.com/dixieflatline76/Spice/v2/util"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 )
 
 func TestToggleFavorite_AutoAdvance(t *testing.T) {
@@ -36,7 +35,6 @@ func TestToggleFavorite_AutoAdvance(t *testing.T) {
 	// Mock deep delete path
 	mf.On("RemoveFavorite", img).Return(nil)
 	ms.On("Remove", img.ID).Return(img, true)
-	mm.On("NotifyUser", mock.Anything, mock.Anything).Return()
 	mm.On("RefreshTrayMenu").Return().Maybe()
 
 	// Mock background telemetry

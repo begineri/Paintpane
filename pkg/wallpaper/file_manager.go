@@ -1,6 +1,7 @@
 package wallpaper
 
 import (
+	"context"
 	"fmt"
 	"image"
 	_ "image/jpeg"
@@ -14,21 +15,25 @@ import (
 	"time"
 
 	"github.com/dixieflatline76/Spice/v2/util/log"
+
+	"github.com/dixieflatline76/Spice/v2/config"
 )
 
 // FileManager handles all file system operations for wallpaper images.
 // It enforces the directory structure for Source + Derivative architecture.
 type FileManager struct {
-	rootDir string
-	wg      sync.WaitGroup
-	closing atomic.Bool
+	derivativeDeleteMu   sync.Mutex    // Protects lastDerivativeDelete
+	lastDerivativeDelete chan struct{} // Closed when the most recent delete batch finishes
+	rootDir              string
+	wg                   sync.WaitGroup
+	closing              atomic.Bool
 }
 
 // NewFileManager creates a new FileManager with the given root directory.
 // The rootDir is typically ".../wallpaper_downloads".
 func NewFileManager(rootDir string) *FileManager {
 	return &FileManager{
-		rootDir: rootDir,
+		rootDir: config.ResolveLinkedDir(rootDir),
 	}
 }
 
@@ -56,6 +61,14 @@ func (fm *FileManager) EnsureDirs() error {
 			if err := os.MkdirAll(dir, 0755); err != nil {
 				return fmt.Errorf("failed to create directory %s: %w", dir, err)
 			}
+		}
+	}
+
+	// Whole-image display modes have no face-processing variants.
+	for _, mode := range []string{FullArtDir, FramedArtDir} {
+		dir := filepath.Join(fittedRoot, mode, StandardDir)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return fmt.Errorf("failed to create directory %s: %w", dir, err)
 		}
 	}
 
@@ -369,14 +382,51 @@ func (fm *FileManager) AsyncDeleteDerivatives(id string) {
 	}()
 }
 
+// DeleteOtherDerivativesAtResolution removes an image's derivatives for one resolution in every
+// other mode directory, keeping keepPath. Tuning applies across modes, so those files are stale.
+func (fm *FileManager) DeleteOtherDerivativesAtResolution(id, resolution, keepPath string) {
+	keep, err := os.Stat(keepPath)
+	if err != nil {
+		return // Without the file to keep, it cannot be told apart from the others.
+	}
+	err = filepath.Walk(filepath.Join(fm.rootDir, FittedRootDir), func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() || filepath.Base(filepath.Dir(path)) != resolution {
+			return nil
+		}
+		name := info.Name()
+		if strings.TrimSuffix(name, filepath.Ext(name)) != id || os.SameFile(keep, info) {
+			return nil
+		}
+		if err := os.Remove(path); err != nil {
+			log.Printf("DeleteOtherDerivativesAtResolution: failed to remove %s: %v", path, err)
+		}
+		return nil
+	})
+	if err != nil {
+		log.Printf("DeleteOtherDerivativesAtResolution: error walking fitted dir: %v", err)
+	}
+}
+
 // AsyncDeleteDerivativesBatch launches DeleteDerivatives for a slice of IDs.
 func (fm *FileManager) AsyncDeleteDerivativesBatch(ids []string) {
 	if fm.closing.Load() || len(ids) == 0 {
 		return
 	}
+
+	// Batches run one at a time, so waiting for the latest one covers all of them.
+	done := make(chan struct{})
+	fm.derivativeDeleteMu.Lock()
+	previous := fm.lastDerivativeDelete
+	fm.lastDerivativeDelete = done
+	fm.derivativeDeleteMu.Unlock()
+
 	fm.wg.Add(1)
 	go func() {
 		defer fm.wg.Done()
+		defer close(done)
+		if previous != nil {
+			<-previous
+		}
 		for _, id := range ids {
 			if fm.closing.Load() {
 				return
@@ -384,6 +434,23 @@ func (fm *FileManager) AsyncDeleteDerivativesBatch(ids []string) {
 			_ = fm.DeleteDerivatives(id)
 		}
 	}()
+}
+
+// WaitForDerivativeDeletes blocks until every batch started so far has finished. It returns false
+// if ctx ends first. Unlike WaitTimeout, it is safe while new work is being started.
+func (fm *FileManager) WaitForDerivativeDeletes(ctx context.Context) bool {
+	fm.derivativeDeleteMu.Lock()
+	done := fm.lastDerivativeDelete
+	fm.derivativeDeleteMu.Unlock()
+	if done == nil {
+		return true
+	}
+	select {
+	case <-done:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 // WaitTimeout waits for all in-flight asynchronous operations to finish up to timeout.

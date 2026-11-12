@@ -29,10 +29,8 @@ type BenchMockPluginManager struct {
 	mock.Mock
 }
 
-func (m *BenchMockPluginManager) Register(p ui.Plugin)           {}
-func (m *BenchMockPluginManager) Deregister(p ui.Plugin)         {}
-func (m *BenchMockPluginManager) NotifyUser(t, msg string)       {}
-func (m *BenchMockPluginManager) RegisterNotifier(n ui.Notifier) {}
+func (m *BenchMockPluginManager) Register(p ui.Plugin)   {}
+func (m *BenchMockPluginManager) Deregister(p ui.Plugin) {}
 func (m *BenchMockPluginManager) CreateMenuItem(l string, a func(), i string) *fyne.MenuItem {
 	return &fyne.MenuItem{}
 }
@@ -45,7 +43,7 @@ func (m *BenchMockPluginManager) GetPreferences() fyne.Preferences { return nil 
 func (m *BenchMockPluginManager) GetAssetManager() *asset.Manager  { return nil }
 func (m *BenchMockPluginManager) RefreshTrayMenu()                 {}
 func (m *BenchMockPluginManager) RebuildTrayMenu()                 {}
-func (m *BenchMockPluginManager) ShowTuneImagePopup(_ int, _ provider.TuningOptions, _ provider.TuningOptions, _ [9]string, _ [9]provider.CropAnchor, _ bool, _ func(provider.TuningOptions, func()), _ func()) {
+func (m *BenchMockPluginManager) ShowTuneImagePopup(_ int, _ string, _ provider.TuningOptions, _ provider.TuningOptions, _ [9]string, _ [9]provider.CropAnchor, _ ui.TunePreview, _ bool, _ func(provider.TuningOptions, func()), _ func()) {
 }
 
 // BenchMockProvider

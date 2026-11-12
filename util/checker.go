@@ -12,8 +12,8 @@ import (
 )
 
 const (
-	githubOwner = "dixieflatline76"
-	githubRepo  = "Spice"
+	githubOwner = "begineri"
+	githubRepo  = "Paintpane"
 )
 
 // CheckForUpdatesResult holds the outcome of the update check.

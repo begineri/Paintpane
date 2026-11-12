@@ -1,21 +1,21 @@
 {
     "description": "Art Institute of Chicago: Curated Collections",
-    "version": "v1.0.0",
+    "version": "v1.0.1",
     "collections": [
         {
             "key": "artic_highlights",
-            "name": "⭐ Best of AIC",
+            "name": "⭐ Best of the Art Institute",
             "name_translations": {
-                "de": "⭐ Das Beste von AIC",
-                "es": "⭐ Lo Mejor de AIC",
-                "fr": "⭐ Le Meilleur de l'AIC",
-                "it": "⭐ Il Meglio dell'AIC",
-                "ja": "⭐ AICのベスト",
-                "pt": "⭐ O Melhor do AIC",
-                "ru": "⭐ Лучшее из AIC",
-                "uk": "⭐ Найкраще з AIC",
-                "zh-CN": "⭐ AIC精选",
-                "zh-TW": "⭐ AIC精選"
+                "de": "⭐ Das Beste des Art Institute of Chicago",
+                "es": "⭐ Lo Mejor del Instituto de Arte de Chicago",
+                "fr": "⭐ Le Meilleur de l'Institut d'art de Chicago",
+                "it": "⭐ Il Meglio dell'Art Institute of Chicago",
+                "ja": "⭐ シカゴ美術館のベスト",
+                "pt": "⭐ O Melhor do Instituto de Arte de Chicago",
+                "ru": "⭐ Лучшее из Чикагского института искусств",
+                "uk": "⭐ Найкраще з Чиказького інституту мистецтв",
+                "zh-CN": "⭐ 芝加哥艺术博物馆精选",
+                "zh-TW": "⭐ 芝加哥藝術博物館精選"
             },
             "type": "curated",
             "ids": [
@@ -179,8 +179,8 @@
                 "pt": "Pinturas Europeias (Pré-Século XIX e Realismo)",
                 "ru": "Европейская живопись (До 19 века и Реализм)",
                 "uk": "Європейський живопис (До 19 століття та Реалізм)",
-                "zh-CN": "欧洲绘画 (19世纪前与现实主义)",
-                "zh-TW": "歐洲繪畫 (19世紀前與現實主義)"
+                "zh-CN": "欧洲绘画（19 世纪前与现实主义）",
+                "zh-TW": "歐洲繪畫（19 世紀前與現實主義）"
             },
             "type": "curated",
             "ids": [
@@ -213,8 +213,8 @@
                 "pt": "Nus Artísticos (Mídia Mista)",
                 "ru": "Художественные Ню (Смешанная техника)",
                 "uk": "Художні ню (Змішана техніка)",
-                "zh-CN": "艺术裸体 (混合媒介)",
-                "zh-TW": "藝術裸體 (混合媒材)"
+                "zh-CN": "艺术裸体（混合媒介）",
+                "zh-TW": "藝術裸體（混合媒材）"
             },
             "type": "curated",
             "ids": [

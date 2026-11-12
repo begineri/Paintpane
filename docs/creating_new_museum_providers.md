@@ -244,3 +244,16 @@ img := &provider.Image{
 ```
 
 If you hardcode the museum name into the attribution string, it will result in redundant UI text for the user (e.g., "By The Getty - The Getty - [Title]").
+
+## 9. Image Licence and Credit
+
+Before a museum ships, check the licence of the images Paintpane actually downloads (the image size
+requested can change it: the National Palace Museum's mid-resolution images are CC BY 4.0).
+
+- **Credit required** (CC BY and the like): add a section to the EULA (`asset/text/eula.txt` and its
+  translations) under "Third-Party Services and Content" with the credit in the museum's own words,
+  copied from its website, and set the detail page's licence link text to that licence.
+- **No credit required** (CC0, public domain): no EULA change; the link reads "Open Access (CC0)".
+- Do not put a credit in the tray menu or on the wallpaper.
+
+The National Palace Museum provider (`pkg/wallpaper/providers/npm`) is the example of a required credit.

@@ -31,7 +31,7 @@ func TestLocalHandler_Attribution(t *testing.T) {
 	handler := s.Handler()
 
 	// Test case 1: "google_photos" should suppress author in attribution
-	reqGP := httptest.NewRequest("GET", "/local/google_photos/gp_col_1/images?page=1", nil)
+	reqGP := localRequest("/local/google_photos/gp_col_1/images?page=1")
 	wGP := httptest.NewRecorder()
 	handler.ServeHTTP(wGP, reqGP)
 
@@ -44,7 +44,7 @@ func TestLocalHandler_Attribution(t *testing.T) {
 	assert.Equal(t, "Vacation", imagesGP[0].Attribution, "Google Photos should suppress author name")
 
 	// Test case 2: "other_provider" should include author
-	reqOther := httptest.NewRequest("GET", "/local/other_provider/op_col_1/images?page=1", nil)
+	reqOther := localRequest("/local/other_provider/op_col_1/images?page=1")
 	wOther := httptest.NewRecorder()
 	handler.ServeHTTP(wOther, reqOther)
 
@@ -124,7 +124,7 @@ func TestLocalHandler_Security_Direct(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest("GET", tt.path, nil)
+			req := localRequest(tt.path)
 			// Manually set RequestURI/URL.Path to ensure it's not cleaned by NewRequest if possible,
 			// though NewRequest parses it.
 			// We can manually invoke handleLocal which uses r.URL.Path
@@ -161,7 +161,7 @@ func TestLocalHandler_Pagination(t *testing.T) {
 	handler := s.Handler()
 
 	// Page 1, PerPage 4 -> should get img0, img1, img2, img3
-	req1 := httptest.NewRequest("GET", "/local/listing_test/many_images/images?page=1&per_page=4", nil)
+	req1 := localRequest("/local/listing_test/many_images/images?page=1&per_page=4")
 	w1 := httptest.NewRecorder()
 	handler.ServeHTTP(w1, req1)
 
@@ -174,7 +174,7 @@ func TestLocalHandler_Pagination(t *testing.T) {
 	assert.Equal(t, "LocalFolder_many_images_img3", images1[3].ID)
 
 	// Page 2, PerPage 4 -> should get img4, img5, img6, img7
-	req2 := httptest.NewRequest("GET", "/local/listing_test/many_images/images?page=2&per_page=4", nil)
+	req2 := localRequest("/local/listing_test/many_images/images?page=2&per_page=4")
 	w2 := httptest.NewRecorder()
 	handler.ServeHTTP(w2, req2)
 
@@ -186,7 +186,7 @@ func TestLocalHandler_Pagination(t *testing.T) {
 	assert.Equal(t, "LocalFolder_many_images_img4", images2[0].ID)
 
 	// Page 3, PerPage 4 -> should get img8, img9 (only 2 left)
-	req3 := httptest.NewRequest("GET", "/local/listing_test/many_images/images?page=3&per_page=4", nil)
+	req3 := localRequest("/local/listing_test/many_images/images?page=3&per_page=4")
 	w3 := httptest.NewRecorder()
 	handler.ServeHTTP(w3, req3)
 
@@ -199,7 +199,7 @@ func TestLocalHandler_Pagination(t *testing.T) {
 	assert.Equal(t, "LocalFolder_many_images_img9", images3[1].ID)
 
 	// Page 4 -> Empty
-	req4 := httptest.NewRequest("GET", "/local/listing_test/many_images/images?page=4&per_page=4", nil)
+	req4 := localRequest("/local/listing_test/many_images/images?page=4&per_page=4")
 	w4 := httptest.NewRecorder()
 	handler.ServeHTTP(w4, req4)
 
@@ -208,4 +208,11 @@ func TestLocalHandler_Pagination(t *testing.T) {
 	err = json.Unmarshal(w4.Body.Bytes(), &images4)
 	assert.NoError(t, err)
 	assert.Len(t, images4, 0)
+}
+
+// localRequest is a GET as the program's own sources send it: to 127.0.0.1:49452, with no Origin.
+func localRequest(target string) *http.Request {
+	req := httptest.NewRequest(http.MethodGet, target, nil)
+	req.Host = "127.0.0.1:49452"
+	return req
 }

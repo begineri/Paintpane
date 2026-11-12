@@ -21,7 +21,7 @@ func TestMSIXStagingPaths(t *testing.T) {
 	defer os.RemoveAll(tmpDir)
 
 	picStaging := filepath.Join(tmpDir, "Pictures", "SpiceWallpapers")
-	docStaging := filepath.Join(tmpDir, "Documents", "Spice")
+	docStaging := filepath.Join(tmpDir, "Documents", "Paintpane")
 
 	// Save original vars and restore after test
 	origFamily := msixPackageFamilyName

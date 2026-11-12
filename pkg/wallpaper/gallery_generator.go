@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"image"
 	_ "image/gif"
-	"image/jpeg"
 	_ "image/png"
 	"io"
 	"net/http"
@@ -159,9 +158,10 @@ func GenerateGalleryForProvider(ctx context.Context, prov provider.ImageProvider
 							items[index].Width = float64(framedImg.Bounds().Dx())
 							items[index].Height = float64(framedImg.Bounds().Dy())
 
-							var encBuf bytes.Buffer
-							if err := jpeg.Encode(&encBuf, framedImg, &jpeg.Options{Quality: 90}); err == nil {
-								b = encBuf.Bytes()
+							// Width and Height above set how large the piece hangs on the wall; the
+							// pixels are only for looking at, so they are scaled down and compressed.
+							if small, err := gallery.EncodeThumbnail(framedImg); err == nil {
+								b = small
 								ct = "image/jpeg"
 							}
 						} else {

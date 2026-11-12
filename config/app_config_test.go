@@ -193,17 +193,6 @@ func TestAppConfig(t *testing.T) {
 	prefs := NewMockPreferences()
 	cfg := NewAppConfig(prefs)
 
-	t.Run("Notifications", func(t *testing.T) {
-		// Default should be true
-		assert.True(t, cfg.GetAppNotificationsEnabled())
-
-		cfg.SetAppNotificationsEnabled(false)
-		assert.False(t, cfg.GetAppNotificationsEnabled())
-
-		cfg.SetAppNotificationsEnabled(true)
-		assert.True(t, cfg.GetAppNotificationsEnabled())
-	})
-
 	t.Run("UpdateCheck", func(t *testing.T) {
 		// Default should be true
 		assert.True(t, cfg.GetUpdateCheckEnabled())

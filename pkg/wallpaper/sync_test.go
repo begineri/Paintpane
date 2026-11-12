@@ -3,6 +3,7 @@
 package wallpaper
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -69,10 +70,11 @@ func TestSyncMonitors_RefreshUI(t *testing.T) {
 	menu := wp.CreateTrayMenu()
 	found := false
 	for _, item := range menu.Items {
-		if item.Label == "By: Artist" {
+		// The first item describes what is on screen: "Title — Artist · Source".
+		if strings.HasPrefix(item.Label, "Artist") {
 			found = true
 			break
 		}
 	}
-	assert.True(t, found, "Expected 'By: Artist' in tray menu items")
+	assert.True(t, found, "Expected the current artist in the tray menu header")
 }

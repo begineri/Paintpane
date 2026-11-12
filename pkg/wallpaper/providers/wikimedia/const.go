@@ -6,7 +6,7 @@ const (
 
 	// WikimediaUserAgent is the required User-Agent header for Wikimedia API requests.
 	// Policy: https://meta.wikimedia.org/wiki/User-Agent_policy
-	WikimediaUserAgent = "Spice-Wallpaper-App/1.0 (https://github.com/dixieflatline76/Spice; contact@dixieflatline.com)"
+	WikimediaUserAgent = "Paintpane/1.0 (https://github.com/begineri/Paintpane; https://github.com/begineri/Paintpane/issues)"
 
 	// WikimediaDomainRegexp matches commons.wikimedia.org or wikipedia.org URLs
 	WikimediaDomainRegexp = `^https?://(commons\.wikimedia\.org|.*\.wikipedia\.org)/.*$`

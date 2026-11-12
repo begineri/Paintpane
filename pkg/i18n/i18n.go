@@ -94,6 +94,12 @@ func getEffectiveLanguage() string {
 	return code
 }
 
+// EffectiveLanguage returns the language code in use: the chosen language, or the
+// system's while the setting is System default ("en" when it is not recognised).
+func EffectiveLanguage() string {
+	return getEffectiveLanguage()
+}
+
 // SetLanguage sets the application-wide language.
 // Supported: "English", "Deutsch" or codes "en", "de".
 // Empty string or "System Default" reverts to system locale.

@@ -303,7 +303,7 @@ graph TD
     I --> Out
 ```
 
-**Key design insight 1 (Virtual Framing)**: The `VirtualFramer` sits completely in front of the `SmartImageProcessor`. If an image has extreme aspect ratios but framing is enabled, the pipeline rescues it using a Sentinel Error (`ErrRequiresVirtualFraming`), skipping the crop logic entirely and rendering a blurred museum matting around the untouched artwork.
+**Key design insight 1 (Virtual Framing)**: The `VirtualFramer` sits completely in front of the `SmartImageProcessor`. If an image has extreme aspect ratios but framing is enabled, the pipeline rescues it using a Sentinel Error (`ErrRequiresVirtualFraming`), skipping the crop logic entirely and rendering a blurred museum matting around the untouched artwork. The global Artwork Display mode can also send every image past the crop logic, either framed or plain ([design](artwork_display_modes.md)).
 
 **Key design insight 2 (Crop Strategies)**: All cropping strategies converge on `smartPanAndResize()`, which takes a center point and crops the largest possible region matching the target aspect ratio around that point. Face detection and smartcrop are **completely separate paths** — they never interact. This design makes extending the crop logic (e.g., user crop anchors) trivial: any new strategy just provides a center point.
 

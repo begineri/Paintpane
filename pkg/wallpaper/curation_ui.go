@@ -34,11 +34,31 @@ func CreateCuratedQueryPanel(p provider.ImageProvider, sm setting.SettingsManage
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title: i18n.T("Curated Collections"),
-				Items: items,
+				Title:     i18n.T("Curated collections"),
+				SelectAll: curatedSelectAll(p, col.Entries),
+				Items:     items,
 			},
 		},
 	}
+}
+
+// curatedSelectAll is the Select all switch in the curated collections' header,
+// which turns them all on or off; it shows on while every collection is on.
+func curatedSelectAll(p provider.ImageProvider, entries []curation.CollectionEntry) *schema.SelectAllItem {
+	members := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		members = append(members, curatedSettingName(p, entry))
+	}
+	return &schema.SelectAllItem{
+		Name:    p.ID() + "_curated_all",
+		Label:   i18n.T("Select all"),
+		Members: members,
+	}
+}
+
+// curatedSettingName is the setting name of a curated collection's switch.
+func curatedSettingName(p provider.ImageProvider, entry curation.CollectionEntry) string {
+	return p.ID() + "_" + entry.Key
 }
 
 func buildCuratedUIItem(p provider.ImageProvider, sm setting.SettingsManager, cfg *Config, entry curation.CollectionEntry) schema.ItemSchema {
@@ -56,16 +76,17 @@ func buildCuratedUIItem(p provider.ImageProvider, sm setting.SettingsManager, cf
 
 	actionText := ""
 	var actionFunc func()
-	label := i18n.TMap(entry.Name, entry.NameTranslations)
+	label := strings.TrimSpace(i18n.TMap(entry.Name, entry.NameTranslations))
+	note := ""
 
 	if entry.Type == "curated" && len(entry.IDs) > 0 {
 		actionText = i18n.T("Preview")
-		label = fmt.Sprintf("%s (%d Pieces)", label, len(entry.IDs))
+		note = curatedPieces(len(entry.IDs))
 
 		actionFunc = func() {
 			safeName := strings.ReplaceAll(strings.ToLower(entry.Key), " ", "_")
 			fileName := fmt.Sprintf("%s.html", safeName)
-			providerCacheDir := filepath.Join(config.GetWorkingDir(), "cache", strings.ToLower(p.ID()))
+			providerCacheDir := filepath.Join(config.GetCacheDir(), strings.ToLower(p.ID()))
 			outPath := filepath.Join(providerCacheDir, fileName)
 
 			langParam := i18n.GetLanguage()
@@ -85,12 +106,12 @@ func buildCuratedUIItem(p provider.ImageProvider, sm setting.SettingsManager, cf
 	} else if entry.Type == "curated" && len(entry.Items) > 0 {
 		// Pre-resolved items (e.g. Rijksmuseum)
 		actionText = i18n.T("Preview")
-		label = fmt.Sprintf("%s (%d Pieces)", label, len(entry.Items))
+		note = curatedPieces(len(entry.Items))
 
 		actionFunc = func() {
 			safeName := strings.ReplaceAll(strings.ToLower(entry.Key), " ", "_")
 			fileName := fmt.Sprintf("%s.html", safeName)
-			providerCacheDir := filepath.Join(config.GetWorkingDir(), "cache", strings.ToLower(p.ID()))
+			providerCacheDir := filepath.Join(config.GetCacheDir(), strings.ToLower(p.ID()))
 			outPath := filepath.Join(providerCacheDir, fileName)
 
 			langParam := i18n.GetLanguage()
@@ -110,10 +131,12 @@ func buildCuratedUIItem(p provider.ImageProvider, sm setting.SettingsManager, cf
 	}
 
 	boolItem := schema.BoolItem{
-		Name:         p.ID() + "_" + entry.Key,
+		Name:         curatedSettingName(p, entry),
 		Label:        label,
-		ActionText:   "",
-		ActionFunc:   nil,
+		Note:         note,
+		ActionText:   actionText,
+		ActionIcon:   "view",
+		ActionFunc:   actionFunc,
 		InitialValue: active,
 		NeedsRefresh: true,
 		ApplyFunc: func(b bool) {
@@ -134,19 +157,10 @@ func buildCuratedUIItem(p provider.ImageProvider, sm setting.SettingsManager, cf
 		},
 	}
 
-	if actionFunc != nil {
-		btnItem := schema.ButtonItem{
-			Name:       p.ID() + "_" + entry.Key + "_preview",
-			ButtonText: actionText,
-			OnPressed:  actionFunc,
-		}
-		return schema.HorizontalRowItem{
-			ID:            p.ID() + "_" + entry.Key + "_row",
-			Items:         []schema.ItemSchema{boolItem, btnItem},
-			Layout:        schema.RowLayoutHBoxSpacer,
-			ShowSeparator: true,
-		}
-	}
-
 	return boolItem
+}
+
+// curatedPieces is the number of pieces shown after a collection's name.
+func curatedPieces(count int) string {
+	return i18n.Tf("{{.Count}} pieces", map[string]any{"Count": count})
 }

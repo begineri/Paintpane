@@ -73,10 +73,12 @@ type Plugin struct {
 	updateCallback      func()
 
 	// New Components
-	store        StoreInterface
-	fm           *FileManager
-	pipeline     *Pipeline
-	jobSubmitter JobSubmitter // Interface for testing
+	store         StoreInterface
+	fm            *FileManager
+	pipeline      *Pipeline
+	jobSubmitter  JobSubmitter       // Interface for testing
+	rebuildMu     sync.Mutex         // Protects rebuildCancel
+	rebuildCancel context.CancelFunc // Cancels the derivative rebuild in progress
 
 	// Configuration and State
 	fetchingInProgress *util.SafeFlag
@@ -107,6 +109,13 @@ type Plugin struct {
 	// Rate limiters for PacedProviders
 	apiLimiters     sync.Map // string (providerID) -> *rate.Limiter
 	processLimiters sync.Map // string (providerID) -> *rate.Limiter
+
+	// Pauses a provider's downloads while its image server cannot be reached.
+	backoffOnce sync.Once
+	backoff     *downloadBackoff
+
+	// jobClaims keeps one job per image at a time (A2 phase 5 #4).
+	jobClaims jobClaims
 
 	// Context tracking for the overarching fetch loop
 	globalFetchCtx    context.Context
@@ -373,6 +382,7 @@ func (wp *Plugin) Activate() {
 	// Create a new context for this activation cycle
 	wp.ctx, wp.cancel = context.WithCancel(context.Background())
 	pipeline := NewPipeline(wp.ctx, wp.cfg, wp.store.(*ImageStore), wp.ProcessImageJob, wp.getAPILimiter, wp.getProcessLimiter)
+	pipeline.SetDownloadHold(wp.downloadBackoff().pausedFor)
 	// Publish the pipeline/submitter under the same lock used by the fetch goroutines that
 	// read wp.jobSubmitter, so the pre-Activate nil guard is race-free.
 	wp.downloadMutex.Lock()
@@ -391,10 +401,22 @@ func (wp *Plugin) Activate() {
 	// Reconcile favorite flags against live data to prevent ghost favorites
 	wp.reconcileFavorites()
 
+	// A start Windows made at logon waits before it fetches or processes anything (D2); a start the
+	// person made, or one with an empty library, does not.
+	delay := wp.startupDelay()
+	if delay > 0 {
+		log.Printf("[Startup] Started at logon. Fetching and processing wait %v.", delay.Round(time.Second))
+	}
+	cleanOrphans := func() {
+		if wp.fm != nil {
+			wp.fm.AsyncCleanupOrphans(wp.store.GetKnownIDs())
+		}
+	}
+
 	// Perform an initial scan to catch and delete any stranded/orphaned files
 	// caused by file-locking errors or crashes during the previous session.
-	if wp.fm != nil {
-		wp.fm.AsyncCleanupOrphans(wp.store.GetKnownIDs())
+	if delay == 0 {
+		cleanOrphans()
 	}
 
 	// Initialize Monitors (Actors)
@@ -452,12 +474,22 @@ func (wp *Plugin) Activate() {
 	wp.syncStoreWithConfig()
 	wp.store.LoadAvoidSet(wp.cfg.GetAvoidSet())
 
-	workers := runtime.NumCPU()
-	if wp.cfg != nil && wp.cfg.MaxConcurrentProcessors > 0 {
-		workers = wp.cfg.MaxConcurrentProcessors
-	}
+	// The desktop still shows last time's wallpapers; know which they are (A2 §14.9 #2).
+	wp.restoreLastShownImages()
+
 	// Start Pipeline
-	wp.pipeline.Start(workers)
+	wp.pipeline.Start(wp.pipelineWorkerCount())
+
+	// The startup Sync may have left images without derivatives, such as after an upgrade to a
+	// new default display mode or quitting during a rebuild. Does nothing if none are missing.
+	if delay == 0 {
+		go wp.rebuildMissingDerivatives()
+	} else {
+		wp.afterStartupDelay(delay, func() {
+			cleanOrphans()
+			go wp.rebuildMissingDerivatives()
+		})
+	}
 
 	// Nightly scheduler now runs unconditionally to handle metadata syncs, updates, etc.
 	// Actual image downloading is gated within the scheduler by GetNightlyRefresh().
@@ -465,22 +497,16 @@ func (wp *Plugin) Activate() {
 
 	wp.SetSmartFit(wp.cfg.GetSmartFit())
 
-	if wp.cfg.GetChgImgOnStart() {
-		go func() {
-			time.Sleep(3 * time.Second)
-			wp.RefreshImagesAndPulse()
-		}()
-	} else {
-		// Reset all pages to 1 on clean activation if not pulsing
-		wp.downloadMutex.Lock()
-		for _, q := range wp.cfg.GetQueries() {
-			wp.queryPages[q.ID] = util.NewSafeIntWithValue(1)
-		}
-		wp.downloadMutex.Unlock()
-		// Sync Collections and then fetch
-		wp.SyncProviders()
-		wp.FetchNewImages(false)
-	}
+	// A start keeps the wallpaper from last time; the next scheduled change replaces it. There is
+	// no "change wallpaper on start" setting any more (owner's choice, 2026-11-08).
+	//
+	// Each query goes on from the page it reached last time (loadQueryPages in Init); starting
+	// every query at page 1 again fetched pages whose images the library already had. Sources that
+	// page with a cursor get it back here (page_cursors.go).
+	wp.restorePageCursors()
+	// Sync collections and fetch, unless the library is already full (C1); after an autostart,
+	// not before the delay is over (D2).
+	wp.afterStartupDelay(delay, wp.startupFetch)
 	wp.ChangeWallpaperFrequency(wp.cfg.GetWallpaperChangeFrequency(), false)
 
 	// Start monitor watcher
@@ -548,6 +574,12 @@ func (wp *Plugin) Deactivate() {
 // -------------------------------------------------------------------------
 //  Command & Control Shims (Legacy Interface -> Monitor Actors)
 // -------------------------------------------------------------------------
+
+// NextLockScreen gives the lock screen another image and leaves the desktop alone (tray T15). The
+// lock screen follows the primary monitor, so the command goes to monitor 0.
+func (wp *Plugin) NextLockScreen() {
+	wp.dispatch(0, CmdNextLockScreen)
+}
 
 // SetNextWallpaper advances the wallpaper.
 func (wp *Plugin) SetNextWallpaper(monitorID int, forceImmediate bool) {
@@ -625,48 +657,25 @@ func (wp *Plugin) TogglePauseMonitorAction(monitorID int) {
 		return
 	}
 
-	// Case 1: Global Toggle
-	if monitorID == -1 {
-		wp.monMu.RLock()
-		// Determine target state based on monitor 0's status (or first available)
-		targetPaused := true
-		for id := range wp.Monitors {
-			targetPaused = !wp.IsMonitorPaused(id)
-			break
-		}
-		wp.monMu.RUnlock()
-
-		wp.dispatch(-1, CmdPause)
-
-		msg := i18n.T("All Monitors: Resuming Play")
-		if targetPaused {
-			msg = i18n.T("All Monitors: Pausing Play")
-		}
-		wp.manager.NotifyUser(i18n.T("Wallpaper Rotation"), msg)
-		return
-	}
-
-	// Case 2: Targeted Toggle
-	willBePaused := !wp.IsMonitorPaused(monitorID)
+	// -1 toggles every monitor. No notification is shown (prototype v35); the tray shows the
+	// state.
 	wp.dispatch(monitorID, CmdPause)
-
-	msg := i18n.Tf("Display {{.ID}}: Resuming Play", map[string]any{"ID": monitorID + 1})
-	if willBePaused {
-		msg = i18n.Tf("Display {{.ID}}: Pausing Play", map[string]any{"ID": monitorID + 1})
-	}
-	wp.manager.NotifyUser(i18n.T("Wallpaper Rotation"), msg)
 }
 
 // IsMonitorPaused returns the current pause state of a specific monitor.
-// NOTE: State.Paused is written by the MC actor goroutine (single writer).
-// This read is safe for UI display purposes; exact timing is not critical.
+// State.Paused is written by the MC actor goroutine, so it is read under mc.mu. That wait can
+// last as long as the actor's current command, so monMu is released first, and this must never
+// be called from the actor goroutine itself.
 func (wp *Plugin) IsMonitorPaused(monitorID int) bool {
 	wp.monMu.RLock()
-	defer wp.monMu.RUnlock()
-	if mc, ok := wp.Monitors[monitorID]; ok {
-		return mc.State.Paused
+	mc, ok := wp.Monitors[monitorID]
+	wp.monMu.RUnlock()
+	if !ok {
+		return false
 	}
-	return false
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+	return mc.State.Paused
 }
 
 // GetShortcutsDisabled returns whether hotkeys are disabled.
@@ -761,14 +770,6 @@ func (wp *Plugin) ChangeWallpaperFrequency(newFreq Frequency, silent bool) {
 		}
 	}
 
-	if !silent {
-		msg := fmt.Sprintf("%d %s", int(newFreq), i18n.T("Minutes"))
-		if newFreq == FrequencyNever {
-			msg = i18n.T("Never (Paused)")
-		}
-		wp.manager.NotifyUser(i18n.T("Wallpaper Change Frequency"), msg)
-	}
-
 	if wp.manager != nil {
 		wp.manager.RebuildTrayMenu()
 	}
@@ -808,15 +809,34 @@ func (wp *Plugin) TriggerOpenSettings() {
 	}
 }
 
+// ViewCurrentImageOnWeb opens the page of the image this display shows.
 func (wp *Plugin) ViewCurrentImageOnWeb(monitorID int) {
 	wp.monMu.RLock()
-	defer wp.monMu.RUnlock()
-	if mc, ok := wp.Monitors[monitorID]; ok {
-		if mc.State.CurrentImage.ViewURL != "" {
-			if u, err := url.Parse(mc.State.CurrentImage.ViewURL); err == nil && wp.manager != nil {
-				_ = wp.manager.OpenURL(u)
-			}
-		}
+	mc, ok := wp.Monitors[monitorID]
+	wp.monMu.RUnlock()
+	if !ok {
+		return
+	}
+	mc.mu.RLock()
+	img := mc.State.CurrentImage
+	mc.mu.RUnlock()
+	wp.ViewImageOnWeb(img)
+}
+
+// ViewImageOnWeb opens img's page (its ViewURL) in the browser. It logs why when there is none,
+// so a click on the tray's first row that opens nothing leaves a trace.
+func (wp *Plugin) ViewImageOnWeb(img provider.Image) {
+	if img.ViewURL == "" {
+		log.Printf("No page to open for %s (%s)", img.ID, img.Provider)
+		return
+	}
+	u, err := url.Parse(img.ViewURL)
+	if err != nil {
+		log.Printf("Cannot open the page of %s: %v", img.ID, err)
+		return
+	}
+	if wp.manager != nil {
+		_ = wp.manager.OpenURL(u)
 	}
 }
 
@@ -859,7 +879,6 @@ func (wp *Plugin) ToggleFavorite(img provider.Image) {
 		} else {
 			wp.store.SetFavorited(img.ID, false)
 		}
-		wp.manager.NotifyUser(i18n.T("Favorites"), i18n.T("Removed from favorites."))
 	} else {
 		// Add
 		if err := wp.favoriter.AddFavorite(img); err != nil {
@@ -876,7 +895,6 @@ func (wp *Plugin) ToggleFavorite(img provider.Image) {
 		}
 		wp.downloadMutex.Unlock()
 
-		wp.manager.NotifyUser(i18n.T("Favorites"), i18n.T("Added to favorites."))
 		// Targeted Responsiveness Fix: Only trigger fetch for Favorites provider.
 		go wp.RequestFetch("Favorites")
 	}
@@ -967,6 +985,47 @@ func (wp *Plugin) ClearCache() {
 // -------------------------------------------------------------------------
 //  Helpers
 // -------------------------------------------------------------------------
+
+// ToggleShowNudes flips the nude image setting.
+func (wp *Plugin) ToggleShowNudes() {
+	wp.SetShowNudes(!wp.cfg.GetShowNudes())
+}
+
+// SetShowNudes sets whether nude images may be shown. Hiding also replaces any
+// nude image currently on screen; showing takes effect from the next rotation.
+func (wp *Plugin) SetShowNudes(show bool) {
+	wp.cfg.SetShowNudes(show)
+	log.Printf("Show nude images set to %v", show)
+	if !show {
+		wp.dispatch(-1, CmdEnforceNudeFilter)
+	}
+	if wp.manager != nil {
+		wp.manager.RebuildTrayMenu()
+	}
+}
+
+// ToggleNudeMark adds or removes the manual nude mark on a monitor's current image.
+func (wp *Plugin) ToggleNudeMark(monitorID int) {
+	wp.monMu.RLock()
+	mc, ok := wp.Monitors[monitorID]
+	wp.monMu.RUnlock()
+	if !ok {
+		return
+	}
+	mc.mu.RLock()
+	id := mc.State.CurrentImage.ID
+	mc.mu.RUnlock()
+	if id == "" {
+		return
+	}
+
+	wp.cfg.SetNudeMarked(id, !wp.cfg.IsNudeMarked(id))
+	// The same image may be on other monitors too.
+	wp.dispatch(-1, CmdEnforceNudeFilter)
+	if wp.manager != nil {
+		wp.manager.RebuildTrayMenu()
+	}
+}
 
 // dispatch routes commands to appropriate monitor actors.
 func (wp *Plugin) dispatch(monitorID int, cmd Command) {
@@ -1153,6 +1212,7 @@ func (wp *Plugin) saveQueryPages() {
 	if err := os.WriteFile(pagesPath, data, 0600); err != nil {
 		log.Printf("[ERROR] Failed to write query_pages.json: %v", err)
 	}
+	wp.savePageCursors(snap)
 }
 
 func (wp *Plugin) onQueryRemoved(queryID string) {
@@ -1192,27 +1252,54 @@ func (wp *Plugin) ResetFavorites() {
 	// so they don't remain as "dead" icons in the library view after clearing.
 	wp.store.RemoveByQueryID(FavoritesQueryID)
 
-	wp.manager.NotifyUser(i18n.T("Favorites"), i18n.T("All favorites cleared."))
 	go wp.RequestFetch("Favorites")
+}
+
+// pipelineWorkerCount returns how many images may be processed at once. Each worker can
+// hold a fully decoded original in memory and resizing is itself multi-threaded, so this
+// stays well below the core count unless configured otherwise.
+func (wp *Plugin) pipelineWorkerCount() int {
+	if wp.cfg.MaxConcurrentProcessors > 0 {
+		return wp.cfg.MaxConcurrentProcessors
+	}
+	if configured := wp.cfg.GetMaxConcurrentProcessors(); configured > 0 {
+		return configured
+	}
+	return min(runtime.NumCPU(), DefaultMaxConcurrentProcessors)
+}
+
+// targetProcessingFlags returns the settings that decide what a derivative looks like.
+func (wp *Plugin) targetProcessingFlags() map[string]bool {
+	mode := wp.cfg.GetSmartFitMode()
+	display := wp.cfg.GetArtworkDisplayMode()
+	return map[string]bool{
+		"SmartFit":        wp.cfg.GetSmartFit(),
+		"FitFlexibility":  mode == SmartFitAggressive,
+		"FitQuality":      mode == SmartFitNormal,
+		"FaceCrop":        wp.cfg.GetFaceCropEnabled(),
+		"FaceBoost":       wp.cfg.GetFaceBoostEnabled(),
+		"WallNeutral":     wp.cfg.VirtualWallColor == WallNeutral,
+		"Matting":         wp.cfg.VirtualPaperMatting,
+		flagDisplayFull:   display == ArtworkDisplayFull,
+		flagDisplayFramed: display == ArtworkDisplayFramed,
+		fmt.Sprintf("FrameSize_%.2f", wp.cfg.VirtualFrameSize): true,
+	}
 }
 
 // syncStoreWithConfig reconciles the image store with the current configuration.
 // It handles query activation, cache sizing, and derivative invalidation for processing modes.
 func (wp *Plugin) syncStoreWithConfig() {
-	mode := wp.cfg.GetSmartFitMode()
-	targetFlags := map[string]bool{
-		"SmartFit":       wp.cfg.GetSmartFit(),
-		"FitFlexibility": mode == SmartFitAggressive,
-		"FitQuality":     mode == SmartFitNormal,
-		"FaceCrop":       wp.cfg.GetFaceCropEnabled(),
-		"FaceBoost":      wp.cfg.GetFaceBoostEnabled(),
-		"FrameFallback":  wp.cfg.VirtualFramingFallback,
-		"WallNeutral":    wp.cfg.VirtualWallColor == WallNeutral,
-		"Matting":        wp.cfg.VirtualPaperMatting,
-		fmt.Sprintf("FrameSize_%.2f", wp.cfg.VirtualFrameSize): true,
-	}
+	wp.store.Sync(int(wp.cfg.GetCacheSize().Size()), wp.targetProcessingFlags(), wp.cfg.GetActiveQueryIDs())
+}
 
-	wp.store.Sync(int(wp.cfg.GetCacheSize().Size()), targetFlags, wp.cfg.GetActiveQueryIDs())
+// SetArtworkDisplayMode applies a new artwork display mode and rebuilds wallpapers to match.
+// Selecting the current mode does nothing, so it cannot trigger a needless rebuild.
+func (wp *Plugin) SetArtworkDisplayMode(mode ArtworkDisplayMode) {
+	if wp.cfg.GetArtworkDisplayMode() == mode {
+		return
+	}
+	wp.cfg.SetArtworkDisplayMode(mode)
+	wp.RefreshImagesAndPulse()
 }
 
 func (wp *Plugin) GetProviderTitle(providerID string) string {

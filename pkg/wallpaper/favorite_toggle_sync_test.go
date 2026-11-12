@@ -43,5 +43,5 @@ func TestMonitorController_SyncState(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 
 	// Assert
-	assert.True(t, mc.State.CurrentImage.IsFavorited, "Monitor state should have refreshed favorite status from store")
+	assert.True(t, stateOf(mc).CurrentImage.IsFavorited, "Monitor state should have refreshed favorite status from store")
 }

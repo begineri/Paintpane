@@ -21,6 +21,9 @@ func (wp *Plugin) StartNightlyRefresh() {
 	if wp.stopNightlyRefresh == nil {
 		wp.stopNightlyRefresh = make(chan struct{})
 	}
+	// Keep our own reference: stopping closes the channel and then clears the field, and waiting
+	// on the cleared field would block forever.
+	stop := wp.stopNightlyRefresh
 	wp.downloadMutex.Unlock()
 
 	log.Debugf("Starting nightly refresh checker...")
@@ -54,8 +57,10 @@ func (wp *Plugin) StartNightlyRefresh() {
 	for {
 		select {
 		case now := <-ticker.C:
+			// A fetch cycle can run for hours, so don't leave the cache limit to nightly maintenance.
+			wp.store.PruneToLimit(wp.cacheLimit(), wp.imagesOnShow())
 			lastRefreshDay = runCheckWithTimeout(now, lastRefreshDay, false) // Normal periodic check
-		case <-wp.stopNightlyRefresh:
+		case <-stop:
 			log.Print("Stopping nightly refresh checker.")
 			return // Exit the goroutine
 		}
@@ -205,7 +210,7 @@ func (wp *Plugin) generateGalleryForOTA(prov provider.ImageProvider) {
 		return
 	}
 
-	cacheDir := filepath.Join(config.GetWorkingDir(), "cache", strings.ToLower(prov.ID()))
+	cacheDir := filepath.Join(config.GetCacheDir(), strings.ToLower(prov.ID()))
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 

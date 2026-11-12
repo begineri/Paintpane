@@ -11,7 +11,6 @@ import (
 	"github.com/dixieflatline76/Spice/v2/pkg/provider"
 	"github.com/dixieflatline76/Spice/v2/util"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,7 +41,6 @@ func TestFavScenario1_FavoriteSourceImage(t *testing.T) {
 	mockFav := &mockFavoriter{}
 	mockMgr := &mockManager{}
 	mockFav.On("AddFavorite", wallhavenImg).Return(nil)
-	mockMgr.On("NotifyUser", mock.Anything, mock.Anything).Return()
 
 	wp := &Plugin{
 		store:              store,
@@ -130,7 +128,6 @@ func TestFavScenario4_UnfavoriteFavoritesProviderImage(t *testing.T) {
 	mockFav := &mockFavoriter{}
 	mockMgr := &mockManager{}
 	mockFav.On("RemoveFavorite", favImgTrue).Return(nil)
-	mockMgr.On("NotifyUser", mock.Anything, mock.Anything).Return()
 
 	wp := &Plugin{
 		store:              store,
@@ -168,7 +165,6 @@ func TestFavScenario4b_UnfavoriteFavoritesProviderImage_StaleFalseFlag(t *testin
 	mockFav := &mockFavoriter{}
 	mockMgr := &mockManager{}
 	mockFav.On("RemoveFavorite", favImgFalse).Return(nil)
-	mockMgr.On("NotifyUser", mock.Anything, mock.Anything).Return()
 
 	wp := &Plugin{
 		store:              store,

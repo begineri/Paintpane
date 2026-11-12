@@ -240,11 +240,11 @@ func GenerateHTML(title string, titleTranslations map[string]string, items []Gal
     </div>
     
     <div class="gallery-footer">
-        <div><span data-i18n="Curated by">Curated by</span> <a href="https://spicebox.dev/" target="_blank" class="brand-link">&#127798; Spice</a></div>
+        <div><span data-i18n="Curated by">Curated by</span> <a href="https://github.com/begineri/Paintpane" target="_blank" class="brand-link" data-i18n="Paintpane">Paintpane</a></div>
         <div class="footer-links">
-            <a href="https://spicebox.dev/" target="_blank" data-i18n="Website">Website</a> &bull; 
-            <a href="https://spicebox.dev/" target="_blank" data-i18n="Get for Windows">Get for Windows</a> &bull; 
-            <a href="https://spicebox.dev/" target="_blank" data-i18n="Get for macOS">Get for macOS</a>
+            <a href="https://github.com/begineri/Paintpane" target="_blank" data-i18n="Website">Website</a> &bull; 
+            <a href="https://github.com/begineri/Paintpane/releases/latest" target="_blank" data-i18n="Get for Windows">Get for Windows</a> &bull; 
+            <a href="https://github.com/begineri/Paintpane/releases/latest" target="_blank" data-i18n="Get for macOS">Get for macOS</a>
         </div>
         <div data-i18n="Artwork sourced from public domain collections." style="font-size: 12px; color: rgba(255, 255, 255, 0.3); margin-top: 5px;">
             Artwork sourced from public domain collections.
@@ -270,7 +270,7 @@ func GenerateHTML(title string, titleTranslations map[string]string, items []Gal
                 
                 // Update document title
                 const tTitle = trans[originalTitle] || originalTitle;
-                const tSpice = trans["Spice Gallery"] || "Spice Gallery";
+                const tSpice = trans["Paintpane Gallery"] || "Paintpane Gallery";
                 document.title = tTitle + " - " + tSpice;
             }
 
@@ -347,7 +347,8 @@ func GenerateHTML(title string, titleTranslations map[string]string, items []Gal
 		"Get for Windows",
 		"Get for macOS",
 		"Artwork sourced from public domain collections.",
-		"Spice Gallery",
+		"Paintpane Gallery",
+		"Paintpane",
 	}
 
 	// Keep strings from being marked stale by the AST extractor
@@ -357,7 +358,8 @@ func GenerateHTML(title string, titleTranslations map[string]string, items []Gal
 	_ = i18n.T("Get for Windows")
 	_ = i18n.T("Get for macOS")
 	_ = i18n.T("Artwork sourced from public domain collections.")
-	_ = i18n.T("Spice Gallery")
+	_ = i18n.T("Paintpane Gallery")
+	_ = i18n.T("Paintpane")
 
 	uiTrans := i18n.GetTranslationsForKeys(uiKeys)
 

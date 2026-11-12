@@ -8,12 +8,24 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"testing"
 
 	"github.com/dixieflatline76/Spice/v2/config"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func init() {
+	// Dev builds: enable debug logging by default
+	SetDebugEnabled(true)
+	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
+
+	// Test binaries log to stdout only, so test runs do not fill the user's log
+	// file with fixtures and temp paths.
+	if testing.Testing() {
+		log.SetOutput(&safeWriter{w: os.Stdout})
+		return
+	}
+
 	// Determine the log directory based on the centralized config
 	logDir := config.GetAppDir()
 
@@ -32,10 +44,6 @@ func init() {
 	// Wrap os.Stdout in a safe writer that ignores errors (e.g. in GUI mode)
 	safeStdout := &safeWriter{w: os.Stdout}
 	log.SetOutput(io.MultiWriter(safeStdout, fileLogger))
-	log.SetFlags(log.Ldate | log.Ltime | log.Lshortfile)
-
-	// Dev builds: enable debug logging by default
-	SetDebugEnabled(true)
 }
 
 // safeWriter wraps an io.Writer and ignores errors, returning success.

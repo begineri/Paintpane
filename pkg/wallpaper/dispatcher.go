@@ -4,6 +4,7 @@ import (
 	"context"
 	"golang.org/x/time/rate"
 	"sync"
+	"time"
 
 	"github.com/dixieflatline76/Spice/v2/pkg/provider"
 )
@@ -21,6 +22,45 @@ type Dispatcher struct {
 	mu        sync.Mutex
 	providers map[string]chan DownloadJob
 	wg        *sync.WaitGroup
+
+	// hold, when set, returns how long a provider's downloads are paused (see
+	// downloadBackoff). Its pump keeps the provider's jobs until then. Set it
+	// before the first Submit.
+	hold func(providerID string) time.Duration
+}
+
+// maxHoldCheck is how long a held pump sleeps before it asks again.
+var maxHoldCheck = time.Minute
+
+// waitWhileHeld blocks while the provider's downloads are paused. It returns
+// false when the dispatcher or the job was cancelled meanwhile.
+func (d *Dispatcher) waitWhileHeld(providerID string, jobCtx context.Context) bool {
+	if d.hold == nil {
+		return true
+	}
+	var jobDone <-chan struct{}
+	if jobCtx != nil {
+		jobDone = jobCtx.Done()
+	}
+	for {
+		wait := d.hold(providerID)
+		if wait <= 0 {
+			return true
+		}
+		if wait > maxHoldCheck {
+			wait = maxHoldCheck
+		}
+		t := time.NewTimer(wait)
+		select {
+		case <-t.C:
+		case <-d.ctx.Done():
+			t.Stop()
+			return false
+		case <-jobDone:
+			t.Stop()
+			return false
+		}
+	}
 }
 
 // NewDispatcher initializes a Fair Queuing Dispatcher.
@@ -100,6 +140,15 @@ func (d *Dispatcher) pump(pr provider.ImageProvider, inChan <-chan DownloadJob) 
 		case job := <-inChan:
 			// Ensure context is still alive
 			if job.Ctx != nil && job.Ctx.Err() != nil {
+				continue
+			}
+
+			// A provider whose image server keeps failing is paused; its jobs wait here,
+			// without taking a worker from the other providers.
+			if !d.waitWhileHeld(pr.ID(), job.Ctx) {
+				if d.ctx.Err() != nil {
+					return
+				}
 				continue
 			}
 

@@ -1,19 +1,19 @@
 {
     "description": "National Palace Museum (Taiwan): Curated Antiquities",
-    "version": "v2.6.0",
+    "version": "v2.6.1",
     "collections": [
         {
             "key": "npm_masterpieces",
-            "name": "⭐ Best of NPM",
+            "name": "⭐ Best of the National Palace Museum",
             "name_translations": {
-                "de": "⭐ Das Beste des NPM",
-                "es": "⭐ Lo Mejor del NPM",
-                "fr": "⭐ Le Meilleur du NPM",
-                "it": "⭐ Il Meglio del NPM",
-                "ja": "⭐ NPMのベスト",
-                "pt": "⭐ O Melhor do NPM",
-                "ru": "⭐ Лучшее из NPM",
-                "uk": "⭐ Найкраще з NPM",
+                "de": "⭐ Das Beste des Nationalen Palastmuseums",
+                "es": "⭐ Lo Mejor del Museo del Palacio Nacional",
+                "fr": "⭐ Le Meilleur du Musée national du Palais",
+                "it": "⭐ Il Meglio del Museo del Palazzo Nazionale",
+                "ja": "⭐ 國立故宮博物院のベスト",
+                "pt": "⭐ O Melhor do Museu do Palácio Nacional",
+                "ru": "⭐ Лучшее из Национального дворцового музея",
+                "uk": "⭐ Найкраще з Національного палацового музею",
                 "zh-CN": "⭐ 故宫精选",
                 "zh-TW": "⭐ 故宮精選"
             },
@@ -50,57 +50,57 @@
         },
         {
             "key": "npm_ceramics",
-            "name": "Ceramics (陶瓷器)",
+            "name": "Ceramics",
             "name_translations": {
-                "da": "Keramik (陶瓷器)",
-                "de": "Keramik (陶瓷器)",
-                "es": "Cerámica (陶瓷器)",
-                "fr": "Céramiques (陶瓷器)",
-                "it": "Ceramiche (陶瓷器)",
-                "ja": "陶磁器 (陶瓷器)",
-                "ko": "도자기 (陶瓷器)",
-                "nl": "Keramiek (陶瓷器)",
-                "ru": "Керамика (陶瓷器)",
-                "zh-CN": "陶瓷 (陶瓷器)",
-                "zh-TW": "陶瓷 (陶瓷器)"
+                "da": "Keramik",
+                "de": "Keramik",
+                "es": "Cerámica",
+                "fr": "Céramiques",
+                "it": "Ceramiche",
+                "ja": "陶磁器",
+                "ko": "도자기",
+                "nl": "Keramiek",
+                "ru": "Керамика",
+                "zh-CN": "陶瓷",
+                "zh-TW": "陶瓷"
             },
             "search_params": "rblType=陶瓷器",
             "type": "search"
         },
         {
             "key": "npm_jades",
-            "name": "Jades (玉器)",
+            "name": "Jades",
             "name_translations": {
-                "da": "Jade (玉器)",
-                "de": "Jade (玉器)",
-                "es": "Jades (玉器)",
-                "fr": "Jades (玉器)",
-                "it": "Giade (玉器)",
-                "ja": "玉器 (玉器)",
-                "ko": "옥기 (玉器)",
-                "nl": "Jade (玉器)",
-                "ru": "Нефрит (玉器)",
-                "zh-CN": "玉器 (玉器)",
-                "zh-TW": "玉器 (玉器)"
+                "da": "Jade",
+                "de": "Jade",
+                "es": "Jades",
+                "fr": "Jades",
+                "it": "Giade",
+                "ja": "玉器",
+                "ko": "옥기",
+                "nl": "Jade",
+                "ru": "Нефрит",
+                "zh-CN": "玉器",
+                "zh-TW": "玉器"
             },
             "search_params": "rblType=玉器",
             "type": "search"
         },
         {
             "key": "npm_bronzes",
-            "name": "Bronzes (銅器)",
+            "name": "Bronzes",
             "name_translations": {
-                "da": "Bronzer (銅器)",
-                "de": "Bronzen (銅器)",
-                "es": "Bronces (銅器)",
-                "fr": "Bronzes (銅器)",
-                "it": "Bronzi (銅器)",
-                "ja": "青銅器 (銅器)",
-                "ko": "청동기 (銅器)",
-                "nl": "Brons (銅器)",
-                "ru": "Бронза (銅器)",
-                "zh-CN": "青铜器 (銅器)",
-                "zh-TW": "青銅器 (銅器)"
+                "da": "Bronzer",
+                "de": "Bronzen",
+                "es": "Bronces",
+                "fr": "Bronzes",
+                "it": "Bronzi",
+                "ja": "青銅器",
+                "ko": "청동기",
+                "nl": "Brons",
+                "ru": "Бронза",
+                "zh-CN": "青铜器",
+                "zh-TW": "青銅器"
             },
             "search_params": "rblType=銅器",
             "type": "search"
@@ -109,7 +109,7 @@
             "key": "npm_song",
             "name": "Song Dynasty (960–1279)",
             "name_translations": {
-                "da": "Song-dynastiet (960-1279)",
+                "da": "Song-dynastiet (960–1279)",
                 "de": "Song-Dynastie (960–1279)",
                 "es": "Dinastía Song (960–1279)",
                 "fr": "Dynastie Song (960–1279)",
@@ -118,8 +118,8 @@
                 "ko": "송나라 (960–1279)",
                 "nl": "Song-dynastie (960–1279)",
                 "ru": "Династия Сун (960–1279)",
-                "zh-CN": "宋朝 (960–1279)",
-                "zh-TW": "宋朝 (960–1279)"
+                "zh-CN": "宋朝（960–1279）",
+                "zh-TW": "宋朝（960–1279）"
             },
             "search_params": "rblYear=960~1279~Song Dynasty&rblType=陶瓷器",
             "type": "search"
@@ -128,7 +128,7 @@
             "key": "npm_ming",
             "name": "Ming Dynasty (1368–1644)",
             "name_translations": {
-                "da": "Ming-dynastiet (1368-1644)",
+                "da": "Ming-dynastiet (1368–1644)",
                 "de": "Ming-Dynastie (1368–1644)",
                 "es": "Dinastía Ming (1368–1644)",
                 "fr": "Dynastie Ming (1368–1644)",
@@ -137,8 +137,8 @@
                 "ko": "명나라 (1368–1644)",
                 "nl": "Ming-dynastie (1368–1644)",
                 "ru": "Династия Мин (1368–1644)",
-                "zh-CN": "明朝 (1368–1644)",
-                "zh-TW": "明朝 (1368–1644)"
+                "zh-CN": "明朝（1368–1644）",
+                "zh-TW": "明朝（1368–1644）"
             },
             "search_params": "rblYear=1368~1644~Ming dynasty",
             "type": "search"
@@ -147,7 +147,7 @@
             "key": "npm_qing",
             "name": "Qing Dynasty (1644–1911)",
             "name_translations": {
-                "da": "Qing-dynastiet (1644-1911)",
+                "da": "Qing-dynastiet (1644–1911)",
                 "de": "Qing-Dynastie (1644–1911)",
                 "es": "Dinastía Qing (1644–1911)",
                 "fr": "Dynastie Qing (1644–1911)",
@@ -156,8 +156,8 @@
                 "ko": "청나라 (1644–1911)",
                 "nl": "Qing-dynastie (1644–1911)",
                 "ru": "Династия Цин (1644–1911)",
-                "zh-CN": "清朝 (1644–1911)",
-                "zh-TW": "清朝 (1644–1911)"
+                "zh-CN": "清朝（1644–1911）",
+                "zh-TW": "清朝（1644–1911）"
             },
             "search_params": "rblYear=1644~1911~Qing dynasty",
             "type": "search"

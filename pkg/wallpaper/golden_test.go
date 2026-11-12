@@ -44,7 +44,6 @@ func TestGoldenMaster(t *testing.T) {
 	cfg := GetConfig(prefs)
 	cfg.SetSmartFitMode(SmartFitAggressive)
 	cfg.SetFaceCropEnabled(true)
-	cfg.VirtualFramingFallback = true
 	cfg.VirtualPaperMatting = false
 
 	mockOS := new(MockOS)

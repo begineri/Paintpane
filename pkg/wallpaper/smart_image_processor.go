@@ -8,6 +8,7 @@ import (
 	"image/jpeg"
 	"image/png"
 	"math"
+	"sync"
 	"time"
 
 	"github.com/disintegration/imaging"
@@ -22,7 +23,9 @@ type SmartImageProcessor struct {
 	resampler imaging.ResampleFilter //moved to struct level
 	pigo      *pigo.Pigo
 	config    *Config
-	// Diagnostics
+	// Diagnostics. Pipeline workers call FitImage concurrently, so these need a lock; with several
+	// images in flight, "last" is whichever update landed most recently.
+	statsMu   sync.Mutex
 	lastStats FaceDetectionStats
 }
 
@@ -37,7 +40,16 @@ type FaceDetectionStats struct {
 
 // GetLastStats returns the diagnostics from the last fit operation.
 func (c *SmartImageProcessor) GetLastStats() FaceDetectionStats {
+	c.statsMu.Lock()
+	defer c.statsMu.Unlock()
 	return c.lastStats
+}
+
+// updateStats changes the diagnostics under their lock.
+func (c *SmartImageProcessor) updateStats(update func(stats *FaceDetectionStats)) {
+	c.statsMu.Lock()
+	defer c.statsMu.Unlock()
+	update(&c.lastStats)
 }
 
 // NewSmartImageProcessor creates a new processor instance.
@@ -197,8 +209,10 @@ func (c *SmartImageProcessor) checkFlexibilityModeCompatibility(imgWidth, imgHei
 
 // FitImage fits an image with context awareness.
 func (c *SmartImageProcessor) FitImage(ctx context.Context, img image.Image, targetWidth, targetHeight int, opts provider.TuningOptions) (image.Image, error) {
-	if c.config.GetSmartFitMode() == SmartFitOff {
-		c.lastStats = FaceDetectionStats{}
+	// With Smart Fit off the system crops the original, unless this image was set to Smart crop in
+	// Tune Image while the global mode shows images whole: then nothing else would crop it.
+	if c.config.GetSmartFitMode() == SmartFitOff && opts.Display != provider.DisplayCrop {
+		c.updateStats(func(stats *FaceDetectionStats) { *stats = FaceDetectionStats{} })
 		return img, nil
 	}
 
@@ -230,11 +244,18 @@ func (c *SmartImageProcessor) FitImage(ctx context.Context, img image.Image, tar
 	}
 
 	// --- CROP LOGIC START ---
-	c.lastStats = FaceDetectionStats{}
+	c.updateStats(func(stats *FaceDetectionStats) { *stats = FaceDetectionStats{} })
 	start := time.Now()
 	defer func() {
-		c.lastStats.Processing = time.Since(start)
+		c.updateStats(func(stats *FaceDetectionStats) { stats.Processing = time.Since(start) })
 	}()
+
+	// A chosen position (dragged in Tune Image, or set by a keep-area shortcut) decides the crop
+	// outright: the kept part sits that far along the cropped axis, with no face or entropy analysis.
+	if percent, ok := opts.CropPosition(imageWidth, imageHeight, systemWidth, systemHeight); ok {
+		return (&SmartPanStrategy{Center: cropCenterAt(img.Bounds(), systemWidth, systemHeight, percent)}).
+			Apply(ctx, img, systemWidth, systemHeight, c)
+	}
 
 	// 1. Analysis Phase
 	faceFound, faceBox, _, err := c.analyzeFace(img)
@@ -256,6 +277,61 @@ func (c *SmartImageProcessor) FitImage(ctx context.Context, img image.Image, tar
 	return strategy.Apply(ctx, img, systemWidth, systemHeight, c)
 }
 
+// cropCenterAt is the centre of the kept part when it sits percent (0-100) of the way along the
+// axis the picture is cropped on; the other axis stays centred.
+func cropCenterAt(b image.Rectangle, targetW, targetH int, percent float64) image.Point {
+	axis, travel := provider.CropTravel(b.Dx(), b.Dy(), targetW, targetH)
+	center := image.Point{X: b.Min.X + b.Dx()/2, Y: b.Min.Y + b.Dy()/2}
+	aspect := float64(targetW) / float64(targetH)
+	shift := int(percent / 100 * float64(travel))
+	switch axis {
+	case provider.CropHorizontal:
+		cropW := int(float64(b.Dy()) * aspect)
+		center.X = b.Min.X + shift + cropW/2
+	case provider.CropVertical:
+		cropH := int(float64(b.Dx()) / aspect)
+		center.Y = b.Min.Y + shift + cropH/2
+	}
+	return center
+}
+
+// AutoCropPercent is where the automatic crop keeps the picture along the cropped axis, 0 to 100
+// percent, so Tune Image can start a drag from where the wallpaper really is. ok is false when
+// nothing is cropped or the position cannot be worked out.
+func (c *SmartImageProcessor) AutoCropPercent(ctx context.Context, img image.Image, targetW, targetH int) (float64, bool) {
+	b := img.Bounds()
+	axis, travel := provider.CropTravel(b.Dx(), b.Dy(), targetW, targetH)
+	if axis == provider.CropNone || c.config.GetSmartFitMode() == SmartFitOff {
+		return 0, false
+	}
+	faceFound, faceBox, _, _ := c.analyzeFace(img)
+	energy, energyErr := c.calculateImageEnergy(ctx, img)
+	var center image.Point
+	switch s := c.selectStrategy(img, faceFound, faceBox, energy, energyErr, provider.AnchorAuto).(type) {
+	case *SmartPanStrategy:
+		center = s.Center
+	case *FaceCropStrategy:
+		r := c.cropAroundFace(b, s.FaceBox, targetW, targetH)
+		center = r.Min.Add(r.Size().Div(2))
+	case *EntropyCropStrategy:
+		var err error
+		if center, err = s.center(ctx, img, targetW, targetH, c); err != nil {
+			return 0, false
+		}
+	default:
+		return 0, false
+	}
+	aspect := float64(targetW) / float64(targetH)
+	var start int
+	if axis == provider.CropHorizontal {
+		start = center.X - int(float64(b.Dy())*aspect)/2 - b.Min.X
+	} else {
+		start = center.Y - int(float64(b.Dx())/aspect)/2 - b.Min.Y
+	}
+	percent := float64(start) / float64(travel) * 100
+	return math.Min(100, math.Max(0, percent)), true
+}
+
 func (c *SmartImageProcessor) analyzeFace(img image.Image) (bool, image.Rectangle, float32, error) {
 	if (!c.config.GetFaceCropEnabled() && !c.config.GetFaceBoostEnabled()) || c.pigo == nil {
 		return false, image.Rectangle{}, 0, nil
@@ -266,11 +342,14 @@ func (c *SmartImageProcessor) analyzeFace(img image.Image) (bool, image.Rectangl
 		return false, image.Rectangle{}, 0, err
 	}
 
-	c.lastStats.Found = true
-	c.lastStats.Rect = fb
+	c.updateStats(func(stats *FaceDetectionStats) {
+		stats.Found = true
+		stats.Rect = fb
+	})
 
-	log.Debugf("Face Logic: Found face (Q:%.1f)", c.lastStats.Q)
-	return true, fb, c.lastStats.Q, nil
+	q := c.GetLastStats().Q
+	log.Debugf("Face Logic: Found face (Q:%.1f)", q)
+	return true, fb, q, nil
 }
 
 func (c *SmartImageProcessor) selectStrategy(img image.Image, faceFound bool, faceBox image.Rectangle, energy float64, energyErr error, anchor provider.CropAnchor) CropStrategy {
@@ -513,8 +592,10 @@ func (c *SmartImageProcessor) findBestFace(img image.Image) (image.Rectangle, er
 		bestDet.Row+expandedScale/2,
 	)
 
-	c.lastStats.Q = bestDet.Q
-	c.lastStats.Scale = bestDet.Scale
+	c.updateStats(func(stats *FaceDetectionStats) {
+		stats.Q = bestDet.Q
+		stats.Scale = bestDet.Scale
+	})
 
 	// Clamp to image bounds
 	faceBox = faceBox.Intersect(img.Bounds())

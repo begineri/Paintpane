@@ -43,7 +43,11 @@ type SectionSchema struct {
 	Title       string
 	Description string
 	Compact     bool // If true, rendering will use high-density layouts
-	Items       []ItemSchema
+	Flat        bool // If true, items are shown as plain text without a card
+	// SelectAll, if set, puts a small switch at the right of the section's label
+	// that turns the listed boolean settings on or off together.
+	SelectAll *SelectAllItem
+	Items     []ItemSchema
 }
 
 // BoolItem represents a checkbox/toggle.
@@ -53,6 +57,8 @@ type BoolItem struct {
 	Help         string
 	ActionText   string // Optional: Hyperlink text to display next to the checkbox
 	ActionFunc   func() // Optional: Function to execute when the hyperlink is clicked
+	ActionIcon   string // Optional: show the action as this icon ("view") next to the switch instead of a link
+	Note         string // Optional: short muted text after the label, e.g. a count
 	InitialValue bool
 	OnChanged    func(bool)
 	ApplyFunc    func(bool)
@@ -62,6 +68,16 @@ type BoolItem struct {
 }
 
 func (BoolItem) isItemSchema() {}
+
+// SelectAllItem is a switch in a section's header that turns a group of boolean
+// settings on or off together. It is not a setting itself: it shows on when every
+// member is on, and follows the members as they change. The header also shows how
+// many members are on.
+type SelectAllItem struct {
+	Name    string
+	Label   string
+	Members []string // Names of the BoolItems it controls
+}
 
 // TextItem represents a text entry field.
 type TextItem struct {
@@ -92,6 +108,8 @@ type SelectItem struct {
 	Label        string
 	Help         string
 	Options      []string
+	Segmented    bool // Render as a segmented control; use for 2-4 short options
+	Swatches     bool // Render as a row of colour swatches; Options are their names
 	InitialValue interface{}
 	OnChanged    func(string, interface{})
 	ApplyFunc    func(interface{})
@@ -146,14 +164,56 @@ type ConfirmButtonItem struct {
 	ButtonText     string
 	ConfirmTitle   string
 	ConfirmMessage string
-	Importance     Importance
-	OnPressed      func()
-	IconName       string
-	EnabledIf      func() bool
-	VisibleIf      func() bool
+	// ConfirmButtonText is what the confirming button of the dialog says, e.g. "Clear cache".
+	ConfirmButtonText string
+	// ConfirmMessageFunc, when set, builds the dialog text when the button is pressed (it can
+	// say how much will be deleted); ConfirmMessage is used when it is nil.
+	ConfirmMessageFunc func() string
+	// HelpAsync, when set, shows a "Calculating…" help line under the label and calls it with a
+	// function that replaces that line once the answer is known (it may be called from any goroutine).
+	HelpAsync func(set func(string))
+	// ConfirmDanger fills that button in the error colour, for actions that delete.
+	ConfirmDanger bool
+	Importance    Importance
+	OnPressed     func()
+	IconName      string
+	EnabledIf     func() bool
+	VisibleIf     func() bool
 }
 
 func (ConfirmButtonItem) isItemSchema() {}
+
+// BlockedImagesItem is the "Blocked images" row (S4-5): how many images are
+// blocked, View, which opens a page of their thumbnails where each can be
+// unblocked (S4-B), and Reset, which unblocks all after a confirmation.
+type BlockedImagesItem struct {
+	Name           string
+	Label          string
+	ResetText      string
+	ConfirmTitle   string
+	ConfirmMessage string
+	// ConfirmButtonText and ConfirmDanger are as on ConfirmButtonItem.
+	ConfirmButtonText string
+	ConfirmDanger     bool
+	// List returns the blocked images, newest first.
+	List    func() []BlockedImageSchema
+	Unblock func(id string)
+	Reset   func()
+}
+
+func (BlockedImagesItem) isItemSchema() {}
+
+// BlockedImageSchema is one blocked image. Images blocked before details were
+// kept have only an ID.
+type BlockedImageSchema struct {
+	ID     string
+	Title  string
+	Artist string
+	Source string // the source's name, in the UI language
+	// ThumbPath is a small copy of the image saved when it was blocked; empty
+	// when there is none.
+	ThumbPath string
+}
 
 // ButtonItem represents a standard action button.
 type ButtonItem struct {
@@ -175,6 +235,8 @@ type HyperlinkItem struct {
 	ID   string
 	Text string
 	URL  string
+	// OnTapped, when set, runs instead of opening URL: a link to another page of the window.
+	OnTapped func()
 }
 
 func (HyperlinkItem) isItemSchema() {}
@@ -258,6 +320,7 @@ type RowLayout string
 const (
 	RowLayoutAdaptiveGrid RowLayout = ""            // Default: Divides space equally among items
 	RowLayoutHBoxSpacer   RowLayout = "hbox_spacer" // Places a spacer between the first and second item, pushing them to opposite sides
+	RowLayoutInline       RowLayout = "inline"      // Places items one after another at their natural width, e.g. a line of links
 )
 
 // HorizontalRowItem groups multiple items horizontally.
@@ -274,6 +337,7 @@ func (HorizontalRowItem) isItemSchema() {}
 type AddQueryConfig struct {
 	Title           string
 	Description     string // Optional description for the modal
+	URLLabel        string // label of the address field: "Pexels URL", "Category or search term"
 	URLPlaceholder  string
 	URLValidator    string
 	URLErrorMsg     string
@@ -322,11 +386,13 @@ type TabsSchema struct {
 
 // TabItemSchema represents an individual tab.
 type TabItemSchema struct {
+	ID        string // Stable identifier, e.g. "sources", "wallpaper", "advanced"
 	Title     string
 	IconName  string
 	IconBytes []byte
 	Panel     *PanelSchema
 	Accordion *AccordionSchema
+	Sources   *SourcesSchema
 }
 
 // AccordionSchema represents a set of collapsible accordion items.
@@ -361,4 +427,72 @@ type MenuItemSchema struct {
 	IsChecked   bool
 	IsDisabled  bool
 	SubMenu     *MenuSchema
+
+	// The fields below are for the tray menu the app draws itself
+	// (docs/ui_refresh.md §12, T-S1/T-S2). A native menu ignores them and shows
+	// Label and IconName.
+
+	// Kind says how the app-drawn menu shows the item.
+	Kind MenuItemKind
+	// Title and Detail are the two lines of a MenuItemNowShowing item (the
+	// artwork's title and the artist's name). Detail on a row with a submenu
+	// is the current choice, shown on the right.
+	Title  string
+	Detail string
+	// Glyph names the monochrome icon the app-drawn menu shows (for example
+	// "next", "pause", "heart"); empty means no icon.
+	Glyph string
+	// KeepOpen leaves the app-drawn menu open after the item is used, for
+	// items whose result shows in the menu itself (next, pause, favourite).
+	KeepOpen bool
+	// Emphasis draws a row's label in bold and its icon in the accent colour, for
+	// the item that offers a new version (T14).
+	Emphasis bool
+	// ChangesWallpaper marks an item that changes the image or the wallpaper
+	// (next, display mode, ...). The app closes Tune Image before running it,
+	// as if the user had closed the window (T-L).
+	ChangesWallpaper bool
+}
+
+// MenuItemKind is how the app-drawn tray menu shows an item.
+type MenuItemKind int
+
+const (
+	// MenuItemRow is a text row with an optional icon on the left.
+	MenuItemRow MenuItemKind = iota
+	// MenuItemNowShowing is the block for the current artwork: source logo,
+	// title and artist.
+	MenuItemNowShowing
+	// MenuItemIconButton is an icon-only button. Consecutive icon buttons share
+	// one row; a separator between two of them is a thin vertical divider.
+	// Label is the button's name, shown on hover.
+	MenuItemIconButton
+	// MenuItemSwitch is a row with a switch on the right; IsChecked is its state.
+	MenuItemSwitch
+)
+
+// SourcesSchema is a searchable list of image sources in groups. Selecting a
+// source shows its detail panel in place of the list.
+type SourcesSchema struct {
+	Groups []SourceGroupSchema
+	// OpenSourceID, when set, opens that source's detail view first.
+	OpenSourceID string
+}
+
+// SourceGroupSchema is one group of sources, such as Museums.
+type SourceGroupSchema struct {
+	ID        string
+	Title     string
+	Collapsed bool // Starts collapsed; the user can expand it
+	Items     []SourceSchema
+}
+
+// SourceSchema is one source row and its detail panel.
+type SourceSchema struct {
+	ID           string
+	Title        string
+	SubtitleFunc func() string // Re-evaluated after changes, e.g. "Chicago · 2 collections on"
+	IconName     string
+	IconBytes    []byte
+	Detail       *PanelSchema
 }

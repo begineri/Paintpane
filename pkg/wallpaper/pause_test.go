@@ -33,7 +33,6 @@ func TestPauseLogic(t *testing.T) {
 		DerivativePaths: map[string]string{"0x0": "some/path"},
 	}, true).Maybe()
 	ms.On("MarkSeen", mock.Anything).Return().Maybe()
-	mm.On("NotifyUser", mock.Anything, mock.Anything).Return().Maybe()
 	mm.On("RefreshTrayMenu").Return().Maybe()
 	mm.On("GetAssetManager").Return(asset.NewManager()).Maybe()
 
@@ -71,16 +70,15 @@ func TestPauseLogic(t *testing.T) {
 		defer mc.mu.RUnlock()
 		return mc.State.Paused
 	}, time.Second, 50*time.Millisecond, "Monitor should be paused after toggle")
-	mm.AssertCalled(t, "NotifyUser", "Wallpaper Rotation", "Display 1: Pausing Play")
 	assert.Eventually(t, func() bool {
 		menu := wp.CreateTrayMenu()
 		for _, item := range menu.Items {
 			if item.IconName == "play.png" {
-				return item.Label == "Resume Play"
+				return item.Label == "Resume rotation"
 			}
 		}
 		return false
-	}, time.Second, 50*time.Millisecond, "Pause menu label should update to Resume Play")
+	}, time.Second, 50*time.Millisecond, "Pause menu label should update to Resume rotation")
 
 	// 3. Test Automatic Transition skipping
 	// Give mc a current image
@@ -113,16 +111,15 @@ func TestPauseLogic(t *testing.T) {
 		defer mc.mu.RUnlock()
 		return !mc.State.Paused
 	}, time.Second, 50*time.Millisecond, "Monitor should be unpaused after second toggle")
-	mm.AssertCalled(t, "NotifyUser", "Wallpaper Rotation", "Display 1: Resuming Play")
 	assert.Eventually(t, func() bool {
 		menu := wp.CreateTrayMenu()
 		for _, item := range menu.Items {
 			if item.IconName == "pause.png" {
-				return item.Label == "Pause Play"
+				return item.Label == "Pause rotation"
 			}
 		}
 		return false
-	}, time.Second, 50*time.Millisecond, "Pause menu label should update to Pause Play")
+	}, time.Second, 50*time.Millisecond, "Pause menu label should update to Pause rotation")
 }
 
 func TestGlobalPauseToggle(t *testing.T) {
@@ -133,9 +130,6 @@ func TestGlobalPauseToggle(t *testing.T) {
 		Monitors: make(map[int]*MonitorController),
 		runOnUI:  func(f func()) { f() },
 	}
-	mm := wp.manager.(*MockPluginManager)
-	mm.On("NotifyUser", mock.Anything, mock.Anything).Return().Maybe()
-
 	// Create 2 Monitors
 	osMock := &MockOS{}
 	ms := &MockImageStore{}

@@ -49,14 +49,6 @@ func (m *mockManager) Deregister(p ui.Plugin) {
 	m.Called(p)
 }
 
-func (m *mockManager) NotifyUser(title, message string) {
-	m.Called(title, message)
-}
-
-func (m *mockManager) RegisterNotifier(n ui.Notifier) {
-	m.Called(n)
-}
-
 func (m *mockManager) CreateMenuItem(label string, action func(), providerId string) *fyne.MenuItem {
 	return nil
 }
@@ -88,7 +80,7 @@ func (m *mockManager) GetAssetManager() *asset.Manager {
 	return nil
 }
 
-func (m *mockManager) ShowTuneImagePopup(_ int, _ provider.TuningOptions, _ provider.TuningOptions, _ [9]string, _ [9]provider.CropAnchor, _ bool, _ func(provider.TuningOptions, func()), _ func()) {
+func (m *mockManager) ShowTuneImagePopup(_ int, _ string, _ provider.TuningOptions, _ provider.TuningOptions, _ [9]string, _ [9]provider.CropAnchor, _ ui.TunePreview, _ bool, _ func(provider.TuningOptions, func()), _ func()) {
 }
 
 func TestToggleFavorite_ResetsPageAndTriggersFetch(t *testing.T) {
@@ -98,7 +90,7 @@ func TestToggleFavorite_ResetsPageAndTriggersFetch(t *testing.T) {
 	wp := &Plugin{
 		store:              store,
 		queryPages:         make(map[string]*util.SafeCounter),
-		cfg:                &Config{},
+		cfg:                &Config{Preferences: NewMockPreferences()},
 		manager:            mockMgr,
 		fetchingInProgress: util.NewSafeBool(),
 	}
@@ -113,7 +105,6 @@ func TestToggleFavorite_ResetsPageAndTriggersFetch(t *testing.T) {
 
 	// Expectations
 	mockFav.On("AddFavorite", img).Return(nil)
-	mockMgr.On("NotifyUser", "Favorites", "Added to favorites.").Return()
 
 	// Action
 	wp.ToggleFavorite(img)

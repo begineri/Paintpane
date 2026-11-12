@@ -3,6 +3,7 @@ package rijksmuseum
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"strings"
 )
 
@@ -141,12 +142,18 @@ func ExtractTitle(raw json.RawMessage) string {
 	}
 
 	if primaryEN != "" {
-		return primaryEN
+		return PlainText(primaryEN)
 	}
 	if anyEN != "" {
-		return anyEN
+		return PlainText(anyEN)
 	}
-	return anyName
+	return PlainText(anyName)
+}
+
+// PlainText decodes the HTML character references the Rijksmuseum data keeps
+// in names and titles ("Melchior d&#39; Hondecoeter").
+func PlainText(s string) string {
+	return strings.TrimSpace(html.UnescapeString(s))
 }
 
 // ExtractObjectNumber extracts the accession number (e.g., "SK-C-5") from identified_by.
@@ -173,14 +180,14 @@ func ExtractArtist(p *Production) string {
 		if hasClassification(ref.ClassifiedAs, aatArtistStatement) {
 			// Prefer English content
 			if hasLanguage(ref.Language, aatEnglish) {
-				return ref.Content
+				return PlainText(ref.Content)
 			}
 		}
 	}
 	// Fallback: any referred_to_by content
 	for _, ref := range p.ReferredToBy {
 		if ref.Content != "" {
-			return ref.Content
+			return PlainText(ref.Content)
 		}
 	}
 	return ""

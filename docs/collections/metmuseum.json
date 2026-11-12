@@ -1,6 +1,6 @@
 {
     "description": "Metropolitan Museum of Art: Curated Collections",
-    "version": "v1.0.0",
+    "version": "v1.0.1",
     "collections": [
         {
             "key": "metmuseum_best_of",
@@ -137,7 +137,7 @@
                 "ru": "Азиатское Искусство",
                 "uk": "Азіатське мистецтво",
                 "zh-CN": "亚洲艺术",
-                "zh-TW": "亚洲艺术"
+                "zh-TW": "亞洲藝術"
             },
             "type": "curated",
             "ids": [

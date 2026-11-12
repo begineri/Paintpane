@@ -165,10 +165,13 @@ func TestLifecycle_BlockPersistence(t *testing.T) {
 		wp2.Activate()
 		// Re-inject dummy pipeline to use dummyProcessor
 		// Fast-failing processor
+		// Swap under downloadMutex: a fetch started by Activate reads jobSubmitter under it.
+		wp2.downloadMutex.Lock()
 		wp2.pipeline = NewPipeline(wp2.ctx, wp2.cfg, wp2.store.(*ImageStore), func(ctx context.Context, job DownloadJob) (provider.Image, error) {
 			return job.Image, errors.New("simulated processing error")
 		}, nil, nil)
 		wp2.jobSubmitter = wp2.pipeline
+		wp2.downloadMutex.Unlock()
 		wp2.pipeline.Start(1)
 
 		// Verify Store State (Internal Verification)
@@ -188,10 +191,13 @@ func TestLifecycle_BlockPersistence(t *testing.T) {
 		wp3 := setupTestPlugin(t, persistentPrefs)
 		wp3.Activate()
 		// Create a smaller pipeline to speed up tests, avoiding rate limiting for tests
+		// Swap under downloadMutex: a fetch started by Activate reads jobSubmitter under it.
+		wp3.downloadMutex.Lock()
 		wp3.pipeline = NewPipeline(wp3.ctx, wp3.cfg, wp3.store.(*ImageStore), func(ctx context.Context, job DownloadJob) (provider.Image, error) {
 			return job.Image, nil
 		}, nil, nil)
 		wp3.jobSubmitter = wp3.pipeline
+		wp3.downloadMutex.Unlock()
 		wp3.pipeline.Start(1)
 
 		// Setup a dummy job for the blocked image
@@ -237,8 +243,11 @@ func TestLifecycle_BlockPersistence(t *testing.T) {
 		wp4 := setupTestPlugin(t, persistentPrefs)
 		wp4.Activate()
 		// Re-inject dummy pipeline
+		// Swap under downloadMutex: a fetch started by Activate reads jobSubmitter under it.
+		wp4.downloadMutex.Lock()
 		wp4.pipeline = NewPipeline(wp4.ctx, wp4.cfg, wp4.store.(*ImageStore), func(ctx context.Context, job DownloadJob) (provider.Image, error) { return job.Image, nil }, nil, nil)
 		wp4.jobSubmitter = wp4.pipeline
+		wp4.downloadMutex.Unlock()
 		wp4.pipeline.Start(1)
 
 		// 1. Trigger Clear (Simulating 'Refresh Images' / 'Wipe')
@@ -319,11 +328,11 @@ func TestLifecycle_HappyPath(t *testing.T) {
 
 	// Wait for the background actor to process (deterministic enough for mock)
 	assert.Eventually(t, func() bool {
-		return mc.State.CurrentImage.ID == "happy_img"
+		return stateOf(mc).CurrentImage.ID == "happy_img"
 	}, 2*time.Second, 100*time.Millisecond)
 
 	// 4. Verify
-	assert.Equal(t, realPath, mc.State.CurrentImage.FilePath)
+	assert.Equal(t, realPath, stateOf(mc).CurrentImage.FilePath)
 
 	// Verify OS call
 	mockOS.AssertExpectations(t)
@@ -371,7 +380,6 @@ func setupTestPlugin(t *testing.T, prefs fyne.Preferences) *Plugin {
 	// Re-load config from prefs (Simulate fresh start)
 	cfg := GetConfig(prefs)
 	cfg.Queries = []ImageQuery{}
-	cfg.SetChgImgOnStart(false)
 	cfg.MaxConcurrentProcessors = 1
 
 	mockOS := new(MockOS)
@@ -381,8 +389,6 @@ func setupTestPlugin(t *testing.T, prefs fyne.Preferences) *Plugin {
 	mockOS.On("SetWallpaper", mock.Anything, 0).Return(nil)
 
 	mockPM := new(MockPluginManager)
-	mockPM.On("NotifyUser", mock.Anything, mock.Anything).Return()
-	mockPM.On("RegisterNotifier", mock.Anything).Return()
 	mockPM.On("GetPreferences").Return(prefs)
 	mockPM.On("Register", mock.Anything).Return()
 	// Return a non-nil Manager to prevent panics in UI updates

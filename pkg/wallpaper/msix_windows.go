@@ -43,7 +43,7 @@ func init() {
 			msixPictureStaging = filepath.Join(home, "Pictures", "SpiceWallpapers")
 			_ = os.MkdirAll(msixPictureStaging, 0755)
 
-			msixDocumentStaging = filepath.Join(home, "Documents", "Spice")
+			msixDocumentStaging = filepath.Join(home, "Documents", "Paintpane")
 			_ = os.MkdirAll(msixDocumentStaging, 0755)
 		}
 		log.Printf("MSIX: Running in package %s", msixPackageFamilyName)

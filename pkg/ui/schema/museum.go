@@ -14,7 +14,8 @@ type MuseumSettingsConfig struct {
 	Title       string
 	Location    string
 	LicenseURL  string
-	Description string
+	LicenseText string // text of the first link; "Open Access (CC0)" when empty
+	Description string // Not shown in the panel; kept for providers and galleries
 	MapQuery    string
 	WebsiteURL  string
 	DonateURL   string
@@ -26,75 +27,34 @@ type MuseumSettingsConfig struct {
 	APIKeyGetFunc   func() string // Read current key value
 	APIKeySetFunc   func(string)  // Save new key value
 
-	MuseumFramingGetFunc func() bool // Read current museum framing value
-	MuseumFramingSetFunc func(bool)  // Save new museum framing value
 }
 
 // CreateMuseumSettingsPanel generates a standard PanelSchema for museum providers.
 func CreateMuseumSettingsPanel(cfg MuseumSettingsConfig, openURL func(string)) *PanelSchema {
 	prefix := strings.ToLower(cfg.ID)
 
-	// Build the info items (always present)
-	infoItems := []ItemSchema{}
-
-	infoItems = append(infoItems,
-		LabelItem{
-			Text:       cfg.Description,
-			Importance: ImportanceLow,
-		},
-		HorizontalRowItem{
-			Items: []ItemSchema{
-				LabelItem{Text: cfg.Location, Importance: ImportanceLow},
-				HyperlinkItem{
-					Text: i18n.T("Open Access (CC0)"),
-					URL:  cfg.LicenseURL,
-				},
-			},
-		},
-		HorizontalRowItem{
-			Items: []ItemSchema{
-				ButtonItem{
-					Name:       prefix + "_visit",
-					ButtonText: i18n.T("Plan a Visit"),
-					IconName:   "MapPin",
-					OnPressed: func() {
-						u := fmt.Sprintf("https://www.google.com/maps/search/?api=1&query=%s", url.QueryEscape(cfg.MapQuery))
-						openURL(u)
-					},
-				},
-				ButtonItem{
-					Name:       prefix + "_web",
-					ButtonText: i18n.T("Visit Website"),
-					IconName:   "Home",
-					OnPressed:  func() { openURL(cfg.WebsiteURL) },
-				},
-				ButtonItem{
-					Name:       prefix + "_donate",
-					ButtonText: i18n.T("Donate"),
-					IconName:   "Heart",
-					OnPressed:  func() { openURL(cfg.DonateURL) },
-				},
-			},
-		},
-	)
-
-	if cfg.MuseumFramingGetFunc != nil && cfg.MuseumFramingSetFunc != nil {
-		infoItems = append(infoItems, BoolItem{
-			Name:         prefix + "_museum_framing",
-			Label:        i18n.T("Display as Framed Gallery"),
-			Help:         i18n.T("Present all artwork from this collection inside a virtual museum frame with a dynamic background, regardless of its original dimensions."),
-			InitialValue: cfg.MuseumFramingGetFunc(),
-			ApplyFunc:    cfg.MuseumFramingSetFunc,
-			NeedsRefresh: false,
-		})
+	// Header: the location on its own line, then one line of links (G6). The
+	// museum's name is the page title.
+	mapURL := fmt.Sprintf("https://www.google.com/maps/search/?api=1&query=%s", url.QueryEscape(cfg.MapQuery))
+	licenseText := cfg.LicenseText
+	if licenseText == "" {
+		licenseText = i18n.T("Open Access (CC0)")
 	}
-
+	links := []ItemSchema{
+		HyperlinkItem{Text: licenseText, URL: cfg.LicenseURL},
+		HyperlinkItem{Text: i18n.T("Visit website"), URL: cfg.WebsiteURL},
+		HyperlinkItem{Text: i18n.T("Plan a visit"), URL: mapURL},
+		HyperlinkItem{Text: i18n.T("Donate"), URL: cfg.DonateURL},
+	}
 	sections := []SectionSchema{
 		{
 			ID:      cfg.ID,
-			Title:   cfg.Title,
 			Compact: true,
-			Items:   infoItems,
+			Flat:    true, // lines of text under the title, not a card
+			Items: []ItemSchema{
+				LabelItem{Text: cfg.Location, Importance: ImportanceLow},
+				HorizontalRowItem{ID: prefix + "_links", Layout: RowLayoutInline, Items: links},
+			},
 		},
 	}
 

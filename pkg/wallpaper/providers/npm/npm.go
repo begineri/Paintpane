@@ -54,7 +54,7 @@ func (p *Provider) ID() string      { return ProviderName }
 func (p *Provider) HomeURL() string { return WebBaseURL }
 
 func (p *Provider) Name() string {
-	return i18n.T("故宮 (NPM)")
+	return i18n.T("National Palace Museum")
 }
 
 func (p *Provider) Title() string { return "故宮 (NPM)" }
@@ -153,7 +153,7 @@ func (p *Provider) fetchImageByCID(ctx context.Context, cid int) (*provider.Imag
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "SpiceWallpaper/2.0")
+	req.Header.Set("User-Agent", "Paintpane")
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -249,6 +249,12 @@ func (p *Provider) FetchThumbnails(ctx context.Context, ids []string) ([]provide
 }
 
 // EnrichImage is a no-op
+// ScaledDownloadURL implements provider.ScaledDownloadProvider: the IIIF image server sends the
+// image already scaled while originals are capped at about 4K.
+func (p *Provider) ScaledDownloadURL(ctx context.Context, img provider.Image, fit func(w, h int) (int, int)) (string, bool) {
+	return provider.IIIFScaledURL(ctx, p.client, img.Path, img.Width, img.Height, fit)
+}
+
 func (p *Provider) EnrichImage(_ context.Context, img provider.Image) (provider.Image, error) {
 	return img, nil
 }
@@ -257,16 +263,15 @@ func (p *Provider) EnrichImage(_ context.Context, img provider.Image) (provider.
 
 func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.PanelSchema {
 	return schema.CreateMuseumSettingsPanel(schema.MuseumSettingsConfig{
-		MuseumFramingGetFunc: func() bool { return p.cfg.GetMuseumFraming(p.ID()) },
-		MuseumFramingSetFunc: func(val bool) { p.cfg.SetMuseumFraming(p.ID(), val) },
-		ID:                   "NPM",
-		Title:                i18n.T("國立故宮博物院 - National Palace Museum"),
-		Location:             i18n.T("Taipei, Taiwan"),
-		LicenseURL:           "https://theme.npm.edu.tw/opendata/Article.aspx?sNo=03009210",
-		Description:          i18n.T("The National Palace Museum houses one of the largest collections of Chinese imperial artifacts and artworks in the world."),
-		MapQuery:             "National Palace Museum Taipei",
-		WebsiteURL:           "https://www.npm.gov.tw/index.aspx?l=2",
-		DonateURL:            "https://www.npm.gov.tw/Articles.aspx?sno=03009802&l=2",
+		ID:          "NPM",
+		Title:       i18n.T("National Palace Museum"),
+		Location:    i18n.T("Taipei, Taiwan"),
+		LicenseURL:  "https://digitalarchive.npm.gov.tw/opendata",
+		LicenseText: i18n.T("Open data (CC BY 4.0)"),
+		Description: i18n.T("The National Palace Museum houses one of the largest collections of Chinese imperial artifacts and artworks in the world."),
+		MapQuery:    "National Palace Museum Taipei",
+		WebsiteURL:  "https://www.npm.gov.tw/index.aspx?l=2",
+		DonateURL:   "https://www.npm.gov.tw/Articles.aspx?sno=03009802&l=2",
 	}, sm.OpenURL)
 }
 

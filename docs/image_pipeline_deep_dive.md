@@ -399,15 +399,23 @@ wallpaper_downloads/
     │   │   └── 1920x1080/
     │   ├── faceboost/                ← FaceBoost enabled
     │   └── standard/                ← No face processing
-    └── quality/                      ← SmartFit Normal mode
-        ├── facecrop/
-        ├── faceboost/
-        └── standard/
+    ├── quality/                      ← SmartFit Normal mode
+    │   ├── facecrop/
+    │   ├── faceboost/
+    │   └── standard/
+    ├── full/standard/                ← Artwork Display: Full Artwork
+    └── framed/standard/              ← Artwork Display: Museum Frame
 ```
+
+The Artwork Display mode takes priority: in `full` and `framed`, SmartFit and face settings do not
+affect the path, and SmartFit "Disabled" no longer means "use the master". See
+[artwork_display_modes.md](artwork_display_modes.md).
 
 When the user changes processing settings (e.g., toggles FaceCrop), the nightly `Sync()` detects
 a flag mismatch and **invalidates** all derivatives — wiping `DerivativePaths` and
-`ProcessingFlags` so images are re-processed with the new settings.
+`ProcessingFlags` so images are re-processed with the new settings. A change of Artwork Display
+mode alone keeps the files, because each mode has its own directory, and only forgets the paths.
+See [artwork_display_modes.md](artwork_display_modes.md).
 
 ### 5.4 The Three Compatibility Gates (Multi-Monitor & Mode Resiliency)
 
@@ -605,8 +613,9 @@ If `syncStoreWithConfig()` builds a target flag map that doesn't match what the 
 sets, **all images** will be invalidated on every nightly cycle. This was caught by the
 regression guard tests (`TestNightlyGrooming_RegressionGuard_IncompleteFlags`).
 
-Both flag maps must be kept in sync — see `makeDownloaderFlags()` and `makeGroomingTarget()`
-in `store_test.go` for the consistency tests.
+Both sides now build their flags from `wp.targetProcessingFlags()`, so they cannot drift apart. See
+`TestSyncKeepsProcessedImagesValid`, and `makeDownloaderFlags()` and `makeGroomingTarget()` in
+`store_test.go` for the older consistency tests.
 
 ### 8.3 Zombie → Delete → Re-Fetch → Zombie Loop
 
@@ -800,8 +809,9 @@ If `syncStoreWithConfig()` builds a target flag map that doesn't match what the 
 sets, **all images** will be invalidated on every nightly cycle. This was caught by the
 regression guard tests (`TestNightlyGrooming_RegressionGuard_IncompleteFlags`).
 
-Both flag maps must be kept in sync — see `makeDownloaderFlags()` and `makeGroomingTarget()`
-in `store_test.go` for the consistency tests.
+Both sides now build their flags from `wp.targetProcessingFlags()`, so they cannot drift apart. See
+`TestSyncKeepsProcessedImagesValid`, and `makeDownloaderFlags()` and `makeGroomingTarget()` in
+`store_test.go` for the older consistency tests.
 
 ### 8.3 Zombie → Delete → Re-Fetch → Zombie Loop
 
@@ -829,9 +839,13 @@ However, if **Virtual Framing** is enabled (usually globally via Museum Mode set
 
 This Sentinel Error pattern strictly decouples the *intent to rescue* (during the gate checks) from the *act of rescuing* (during `FitImage`), ensuring that no expensive processing occurs until absolutely necessary.
 
+`VirtualFramed:<resolution>` records what happened to the image, not how it should be processed, so `flagsMatch` skips it just like `incompatible:<resolution>`. Treating it as a processing flag would invalidate every framed image on every `Sync()`.
+
 ### 9.2 Tune Image Dynamic Lock
 
-When the user opens the "Tune Image" dialog from the system tray, the UI queries the `SmartImageProcessor` *on the fly* to determine if the image is natively compatible with the current monitor and SmartFit mode.
+In the Full Artwork and Museum Frame display modes `CheckCompatibility` returns `nil`, so the frame toggle is never locked. Unchecking it shows the image whole without a frame instead of cropping it, and crop anchors are locked. See [artwork_display_modes.md](artwork_display_modes.md) for the full decision table.
+
+In Smart Crop mode, when the user opens the "Tune Image" dialog from the system tray, the UI queries the `SmartImageProcessor` *on the fly* to determine if the image is natively compatible with the current monitor and SmartFit mode.
 
 - **If Incompatible (Quality Mode)**: The user is locked out of unchecking the "Enable Frame" box. They can adjust frame size, matting, and wall color, but the pipeline enforces the frame to prevent a catastrophic manual crop.
 - **If Compatible (or Flexibility Mode)**: The user can freely uncheck the frame, and the system bypasses the normal `downloader.go` pipeline entirely, directly routing the raw master image through `FitImage` with the user's manual 9-slice anchor choices.

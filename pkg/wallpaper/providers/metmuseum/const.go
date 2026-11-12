@@ -21,7 +21,7 @@ const (
 	DeptEgyptianArt       = 10
 
 	// Collection IDs (Internal Query Strings)
-	CollectionSpiceMelange = "spice_melange"
+	CollectionSpiceMelange = "metmuseum_best_of" // legacy name; the shipped key is now metmuseum_best_of
 	CollectionEuropean     = "european_masterpieces"
 	CollectionModern       = "modern_art"
 	CollectionAsian        = "asian_art"

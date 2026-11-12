@@ -52,7 +52,7 @@ func (p *Provider) ID() string {
 }
 
 func (p *Provider) Name() string {
-	return i18n.T("Local Folders")
+	return i18n.T("Local folders")
 }
 
 func (p *Provider) Type() provider.ProviderType {
@@ -192,7 +192,6 @@ func (p *Provider) CreateSettingsPanel(_ setting.SettingsManager) *schema.PanelS
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title:   i18n.T("Local Folders"),
 				Compact: true,
 				Items:   items,
 			},
@@ -205,11 +204,11 @@ func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, _ string) *schem
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title: i18n.T("Local Folder Sources"),
+				Title: i18n.T("Local folder sources"),
 				Items: []schema.ItemSchema{
 					schema.FolderPickerItem{
 						Name:       "local_folder_add",
-						ButtonText: i18n.T("Add Folder"),
+						ButtonText: i18n.T("Add folder"),
 						OnFolderSelected: func(path string) (string, error) {
 							desc := path
 							if len(desc) > 100 {

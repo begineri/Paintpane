@@ -29,7 +29,7 @@ var allowIdenticalToEnglish = map[string]bool{
 	"Rijksmuseum":                      true,
 	"Cleveland Museum of Art":          true,
 	"Taipei, Taiwan":                   true,
-	"故宮 (NPM)":                         true,
+	"National Palace Museum":           true,
 	"國立故宮博物院 - National Palace Museum": true,
 
 	// Getty Proper Nouns
@@ -52,12 +52,10 @@ var allowIdenticalToEnglish = map[string]bool{
 	"Actions":   true,
 	"Automatically generate a museum frame for art that doesn't fit your screen.": true,
 	"Virtual Frame Aspect Mismatches:":                                            true,
-	"Close Tuning to Resume":                                                      true,
-	"Controls Disabled":                                                           true,
 
 	// Brand names / tech terms kept in English
+	"Paintpane":               true, // the app name; only Chinese translates it
 	"Pexels":                  true,
-	"Wikimedia":               true,
 	"Wikimedia Commons":       true,
 	"Google Photos":           true,
 	"Google Photos Extension": true,
@@ -73,7 +71,10 @@ var allowIdenticalToEnglish = map[string]bool{
 
 	// Short functional strings identical in many languages
 	"Error: ": true,
-	"Minutes": true,
+
+	// Same word in French
+	"{{.Count}} images": true,
+	"1 image":           true,
 
 	// Attribution keys where some languages use the same prefix as English
 	"attribution_in": true,

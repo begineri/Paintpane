@@ -15,6 +15,3 @@ type Plugin interface {
 	CreatePrefsSchema(setting.SettingsManager) *schema.TabsSchema // Returns declarative preferences tabs.
 	Init(PluginManager)                                           // Injects the preferences.
 }
-
-// Notifier is a function that notifies the user.
-type Notifier func(title, message string)

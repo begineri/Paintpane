@@ -37,7 +37,8 @@ When one display is connected, the tray menu shows actions directly:
 | **Source:** | Shows the image provider (e.g., *Wallhaven*, *Met Museum*) |
 | **By:** | Shows attribution — click to open the original image on the web |
 | **Add to Favorites** | Save the current wallpaper locally *(only visible when Favorites is enabled)* |
-| **Tune Image** | Open the Tune Image popup to manually toggle the Virtual Museum Frame or fine-tune crop anchors *(only visible when Smart Fit is active)* |
+| **Tune Image** | Open the Tune Image popup to manually toggle the Virtual Museum Frame or fine-tune crop anchors *(only visible when Smart Fit is active or the Artwork Display mode is not Smart Crop)* |
+| **Artwork Display** | Switch between Smart Crop, Full Artwork and Museum Frame in one click. The current mode is checked. See [Artwork Display Modes](#artwork-display-modes) |
 | **Delete And Block** | Delete the image from cache and prevent it from ever appearing again |
 | *(separator)* | |
 | **Preferences** | Open the settings window |
@@ -77,8 +78,8 @@ These shortcuts perform actions across every connected monitor simultaneously.
 | **Sync / Detect Displays** | `Ctrl` + `Alt` + `D` | `Cmd` + `Ctrl` + `D` |
 | **Open Preferences** | `Ctrl` + `Alt` + `O` | `Cmd` + `Ctrl` + `O` |
 
-### Targeted Actions — Precision Monitor Control
-Hold a **number key (1–9)** alongside the modifier to target a specific display. Display 1 = key `1`, Display 2 = key `2`, etc.
+### Single-display Actions — Precision Monitor Control
+Hold the display's **number key (1–9)** together with `Alt` (Windows) or `Command` (macOS) to act on one display only: Display 1 = key `1`, Display 2 = key `2`, and so on. They are controlled by **Single-display shortcuts (hold Alt + display number)** in Settings → General, which is off by default and only works while **Global shortcuts** is on. **View all shortcuts** on the same page opens a Shortcuts page that lists every key.
 
 | Action | Windows | macOS |
 | :--- | :--- | :--- |
@@ -89,21 +90,20 @@ Hold a **number key (1–9)** alongside the modifier to target a specific displa
 | **Pause / Play** | `Alt` + `N` + `P` | `Command` + `N` + `P` |
 | **Shuffle** | `Alt` + `N` + `R` | `Command` + `N` + `R` |
 | **Info** | `Alt` + `N` + `I` | `Command` + `N` + `I` |
-| **Tune Up** | `Alt` + `N` + `W` | `Command` + `N` + `W` |
-| **Tune Down** | `Alt` + `N` + `S` | `Command` + `N` + `S` |
-| **Tune Left** | `Alt` + `N` + `A` | `Command` + `N` + `A` |
-| **Tune Right** | `Alt` + `N` + `D` | `Command` + `N` + `D` |
-| **Tune Center** | `Alt` + `N` + `E` | `Command` + `N` + `E` |
-| **Tune Auto** | `Alt` + `N` + `Q` | `Command` + `N` + `Q` |
+| **Keep the top** (tall picture) | `Alt` + `N` + `W` | `Command` + `N` + `W` |
+| **Keep the left** (wide picture) | `Alt` + `N` + `A` | `Command` + `N` + `A` |
+| **Keep the bottom** (tall picture) | `Alt` + `N` + `S` | `Command` + `N` + `S` |
+| **Keep the right** (wide picture) | `Alt` + `N` + `D` | `Command` + `N` + `D` |
+| **Keep the middle** | `Alt` + `N` + `E` | `Command` + `N` + `E` |
+| **Back to automatic** | `Alt` + `N` + `Q` | `Command` + `N` + `Q` |
 
 **Example:** To skip the wallpaper on your second monitor, press and hold `Alt` (Windows) or `Command` (macOS), tap `2`, and press `→`. 
 
 ### Customizing & Disabling Shortcuts
  
-Spice gives you granular control over how hotkeys interact with your system. If you find that Spice shortcuts conflict with other software (like your IDE or web browser), you have two options in **Preferences → App**:
+Spice gives you granular control over how hotkeys interact with your system. If you find that Spice shortcuts conflict with other software (like your IDE or web browser), you can turn them off in **Settings → General → Shortcuts**:
 
-1. **Disable All Shortcuts**: The "Enable global shortcuts" master switch completely unregisters Spice from your system's input loop. Use this if you prefer using the tray menu exclusively.
-2. **Disable Targeted Shortcuts Only**: If you love the global rotation shortcuts (`Ctrl` + `Alt` + `Arrow`) but find that the Targeted Shortcuts (e.g., `Alt` + `1` + `Right`) interfere with your browser's "Go Back/Forward" actions, you can disable **only** the targeted modifiers.
+**Global shortcuts** is the master switch for all keyboard hotkeys, and it is on by default. It completely unregisters the app from your system's input loop; use it if you prefer using the tray menu exclusively. **Single-display shortcuts (hold Alt + display number)** controls the keys that act on one display (e.g., `Alt` + `1` + `→`); it is off by default and has no effect while Global shortcuts is off. Those keys only work while a number key is held, so plain `Alt` + `Arrow` in your browser ("Go Back/Forward") is not taken.
 
 > **macOS Permissions**: Targeted shortcuts require Accessibility permissions. macOS will prompt you once when Spice first detects a number key press. If shortcuts stop working, ensure Spice is still enabled in **System Settings → Privacy & Security → Accessibility**.
 
@@ -118,16 +118,15 @@ Open via **Tray → Preferences** or `Ctrl` + `Alt` (Windows) / `Cmd` + `Control
 The **App** tab controls application-wide behaviour, independent of any wallpaper source.
 
 > **Managing Startup (Windows & macOS):**
-> * **Windows**: Click **Manage in Windows Settings** to open Windows Startup Apps (`ms-settings:startupapps`) and toggle Spice on or off.
+> * **Windows**: Turn **Start with Windows** on or off in General › Running. It is on when Paintpane has registered itself to start when you sign in. It is on by default: the first time you accept the licence agreement, Paintpane registers itself once. After that only the switch decides; turn it off and Paintpane never registers itself again, not even after an update. If you accepted the agreement of an earlier version, an update does not turn it on. If you installed Paintpane with the installer, its own **Start with Windows** option (ticked by default) decides instead. If you switch Paintpane off in Windows' own Startup apps page, the switch reads off and stays off, and turning it on switches it back on. After a start at sign-in, Paintpane waits one to two minutes before it downloads or processes anything.
 > * **macOS**: Click **Manage in macOS Settings** to open System Settings Login Items (`LoginItems-Settings.extension`) to add or remove Spice.
 
 | Setting | Description |
 | :--- | :--- |
-| **Start with Windows / Start at Login** | Quick button opening your operating system's native startup settings. |
+| **Start with Windows** (Windows) | Switch: start Paintpane in the background when you sign in. On by default (set once, when you first accept the licence agreement). On macOS the row is **Start at Login**, a button that opens System Settings. |
 | **Enable System Notifications** | Toggle desktop toast notifications (e.g., "Paused Play", "Next Wallpaper"). Useful to turn off if they become distracting. |
 | **Enable New Version Check** | Spice checks for updates once on startup and once per day. A tray indicator appears when a newer version is available. |
 | **Enable global shortcuts** | Master switch for all keyboard hotkeys. Disable if the shortcuts conflict with another application. |
-| **Enable Targeted Shortcuts** | Enable or disable targeted shortcuts (`Alt + 1-9 + Arrow` on Windows / `Cmd + 1-9 + Arrow` on macOS). Recommended to disable if they conflict with browser navigation. |
 | **Theme** | Choose between *System* (follows OS dark/light mode), *Dark*, or *Light*. Changes apply immediately. |
 | **Language** | Select between 12 supported languages (English, German, Spanish, French, Italian, Portuguese, Japanese, Russian, Ukrainian, Chinese Simplified, or Chinese Traditional). Choosing **System Default** follows your OS language. |
 
@@ -142,15 +141,15 @@ The **Wallpaper** plugin tab appears immediately after the App tab. It contains 
 | Setting | Description |
 | :--- | :--- |
 | **Wallpaper Change Frequency** | A flexible freeform minutes input that determines how often Spice automatically rotates. Type `15` for 15 minutes, or `1440` for daily. Set to `0` to disable automatic rotation entirely (you can still change manually via the tray or hotkeys). |
-| **Cache Size** | How many images to keep on disk. A larger cache means faster display and fewer network requests at startup. Set to *None* to disable caching (images are fetched fresh each time). |
-| **Smart Fit Mode** | Controls how Spice fits images to your screen — see below. |
+| **Cache size** | How many images to keep on disk: 100, 150 (the default), 300, 500, 1000, 5000 or 10000. A larger cache means more variety and fewer network requests, and more disk space. When the cache is full at start, Paintpane does not ask the sources for more. |
+| **Artwork Display** | Chooses whether images are cropped to fill the screen or always shown whole — see [Artwork Display Modes](#artwork-display-modes). |
+| **Smart Fit Mode** | Controls how Spice fits images to your screen — see below. Only applies when Artwork Display is set to *Smart Crop*. |
 | **Enable Face Crop** | When Smart Fit is active, the cropper aggressively centers on the largest detected face. **Note**: This setting is automatically disabled if Smart Fit Mode is "Disabled". |
 | **Enable Face Boost** | When Smart Fit is active, the cropper *hints* toward faces but also considers overall composition. **Note**: This setting is automatically disabled if Smart Fit Mode is "Disabled". |
 | **Stagger monitor changes** | Adds a small random delay between wallpaper changes on each display during automatic rotation, preventing a distracting simultaneous flash across all screens. |
 | **Museum Collection OTA** | Over-the-Air updates for museum collections. If enabled, occasionally synchronizes curation files from the cloud to receive new curated collections without updating the app. |
-| **Change wallpaper on start** | When enabled, Spice immediately changes the wallpaper when the app launches. Disable this to show the last-seen wallpaper until the timer fires. |
 | **Refresh wallpapers nightly** | Spice quietly re-fetches images from all active sources once per night, keeping the cache fresh with new content without interrupting your day. |
-| **Display Configuration → Refresh Displays** | Manually tell Spice to re-detect all connected monitors. Use this if you plug in or unplug a display while Spice is running. |
+| **Advanced → Behavior → Detect displays** | Manually tell Spice to re-detect all connected monitors. Use this if you plug in or unplug a display while Spice is running. |
 | **Clear Wallpaper Cache** | Deletes all downloaded images from disk. You will need an internet connection before new wallpapers appear again. Requires confirmation. |
 | **Blocked Images → Reset** | Clears the list of blocked images, allowing previously deleted images to be re-downloaded. Requires confirmation. |
 
@@ -174,26 +173,52 @@ The following table breaks down exactly how the engine processes images and cont
 
 ---
 
-### Tune Image & Virtual Museum Frame
+### Artwork Display Modes
 
-The **Tune Image** popup provides manual control over how Spice frames and crops your wallpaper. 
+Artwork Display decides how every image is presented on your screen. Change it in Preferences or from the **Artwork Display** submenu in the tray.
 
-By default, Spice uses a combination of face detection and entropy analysis to find the best crop region, and will automatically reject extreme aspect ratios (like portraits on a landscape monitor) unless the image can be salvaged via the Virtual Museum Frame. The Tune Image popup lets you override these automated pipeline decisions.
+| Mode | What you see |
+| :--- | :--- |
+| **Smart Crop** | The image fills the screen. Part of it is cropped; Spice never frames an image in this mode. Smart Fit settings apply. |
+| **Full Artwork** (default) | The whole image, as large as it fits, on a plain wall color. Nothing is cropped. |
+| **Museum Frame** | The whole image in a gallery frame on the wall. Nothing is cropped. Frame size, matting and wall color settings apply. |
 
-**Virtual Museum Frame (Auto Salvage vs Manual):**
-- **Auto Salvage**: The pipeline automatically rescues extreme portraits and landscapes by displaying the entire uncropped image on a generated background, preserving the original aspect ratio. (You can enable this automatically for all art from a specific museum in the Museum settings).
-- **Manual Framing**: You can manually toggle the Virtual Museum Frame on *any* image by clicking **Enable Frame** in the Tune popup. You can adjust the **Frame Size** (e.g. 85%), toggle **Paper Matting**, and choose a **Wall Color** (e.g. Algorithmic).
+Things to know:
 
-**Manual Crop Anchors:**
-If you prefer cropping instead of framing, the Tune popup provides a 3×3 crop anchor grid to hint which region to keep when cropping.
-- Select a direction: the wallpaper is immediately re-cropped to emphasize that region.
-- Select **Auto** to return to the intelligent default.
+- **The first switch to a mode takes a while.** Spice creates that mode's wallpapers from the originals in the background, which can take several minutes with a large cache. The wallpaper changes as soon as the first one is ready, and rotation uses the ones finished so far.
+- **Switching back is quick.** Spice keeps each mode's wallpapers, so returning to a mode reuses them. This uses more disk space. Changing another processing setting, such as frame size or Face Crop, clears them.
+- **Smart Fit settings do not apply** in Full Artwork and Museum Frame, so they are disabled in Preferences. This includes when Smart Fit Mode is *Disabled*.
+- **Tune Image still works per image.** In Full Artwork and Museum Frame, **Add frame** puts that image in a frame, or takes it off, and nothing is cropped. In Smart Crop, Tune Image only chooses which part is kept.
+- **Wall Color** also sets the background in Full Artwork.
+- **Low-resolution images** are enlarged to fit and may look soft.
+
+---
+
+### Tune Image
+
+**Tune Image** (from the tray menu, one display at a time) changes how a single picture is shown. The preview is always the shape of that screen and shows the desktop result.
+
+**Smart Crop: choose the part to keep.** Drag the preview along the direction that is cropped: up and down for a picture taller than the screen, left and right for a wider one. The picture follows the pointer and stays where you let go, at any position. A picture close to the screen's shape can be dragged too, only a little; one with exactly the screen's shape has nothing to drag. After a drag, **Reset** returns to the automatic crop. There is no **Add frame** button in this mode, because Smart Crop never frames.
+
+**Full Artwork and Museum Frame: Add frame.** The **Add frame** button puts this one picture in a gallery frame, or takes it off. Once framed, you can set the **Frame size**, the **Paper mat** and the **Wall color** for it. The paper mat is off by default; whatever you chose earlier is kept.
 
 **Keyboard Shortcuts (WASD Layout):**
-You can set crop anchors directly from the keyboard using the same targeted modifier pattern as other shortcuts. Hold a number key (1-9) to target a specific display.
+In Smart Crop you can also place the kept part from the keyboard, with the single-display pattern: hold the display's number key (1-9), with `Alt` (Windows) or `Command` (macOS).
 
 | Key | Action |
 | :--- | :--- |
+| `W` | Keep the top (tall picture) |
+| `A` | Keep the left (wide picture) |
+| `E` | Keep the middle |
+| `S` | Keep the bottom (tall picture) |
+| `D` | Keep the right (wide picture) |
+| `Q` | Back to automatic |
+
+**Example:** To keep the top of the picture on Display 2, press and hold `Alt` (Windows) or `Command` (macOS), tap `2`, and press `W`. These keys set the kept part to the start, middle or end (0, 50 or 100 percent); a position you dragged to is replaced.
+
+> **Note:** Tune Image needs **Smart Fit Mode** to be *Quality* or *Flexibility* for cropping. When Smart Fit is *Disabled*, images are not processed.
+
+--- | :--- |
 | `W` | Tune Up ↑ |
 | `A` | Tune Left ← |
 | `S` | Tune Down ↓ |
@@ -341,7 +366,7 @@ Spice fully supports any number of connected monitors. Each display is managed i
 
 When Spice starts, it detects all connected displays automatically. If you connect or disconnect a display while Spice is running:
 
-1. Open **Preferences → Wallpaper → General → Refresh Displays**, or
+1. Open **Settings → Advanced → Detect displays**, or
 2. Use the hotkey `Ctrl` + `Alt` + `D` (Windows) / `Cmd` + `Control` + `D` (macOS).
 
 ### Per-Display Control

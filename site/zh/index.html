@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>观画壁纸（Paintpane）· 把博物馆名作搬到你的桌面</title>
+<meta name="description" content="博物馆名作，就在你的桌面上。把你的 Windows 壁纸换成博物馆里的名画，随时欣赏，自由选择。">
+<link rel="canonical" href="https://begineri.github.io/Paintpane/zh/">
+<link rel="alternate" hreflang="en" href="https://begineri.github.io/Paintpane/">
+<link rel="alternate" hreflang="zh-CN" href="https://begineri.github.io/Paintpane/zh/">
+<link rel="alternate" hreflang="x-default" href="https://begineri.github.io/Paintpane/">
+<link rel="icon" type="image/png" href="../assets/icon-256.png">
+<link rel="stylesheet" href="../assets/site.css">
+<!--
+  Chinese intro page. Its English twin is ../index.html: same blocks in the same order (Z1–Z12 / E1–E12).
+  Change the copy of both pages together.
+  Chinese copy rules: a space between Chinese and Latin letters or digits, full-width punctuation,
+  作品 for artworks, museum names in full.
+-->
+</head>
+<body>
+
+<!-- Z1 · top bar -->
+<header class="top"><div class="wrap">
+  <a class="brand" href="./"><img class="icon" src="../assets/icon-256.png" alt="" width="28" height="28">观画壁纸 <small lang="en">Paintpane</small></a>
+  <nav>
+    <a href="../" hreflang="en" lang="en">English</a>
+    <a class="gh" href="https://github.com/begineri/Paintpane">GitHub</a>
+    <a class="btn primary small" href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe">下载</a>
+  </nav>
+</div></header>
+
+<main>
+<div class="wrap hero">
+  <!-- Z2 · first screen. The description breaks after the first comma; "Windows 壁纸" stays together. -->
+  <div>
+    <h1>博物馆名作，就在你的桌面上。</h1>
+    <p class="lead"><span>把你的 Windows&nbsp;壁纸换成<wbr>博物馆里的名画，</span><span>随时欣赏，自由选择。</span></p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe">下载 Windows 版</a>
+      <a class="btn ghost" href="https://github.com/begineri/Paintpane">在 GitHub 查看</a>
+    </div>
+    <div class="fine">免费 · 源码公开 · 免安装 · 简体中文和英文界面 · Windows 10 / 11，64 位</div>
+  </div>
+
+  <!-- Z3 · first-screen picture. S1: real desktop shot, 2560 × 1600 screen, Full Artwork, desktop icons hidden. -->
+  <figure>
+    <img class="desk-shot" src="../assets/img/s1-desktop.jpg" width="1600" height="1000" alt="Windows 桌面上完整显示雷诺阿的《两姐妹（在露台上）》，两侧是墙面颜色">
+    <figcaption>《两姐妹（在露台上）》— 皮埃尔-奥古斯特·雷诺阿 · 芝加哥艺术博物馆</figcaption>
+  </figure>
+</div>
+
+<section><div class="wrap">
+  <!-- Z4 · point 01 -->
+  <div class="point">
+    <div class="text">
+      <div class="num">01</div>
+      <h2>常驻托盘，定时换一幅</h2>
+      <p>不用管它，到时间自动换下一幅。想知道屏幕上是哪幅画，点开托盘，第一行就是作品、画家和博物馆。</p>
+      <p>每台显示器独立轮换，可以各显示不同的画。锁屏也会一起更换。</p>
+    </div>
+    <!-- S5: headless render of the tray menu code, light theme, 2× (same size as the menu on a 200 % screen). -->
+    <figure>
+      <img class="shot menu-shot" src="../assets/img/zh/tray.jpg" width="474" height="602" alt="观画壁纸的托盘菜单：当前作品和画家，上一张、暂停、下一张和收藏，调整此图、锁屏换一张、显示方式和设置" loading="lazy">
+    </figure>
+  </div>
+
+  <!-- Z5 · point 02 -->
+  <div class="point wide">
+    <div class="text">
+      <div class="num">02</div>
+      <h2>整幅显示，不裁切</h2>
+      <p>三种显示模式，下面是同一幅画的效果。画面上不会叠加文字或图标。默认“完整显示”，在托盘里一键切换。</p>
+    </div>
+    <!-- S2: the same painting in the three modes, one real desktop shot each (2560 × 1600, desktop icons hidden). -->
+    <figure>
+      <div class="trio">
+        <figure>
+          <img class="desk-shot" src="../assets/img/s2-full.jpg" width="800" height="500" alt="完整显示：整幅画，两侧是墙面颜色" loading="lazy">
+          <figcaption><b>完整显示（默认）</b><span>整幅画缩放到屏幕内，</span><span>空白处用墙面颜色补齐。</span></figcaption>
+        </figure>
+        <figure>
+          <img class="desk-shot" src="../assets/img/s2-frame.jpg" width="800" height="500" alt="博物馆画框：画装在带衬纸的画框里，挂在墙上" loading="lazy">
+          <figcaption><b>博物馆画框</b><span>给画装上画框，</span><span>像挂在展厅的墙上。</span></figcaption>
+        </figure>
+        <figure>
+          <img class="desk-shot" src="../assets/img/s2-crop.jpg" width="800" height="500" alt="智能裁切：画铺满屏幕，上下被裁掉一部分" loading="lazy">
+          <figcaption><b>智能裁切</b><span>铺满整个屏幕，</span><span>画的边缘会被裁掉一部分。</span></figcaption>
+        </figure>
+      </div>
+    </figure>
+  </div>
+
+  <!-- Z6 · point 03 -->
+  <div class="point flip">
+    <div class="text">
+      <div class="num">03</div>
+      <h2>也可以用你自己的图</h2>
+      <p>除了博物馆的画，也可以用壁纸网站 wallhaven、免费图库 Pexels、维基共享资源（维基百科的图片库）上的图，或者你电脑里的一个文件夹。</p>
+    </div>
+    <!-- S6: headless render of Settings › Sources (after P10), Museums collapsed, Yours and Community open. -->
+    <figure>
+      <img class="shot" src="../assets/img/zh/sources-light.png" width="880" height="640" alt="设置 › 图源" loading="lazy">
+    </figure>
+  </div>
+</div></section>
+
+<!-- Z8 · sources -->
+<section><div class="wrap">
+  <h2>图源</h2>
+  <p>以下博物馆的开放馆藏：</p>
+  <ul class="museums">
+    <li>大都会艺术博物馆</li>
+    <li>芝加哥艺术博物馆</li>
+    <li>克利夫兰艺术博物馆</li>
+    <li>荷兰国立博物馆</li>
+    <li>台北故宫博物院</li>
+    <li>丹麦国家美术馆</li>
+    <li>盖蒂博物馆</li>
+  </ul>
+  <p class="other">其他图源：维基共享资源、wallhaven、Pexels、本地文件夹和收藏夹。</p>
+</div></section>
+
+<!-- Z10 · questions -->
+<section><div class="wrap">
+  <h2>常见问题</h2>
+  <div class="faq">
+    <div>
+      <h3>要钱吗？</h3>
+      <p>免费，源码公开。许可证是 PolyForm Noncommercial：可以使用、修改和分享，但不能用于商业目的。</p>
+    </div>
+    <div>
+      <h3>Windows 提示“已保护你的电脑”怎么办？</h3>
+      <p>第一次运行观画壁纸时，Windows 可能会这样提示。点<b>更多信息</b>，再点<b>仍要运行</b>就行。</p>
+    </div>
+    <div>
+      <h3>开机会自动启动吗？</h3>
+      <p>会，默认随 Windows 启动。不需要的话，在“设置 › 常规”里关掉<b>随 Windows 启动</b>。</p>
+    </div>
+    <div>
+      <h3>和 Spice 是什么关系？</h3>
+      <p>观画壁纸是 Spice 的非官方修改版，与原项目无关，也不由原作者提供支持。两者可以同时装，但不要同时运行，它们都会更换壁纸。</p>
+    </div>
+    <div>
+      <h3>有 macOS 版吗？</h3>
+      <p>目前没有，只提供 Windows 版。</p>
+    </div>
+    <div>
+      <h3>能保证不出现 NSFW 内容吗？</h3>
+      <p>不能保证。过滤依据的是馆藏分类、图源的分级和你自己的标记，所以只能说“默认过滤”，不是“绝对过滤”。</p>
+    </div>
+  </div>
+</div></section>
+
+<!-- Z11 · license and credits -->
+<section class="credits"><div class="wrap">
+  <h2>许可与致谢</h2>
+  <p>观画壁纸由 Karl Kwong 创建的 <a href="https://github.com/dixieflatline76/Spice">Spice</a> 修改而来。</p>
+  <p>画作来自各博物馆的开放获取项目。观画壁纸使用与 Spice 相同的 PolyForm Noncommercial License 1.0.0，并保留原版权声明。</p>
+</div></section>
+</main>
+
+<!-- Z12 · footer -->
+<footer><div class="wrap">
+  <a href="https://github.com/begineri/Paintpane">GitHub</a>
+  <a href="https://github.com/begineri/Paintpane/releases">历史版本</a>
+  <a href="https://github.com/begineri/Paintpane/issues">问题反馈</a>
+  <a href="https://github.com/begineri/Paintpane/blob/main/LICENSE">许可</a>
+  <a class="lang" href="../" hreflang="en" lang="en">English</a>
+</div></footer>
+
+</body>
+</html>

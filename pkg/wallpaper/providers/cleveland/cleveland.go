@@ -480,8 +480,6 @@ func (p *Provider) FetchThumbnails(ctx context.Context, ids []string) ([]provide
 // CreateSettingsPanel returns the museum info panel.
 func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.PanelSchema {
 	return schema.CreateMuseumSettingsPanel(schema.MuseumSettingsConfig{
-		MuseumFramingGetFunc: func() bool { return p.cfg.GetMuseumFraming(p.ID()) },
-		MuseumFramingSetFunc: func(val bool) { p.cfg.SetMuseumFraming(p.ID(), val) },
 		ID:                   "CMA",
 		Title:                i18n.T("Cleveland Museum of Art"),
 		Location:             i18n.T("Cleveland, OH, USA"),

@@ -159,11 +159,14 @@ func (p *Provider) fetchCurated(entry *curation.CollectionEntry, page int) ([]pr
 		if item.ImageURL == "" {
 			continue
 		}
+		item.Title, item.Artist = PlainText(item.Title), PlainText(item.Artist)
 		images = append(images, provider.Image{
 			ID:          item.ID,
 			Path:        item.ImageURL,
 			ViewURL:     BuildObjectURL(item.AccessionID),
 			Attribution: fmt.Sprintf("%s - %s", item.Artist, item.Title),
+			Title:       item.Title,
+			Artist:      item.Artist,
 			Provider:    p.ID(),
 		})
 	}
@@ -390,6 +393,8 @@ func (p *Provider) resolveObjectToImage(ctx context.Context, objectID string) (*
 		Path:        imageURL,
 		ViewURL:     BuildObjectURL(objectNumber),
 		Attribution: attribution,
+		Title:       title,
+		Artist:      artist,
 		Provider:    p.ID(),
 	}
 
@@ -476,6 +481,12 @@ func (p *Provider) cacheResult(id string, img *provider.Image) {
 }
 
 // EnrichImage is a no-op — all metadata is resolved during FetchImages.
+// ScaledDownloadURL implements provider.ScaledDownloadProvider: the IIIF image server sends the
+// image already scaled while originals are capped at about 4K.
+func (p *Provider) ScaledDownloadURL(ctx context.Context, img provider.Image, fit func(w, h int) (int, int)) (string, bool) {
+	return provider.IIIFScaledURL(ctx, p.client, img.Path, img.Width, img.Height, fit)
+}
+
 func (p *Provider) EnrichImage(_ context.Context, img provider.Image) (provider.Image, error) {
 	return img, nil
 }
@@ -497,8 +508,8 @@ func (p *Provider) FetchThumbnails(ctx context.Context, ids []string) ([]provide
 				ID:      item.ID,
 				URL:     thumbURL,
 				ViewURL: fmt.Sprintf("https://www.rijksmuseum.nl/en/collection/%s", item.AccessionID),
-				Title:   item.Title,
-				Artist:  item.Artist,
+				Title:   PlainText(item.Title),
+				Artist:  PlainText(item.Artist),
 				Year:    item.Year,
 			})
 		}
@@ -511,8 +522,6 @@ func (p *Provider) FetchThumbnails(ctx context.Context, ids []string) ([]provide
 // CreateSettingsPanel returns the museum info panel.
 func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.PanelSchema {
 	return schema.CreateMuseumSettingsPanel(schema.MuseumSettingsConfig{
-		MuseumFramingGetFunc: func() bool { return p.cfg.GetMuseumFraming(p.ID()) },
-		MuseumFramingSetFunc: func(val bool) { p.cfg.SetMuseumFraming(p.ID(), val) },
 		ID:                   "Rijks",
 		Title:                i18n.T("Rijksmuseum"),
 		Location:             i18n.T("Amsterdam, Netherlands"),

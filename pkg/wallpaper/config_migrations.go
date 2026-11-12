@@ -26,7 +26,10 @@ func NewMigrationChain() *MigrationChain {
 			SanitizeFaceSettingsStep,
 			PruneStaleFavoritesStep,
 			EnsureManagedFavoritesStep,
+			RenameMetBestOfStep,
 			UpdateCollisionsStep,
+			FixSmartFitFlexibilityStep,
+			FixFacePriorityStep,
 		},
 	}
 }
@@ -48,6 +51,35 @@ func (mc *MigrationChain) Execute(cfg *Config) error {
 		cfg.save()
 	}
 	return nil
+}
+
+// FixSmartFitFlexibilityStep fixes the crop strategy at Flexibility (S2-9, v31). The setting is
+// gone from the Wallpaper page: Smart crop always crops to fill the screen, so a saved Quality or
+// Disabled choice is ignored from now on.
+func FixSmartFitFlexibilityStep(cfg *Config) (bool, error) {
+	current := cfg.IntWithFallback(SmartFitModePrefKey, -1)
+	if current == int(SmartFitAggressive) {
+		return false, nil
+	}
+	// No saved mode: the older keys decide, and by default they already mean Flexibility.
+	if current == -1 && cfg.BoolWithFallback(SmartFitPrefKey, true) && cfg.BoolWithFallback("UnlockAspectRatio", true) {
+		return false, nil
+	}
+	log.Println("Migration: Fixing the crop strategy at Flexibility.")
+	cfg.SetInt(SmartFitModePrefKey, int(SmartFitAggressive))
+	return true, nil
+}
+
+// FixFacePriorityStep fixes the face setting at Balanced: Face Crop on, Face Boost off (S2-10,
+// v33). The Face priority row is gone, so a saved Off, Boost or other choice is ignored.
+func FixFacePriorityStep(cfg *Config) (bool, error) {
+	if cfg.BoolWithFallback(FaceCropPrefKey, true) && !cfg.BoolWithFallback(FaceBoostPrefKey, false) {
+		return false, nil
+	}
+	log.Println("Migration: Fixing Face priority at Balanced.")
+	cfg.SetBool(FaceCropPrefKey, true)
+	cfg.SetBool(FaceBoostPrefKey, false)
+	return true, nil
 }
 
 // EnsureFavoritesStep ensures the Favorites query exists using the correct ID.
@@ -222,6 +254,41 @@ func UpdateCollisionsStep(cfg *Config) (bool, error) {
 			cfg.Queries[i].ID = newID
 			changed = true
 		}
+	}
+	return changed, nil
+}
+
+// RenameMetBestOfStep renames the Met default collection key. Early builds shipped it as
+// "spice_melange"; docs/collections/metmuseum.json now calls it "metmuseum_best_of", so a query that
+// still names the old key finds no collection and the Met returns no images. If the user already has
+// a "metmuseum_best_of" query, the old one is dropped instead of duplicated.
+func RenameMetBestOfStep(cfg *Config) (bool, error) {
+	const oldKey, newKey = "spice_melange", "metmuseum_best_of"
+	hasNew := false
+	for _, q := range cfg.Queries {
+		if q.Provider == "MetMuseum" && q.URL == newKey {
+			hasNew = true
+			break
+		}
+	}
+
+	changed := false
+	kept := make([]ImageQuery, 0, len(cfg.Queries))
+	for _, q := range cfg.Queries {
+		if q.Provider == "MetMuseum" && q.URL == oldKey {
+			changed = true
+			if hasNew {
+				log.Printf("Migration: Dropping Met query %q, %q already exists", oldKey, newKey)
+				continue
+			}
+			log.Printf("Migration: Renaming Met collection %q to %q", oldKey, newKey)
+			q.URL = newKey
+			hasNew = true
+		}
+		kept = append(kept, q)
+	}
+	if changed {
+		cfg.Queries = kept
 	}
 	return changed, nil
 }

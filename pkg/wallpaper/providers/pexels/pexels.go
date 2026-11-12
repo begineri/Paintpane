@@ -416,18 +416,13 @@ func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.Panel
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title:   i18n.T("Pexels"),
 				Compact: true,
 				Items: []schema.ItemSchema{
-					schema.LabelItem{
-						Text:       i18n.T("Pexels provides high quality and completely free stock photos licensed under the Pexels license."),
-						Importance: schema.ImportanceLow,
-					},
 					schema.SecretItem{
 						Name:         pexAPIIdent,
-						Label:        i18n.T("pexels API Key:"),
+						Label:        i18n.T("Pexels API key"),
 						InitialValue: p.cfg.GetPexelsAPIKey(),
-						Placeholder:  i18n.T("Enter your Pexels API Key"),
+						Placeholder:  i18n.T("Enter your Pexels API key"),
 						OnVerify: func(key string) error {
 							ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 							defer cancel()
@@ -456,11 +451,12 @@ func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.Panel
 // CreateQueryPanel creates the image query management panel.
 func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, pendingUrl string) *schema.PanelSchema {
 	addCfg := schema.AddQueryConfig{
-		Title:           i18n.T("Add Pexels Collection"),
-		URLPlaceholder:  "https://www.pexels.com/search/...",
+		Title:           i18n.T("Add Pexels collection"),
+		URLLabel:        i18n.T("Pexels URL"),
+		URLPlaceholder:  "https://www.pexels.com/search/…",
 		URLValidator:    PexelsURLRegexp,
-		URLErrorMsg:     i18n.T("Invalid Pexels URL"),
-		DescPlaceholder: i18n.T("Collection Description (e.g. Nature)"),
+		URLErrorMsg:     i18n.T("That isn't a Pexels URL."),
+		DescPlaceholder: i18n.T("e.g. Nature"),
 		AddHandler: func(desc, url string, active bool) (string, error) {
 			apiURL, err := p.ParseURL(url)
 			if err != nil {
@@ -477,12 +473,12 @@ func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, pendingUrl strin
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title:       i18n.T("Pexels Queries"),
+				Title:       i18n.T("Pexels queries"),
 				Description: i18n.T("Manage your Pexels image queries here."),
 				Items: []schema.ItemSchema{
 					schema.ButtonItem{
 						Name:       "pexels_add",
-						ButtonText: i18n.T("Add New Collection"),
+						ButtonText: i18n.T("Add new collection"),
 						IconName:   "add",
 						OnPressed: func() {
 							sm.ShowAddQueryDialog(addCfg, "", "", sm.RefreshUI)

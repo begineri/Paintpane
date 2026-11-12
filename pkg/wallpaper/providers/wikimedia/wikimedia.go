@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"net/url"
 	"regexp"
@@ -19,6 +20,7 @@ import (
 	"github.com/dixieflatline76/Spice/v2/pkg/ui/schema"
 	"github.com/dixieflatline76/Spice/v2/pkg/ui/setting"
 	"github.com/dixieflatline76/Spice/v2/pkg/wallpaper"
+	"github.com/dixieflatline76/Spice/v2/util/log"
 )
 
 //go:embed Wikimedia.png
@@ -65,7 +67,29 @@ type Provider struct {
 	cb         *CircuitBreaker
 
 	queryTokens map[string]map[int]url.Values
-	mu          sync.Mutex
+	// scaled holds the 3840 px copy Commons offered for each listed file larger than that, by
+	// page ID, for ScaledDownloadURL.
+	scaled map[string]string
+	mu     sync.Mutex
+}
+
+// maxScaledEntries bounds the scaled map; it is emptied when full (a file listed before that is
+// then downloaded in full and shrunk after download).
+const maxScaledEntries = 5000
+
+// ScaledDownloadURL implements provider.ScaledDownloadProvider: while originals are capped, a file
+// wider than 3840 px is downloaded as Commons' 3840 px copy (a standard thumbnail size), which is
+// what a 4K screen shows in Full artwork mode. A wide panorama therefore comes out smaller than
+// the cap's 2160 px short edge: decoding its original is what took the app past 1.5 GB
+// (docs/test-report-v1.0.md §13.5).
+func (p *Provider) ScaledDownloadURL(_ context.Context, img provider.Image, fit func(w, h int) (int, int)) (string, bool) {
+	if w, _ := fit(img.Width, img.Height); img.Width <= 0 || w >= img.Width {
+		return "", false
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	u, ok := p.scaled[strings.TrimPrefix(img.ID, p.ID()+"_")]
+	return u, ok
 }
 
 // NewProvider creates a new instance of Provider
@@ -94,9 +118,10 @@ func (p *Provider) ID() string {
 	return "Wikimedia"
 }
 
-// Name returns the provider name
+// Name returns the source's name: Wikimedia Commons, as the rest of the UI
+// calls it. "Wikimedia" alone is the foundation (Donate to Wikimedia).
 func (p *Provider) Name() string {
-	return i18n.T("Wikimedia")
+	return i18n.T("Wikimedia Commons")
 }
 
 func (p *Provider) Type() provider.ProviderType {
@@ -116,7 +141,7 @@ func (p *Provider) HomeURL() string {
 }
 
 func (p *Provider) Title() string {
-	return "Wikimedia"
+	return "Wikimedia Commons"
 }
 
 func (p *Provider) GetProviderIcon() interface{} {
@@ -232,21 +257,24 @@ func (p *Provider) handleHttpInput(input string) (string, error) {
 
 type wikimediaResponse struct {
 	BatchComplete string `json:"batchcomplete"`
-	Continue      struct {
-		GimContinue string `json:"gimcontinue"`
-		GcmContinue string `json:"gcmcontinue"`
-		GsrOffset   int    `json:"gsroffset"`
-		Continue    string `json:"continue"`
-	} `json:"continue"`
-	Query struct {
+	// Continue holds every parameter the next request must repeat. Besides the generator's
+	// (gcmcontinue, gimcontinue, gsroffset) there is iicontinue: imageinfo with a scaled copy
+	// covers 50 files per request, so the rest of a batch of 100 comes with iicontinue and the
+	// generator's own parameter only after that.
+	Continue map[string]json.RawMessage `json:"continue"`
+	Query    struct {
 		Pages map[string]struct {
 			PageID    int    `json:"pageid"`
 			Title     string `json:"title"`
 			ImageInfo []struct {
-				URL         string `json:"url"`
-				Width       int    `json:"width"`
-				Height      int    `json:"height"`
-				ExtMetadata struct {
+				URL            string `json:"url"`
+				DescriptionURL string `json:"descriptionurl"`
+				Width          int    `json:"width"`
+				Height         int    `json:"height"`
+				ThumbURL       string `json:"thumburl"`
+				ThumbWidth     int    `json:"thumbwidth"`
+				ThumbHeight    int    `json:"thumbheight"`
+				ExtMetadata    struct {
 					ObjectName struct {
 						Value string `json:"value"`
 					} `json:"ObjectName"`
@@ -276,6 +304,33 @@ func (p *Provider) WithResolution(query string, width, height int) string {
 		return fmt.Sprintf("search:incategory:\"%s\"%s", catName, constraint)
 	}
 	return query
+}
+
+const (
+	// scaledWidth is the width of the scaled copy requested from Commons (a standard thumbnail size).
+	scaledWidth = 3840
+	// maxOriginalPixels is the largest original that is downloaded as is; bigger ones use the scaled
+	// copy. Matches wallpaper.MaxMasterPixels.
+	maxOriginalPixels = 100_000_000
+)
+
+// unsupportedExts are Commons file types the wallpaper pipeline cannot decode (vector, animated,
+// document, audio/video, and TIFF, whose LZW variants the decoder rejects).
+var unsupportedExts = map[string]bool{
+	".svg": true, ".gif": true, ".pdf": true, ".ogg": true, ".ogv": true, ".webm": true,
+	".tif": true, ".tiff": true,
+}
+
+// isUnsupportedFormat reports whether the file at rawURL is a format we cannot decode. It looks at
+// the URL path only: the API returns URLs such as ".../Jovian_Tempest.tif?utm_source=commons..." and
+// a suffix check on the whole string would miss them, so the download would fail after the fact.
+func isUnsupportedFormat(rawURL string) bool {
+	path := rawURL
+	if u, err := url.Parse(rawURL); err == nil {
+		path = u.Path
+	}
+	i := strings.LastIndex(path, ".")
+	return i >= 0 && unsupportedExts[strings.ToLower(path[i:])]
 }
 
 func (p *Provider) FetchImages(ctx context.Context, query string, page int) ([]provider.Image, error) {
@@ -349,6 +404,9 @@ func (p *Provider) FetchImages(ctx context.Context, query string, page int) ([]p
 		return nil, errors.New("unknown query format")
 	}
 
+	// Ask for a scaled copy next to the original: some Commons files are 200 MP and 200 MB.
+	params.Set("iiurlwidth", strconv.Itoa(scaledWidth))
+
 	for k, v := range continueParams {
 		params.Set(k, v[0])
 	}
@@ -359,17 +417,25 @@ func (p *Provider) FetchImages(ctx context.Context, query string, page int) ([]p
 	if err != nil {
 		return nil, err
 	}
+	if result.Error != nil {
+		if page > 1 {
+			// A cursor saved in an earlier run can go stale ("badcontinue"). Nothing on this page
+			// tells the app to start the query over from page 1.
+			log.Printf("Wikimedia: page %d of %q failed (%s: %s); starting the query over", page, query, result.Error.Code, result.Error.Info)
+			p.mu.Lock()
+			delete(p.queryTokens[query], page)
+			p.mu.Unlock()
+			return nil, nil
+		}
+		return nil, fmt.Errorf("wikimedia API error %s: %s", result.Error.Code, result.Error.Info)
+	}
 
 	for _, pageData := range result.Query.Pages {
 		if len(pageData.ImageInfo) == 0 {
 			continue
 		}
 		info := pageData.ImageInfo[0]
-		lowerURL := strings.ToLower(info.URL)
-		if strings.HasSuffix(lowerURL, ".svg") || strings.HasSuffix(lowerURL, ".gif") ||
-			strings.HasSuffix(lowerURL, ".pdf") || strings.HasSuffix(lowerURL, ".ogg") ||
-			strings.HasSuffix(lowerURL, ".ogv") || strings.HasSuffix(lowerURL, ".webm") ||
-			strings.HasSuffix(lowerURL, ".tif") || strings.HasSuffix(lowerURL, ".tiff") {
+		if isUnsupportedFormat(info.URL) {
 			continue
 		}
 
@@ -381,42 +447,94 @@ func (p *Provider) FetchImages(ctx context.Context, query string, page int) ([]p
 		}
 
 		artist := sanitizeAttribution(info.ExtMetadata.Artist.Value)
-		if artist == "" {
-			artist = "Unknown"
+		if isUnknownAuthor(artist) {
+			artist = "" // the tray then shows no artist (A2 §12.9 #2)
 		}
-		attribution := artist + " (" + sanitizeAttribution(info.ExtMetadata.LicenseShortName.Value) + ")"
+		attribution := joinAttribution(artist, sanitizeAttribution(info.ExtMetadata.LicenseShortName.Value))
+		title := imageTitle(info.ExtMetadata.ObjectName.Value, pageData.Title)
+
+		path, width, height := info.URL, info.Width, info.Height
+		if int64(width)*int64(height) > maxOriginalPixels {
+			// Too big to decode safely. Download the scaled copy instead, or skip the file when
+			// Commons did not offer one.
+			if info.ThumbURL == "" || info.ThumbWidth <= 0 || info.ThumbHeight <= 0 {
+				continue
+			}
+			path, width, height = info.ThumbURL, info.ThumbWidth, info.ThumbHeight
+		} else if info.ThumbURL != "" && info.ThumbWidth > 0 && info.ThumbWidth < width {
+			p.mu.Lock()
+			if p.scaled == nil || len(p.scaled) >= maxScaledEntries {
+				p.scaled = make(map[string]string)
+			}
+			p.scaled[strconv.Itoa(pageData.PageID)] = info.ThumbURL
+			p.mu.Unlock()
+		}
 
 		allImages = append(allImages, provider.Image{
 			ID:          strconv.Itoa(pageData.PageID),
 			Provider:    p.ID(),
-			Path:        info.URL,
-			ViewURL:     info.URL,
+			Path:        path,
+			ViewURL:     FilePageURL(info.DescriptionURL, pageData.PageID),
 			Attribution: attribution,
+			Title:       title,
+			Artist:      artist,
 			FileType:    "image/jpeg",
-			Width:       info.Width,
-			Height:      info.Height,
+			Width:       width,
+			Height:      height,
 		})
 	}
 
-	if result.Continue.Continue != "" {
-		nextParams := url.Values{}
-		nextParams.Set("continue", result.Continue.Continue)
-		if result.Continue.GimContinue != "" {
-			nextParams.Set("gimcontinue", result.Continue.GimContinue)
-		}
-		if result.Continue.GcmContinue != "" {
-			nextParams.Set("gcmcontinue", result.Continue.GcmContinue)
-		}
-		if result.Continue.GsrOffset > 0 {
-			nextParams.Set("gsroffset", strconv.Itoa(result.Continue.GsrOffset))
-		}
-
+	if nextParams := nextPageParams(result.Continue); len(nextParams) > 0 {
 		p.mu.Lock()
 		p.queryTokens[query][page+1] = nextParams
 		p.mu.Unlock()
 	}
 
 	return allImages, nil
+}
+
+// nextPageParams turns the API's "continue" object into the parameters of the next request, all of
+// them as the API gave them (strings, or numbers such as gsroffset).
+func nextPageParams(c map[string]json.RawMessage) url.Values {
+	next := url.Values{}
+	for k, raw := range c {
+		var s string
+		if err := json.Unmarshal(raw, &s); err != nil {
+			s = strings.TrimSpace(string(raw)) // a number
+		}
+		if s != "" {
+			next.Set(k, s)
+		}
+	}
+	if next.Get("continue") == "" {
+		return url.Values{} // not a continuation the API understands
+	}
+	return next
+}
+
+// PageCursor implements provider.PageCursorProvider: the continue parameters for page of query.
+func (p *Provider) PageCursor(query string, page int) (string, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	v, ok := p.queryTokens[query][page]
+	if !ok {
+		return "", false
+	}
+	return v.Encode(), true
+}
+
+// SetPageCursor implements provider.PageCursorProvider.
+func (p *Provider) SetPageCursor(query string, page int, cursor string) {
+	v, err := url.ParseQuery(cursor)
+	if err != nil || page <= 1 || len(v) == 0 {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.queryTokens[query] == nil {
+		p.queryTokens[query] = make(map[int]url.Values)
+	}
+	p.queryTokens[query][page] = v
 }
 
 func (p *Provider) doWithRetry(ctx context.Context, fullURL string, target interface{}) error {
@@ -509,7 +627,7 @@ func (p *Provider) EnrichImage(ctx context.Context, img provider.Image) (provide
 func (p *Provider) GetDownloadHeaders() map[string]string {
 	return map[string]string{
 		"User-Agent": WikimediaUserAgent,
-		"Referer":    "https://github.com/dixieflatline76/Spice",
+		"Referer":    "https://github.com/begineri/Paintpane",
 	}
 }
 
@@ -523,10 +641,6 @@ func (p *Provider) CreateSettingsPanel(_ setting.SettingsManager) *schema.PanelS
 				Title:   i18n.T("Wikimedia Commons"),
 				Compact: true,
 				Items: []schema.ItemSchema{
-					schema.LabelItem{
-						Text:       i18n.T("Wikimedia Commons is a media file repository making public domain and freely-licensed educational media content available to everyone."),
-						Importance: schema.ImportanceLow,
-					},
 					schema.HyperlinkItem{
 						Text: i18n.T("Donate to Wikimedia"),
 						URL:  "https://donate.wikimedia.org/",
@@ -540,11 +654,11 @@ func (p *Provider) CreateSettingsPanel(_ setting.SettingsManager) *schema.PanelS
 // CreateQueryPanel creates the image query management panel.
 func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, pendingUrl string) *schema.PanelSchema {
 	addCfg := schema.AddQueryConfig{
-		Title:           i18n.T("Add Wikimedia Collection"),
-		URLPlaceholder:  "Category:Nature or Search:Pacific Ocean",
-		URLValidator:    `^.*$`, // Wikimedia is flexible
-		URLErrorMsg:     i18n.T("Invalid Wikimedia Input"),
-		DescPlaceholder: i18n.T("Collection Description (e.g. Nature)"),
+		Title:           i18n.T("Add Wikimedia collection"),
+		URLLabel:        i18n.T("Category or search term"),
+		URLPlaceholder:  i18n.T("Category:Nature or Search:Pacific Ocean"),
+		URLValidator:    `^.*$`, // Wikimedia is flexible: anything is accepted, so there is no message
+		DescPlaceholder: i18n.T("e.g. Nature"),
 		AddHandler: func(desc, url string, active bool) (string, error) {
 			apiURL, err := p.ParseURL(url)
 			if err != nil {
@@ -561,12 +675,12 @@ func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, pendingUrl strin
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title:   i18n.T("Wikimedia Queries"),
+				Title:   i18n.T("Wikimedia queries"),
 				Compact: true,
 				Items: []schema.ItemSchema{
 					schema.ButtonItem{
 						Name:       "wikimedia_add",
-						ButtonText: i18n.T("Add New Collection"),
+						ButtonText: i18n.T("Add new collection"),
 						IconName:   "add",
 						OnPressed: func() {
 							sm.ShowAddQueryDialog(addCfg, "", "", sm.RefreshUI)
@@ -629,10 +743,76 @@ func init() {
 	})
 }
 
+var (
+	htmlTagRe    = regexp.MustCompile("<[^>]*>")
+	whiteSpaceRe = regexp.MustCompile(`[\s\p{Zs}]+`) // also &nbsp;
+	fileExtRe    = regexp.MustCompile(`\.[A-Za-z0-9]{2,5}$`)
+	// cameraNameRe matches file names a camera or phone gives, which say
+	// nothing about the work: "IMG_1234", "DSC01234", "20190512_123456".
+	cameraNameRe = regexp.MustCompile(`(?i)^(img|dsc[nf]?|dcim|pict|photo|image|p)?[\d\s_.()\-]*$`)
+)
+
+// imageTitle is the work's title: the ObjectName Commons gives, else the file
+// name without "File:" and its extension. A name that is only a camera's file
+// number is no title, so the tray shows its text for a missing title.
+func imageTitle(objectName, pageTitle string) string {
+	if t := usableTitle(sanitizeAttribution(objectName)); t != "" {
+		return t
+	}
+	name := strings.TrimPrefix(strings.TrimSpace(pageTitle), "File:")
+	name = fileExtRe.ReplaceAllString(name, "")
+	name = strings.ReplaceAll(name, "_", " ")
+	return usableTitle(whiteSpaceRe.ReplaceAllString(name, " "))
+}
+
+func usableTitle(t string) string {
+	t = strings.TrimSpace(t)
+	if cameraNameRe.MatchString(t) {
+		return ""
+	}
+	return t
+}
+
+// sanitizeAttribution turns an HTML credit from Commons into plain text. A tag
+// becomes a space, so text in separate elements does not run together
+// ("Unknown author" + "Unknown author or not provided").
 func sanitizeAttribution(input string) string {
-	re := regexp.MustCompile("<[^>]*>")
-	output := re.ReplaceAllString(input, "")
-	reSpace := regexp.MustCompile(`\s+`)
-	output = reSpace.ReplaceAllString(output, " ")
+	output := htmlTagRe.ReplaceAllString(input, " ")
+	output = html.UnescapeString(output)
+	output = whiteSpaceRe.ReplaceAllString(output, " ")
 	return strings.TrimSpace(output)
+}
+
+// isUnknownAuthor reports whether a credit names no artist: it says the author
+// is not known, as Commons' {{Unknown|author}} template does, or that the work
+// is anonymous ("Anonymous Unknown author", "Anonymous ( Spain ) Unknown
+// author 17 th century …"). The tray then shows no artist.
+func isUnknownAuthor(artist string) bool {
+	a := strings.ToLower(strings.TrimSpace(artist))
+	return a == "" || strings.HasPrefix(a, "unknown") || strings.HasPrefix(a, "anonymous")
+}
+
+// joinAttribution writes "artist (licence)", leaving out what is missing.
+func joinAttribution(artist, license string) string {
+	switch {
+	case artist == "":
+		if license == "" {
+			return ""
+		}
+		return "(" + license + ")"
+	case license == "":
+		return artist
+	}
+	return artist + " (" + license + ")"
+}
+
+// FilePageURL is the Commons page of a file: its description page, with the title, author,
+// licence and source. Without one from the API it is the page by its page ID. It used to be the
+// file itself (imageinfo's url), so the tray's first row opened the bare picture, several
+// megabytes of it, instead of the page about it.
+func FilePageURL(descriptionURL string, pageID int) string {
+	if descriptionURL != "" {
+		return descriptionURL
+	}
+	return fmt.Sprintf("https://commons.wikimedia.org/w/index.php?curid=%d", pageID)
 }

@@ -27,23 +27,14 @@ func TestBuildCuratedUIItem_WithPreview(t *testing.T) {
 	// Build the item
 	item := buildCuratedUIItem(p, nil, cfg, entry)
 
-	// In TDD phase 1, this should fail because it currently returns a schema.BoolItem,
-	// but we expect a schema.HorizontalRowItem that encapsulates the BoolItem and a ButtonItem.
-
-	rowItem, ok := item.(schema.HorizontalRowItem)
-	assert.True(t, ok, "Expected buildCuratedUIItem to return a schema.HorizontalRowItem for entries with items")
-
+	// Collections with pieces are a switch row with a Preview link.
+	boolItem, ok := item.(schema.BoolItem)
+	assert.True(t, ok, "Expected buildCuratedUIItem to return a schema.BoolItem")
 	if ok {
-		assert.Len(t, rowItem.Items, 2, "Expected HorizontalRowItem to contain 2 items (toggle and button)")
-
-		_, isBoolItem := rowItem.Items[0].(schema.BoolItem)
-		assert.True(t, isBoolItem, "Expected first item to be a BoolItem")
-
-		btnItem, isBtnItem := rowItem.Items[1].(schema.ButtonItem)
-		assert.True(t, isBtnItem, "Expected second item to be a ButtonItem")
-
-		if isBtnItem {
-			assert.Equal(t, "Preview", btnItem.ButtonText, "Expected button text to be 'Preview'")
-		}
+		assert.Equal(t, "Preview", boolItem.ActionText)
+		assert.NotNil(t, boolItem.ActionFunc)
+		assert.Equal(t, "Test Collection", boolItem.Label)
+		assert.Equal(t, "2 pieces", boolItem.Note)
+		assert.Equal(t, "view", boolItem.ActionIcon)
 	}
 }

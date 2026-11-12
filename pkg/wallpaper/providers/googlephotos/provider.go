@@ -198,7 +198,7 @@ func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, pendingUrl strin
 					&schema.OAuthPickerItem{
 						Name:  "google_photos_picker",
 						Label: i18n.T("Google Photos Extension"),
-						Help:  i18n.T("Authorize your Google account to select and download your personal photo albums directly into Spice."),
+						Help:  i18n.T("Authorize your Google account to select and download your personal photo albums directly into Paintpane."),
 						CheckAuthStatus: func() (bool, bool) {
 							token := p.cfg.GetGooglePhotosToken()
 							if token == "" {
@@ -219,7 +219,7 @@ func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, pendingUrl strin
 						},
 						OnLaunchPicker: func(ctx context.Context, updateStatus func(string)) (int, string, error) {
 							// 1. Create Session
-							updateStatus(i18n.T("Creating Web Session..."))
+							updateStatus(i18n.T("Creating web session..."))
 							session, err := p.CreatePickerSession(ctx)
 							if err != nil {
 								return 0, "", err

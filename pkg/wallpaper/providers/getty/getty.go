@@ -131,7 +131,7 @@ func (p *Provider) fetchObjectByUUID(ctx context.Context, uuid string) (*provide
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "SpiceWallpaper/2.0")
+	req.Header.Set("User-Agent", "Paintpane")
 
 	resp, err := p.client.Do(req)
 	if err != nil {
@@ -227,21 +227,7 @@ func (p *Provider) parseGettyJSONLD(doc map[string]interface{}) (*provider.Image
 		return nil, errors.New("invalid graph object")
 	}
 
-	title := "Unknown Title"
-	if label, ok := obj["_label"].(string); ok {
-		title = label
-	}
-
-	author := "Unknown Artist"
-	if prodBy, ok := obj["produced_by"].(map[string]interface{}); ok {
-		if carried, ok := prodBy["carried_out_by"].([]interface{}); ok && len(carried) > 0 {
-			if artist, ok := carried[0].(map[string]interface{}); ok {
-				if name, ok := artist["_label"].(string); ok {
-					author = name
-				}
-			}
-		}
-	}
+	title, author := objectNames(obj)
 
 	imageURL := ""
 	if rep, ok := obj["representation"].([]interface{}); ok && len(rep) > 0 {
@@ -294,7 +280,7 @@ func (p *Provider) parseGettyJSONLD(doc map[string]interface{}) (*provider.Image
 
 	img := &provider.Image{
 		Path:        imageURL,
-		Attribution: fmt.Sprintf("%s - %s", author, title),
+		Attribution: attribution(author, title),
 		Title:       title,
 		Artist:      author,
 		Year:        year,
@@ -305,6 +291,12 @@ func (p *Provider) parseGettyJSONLD(doc map[string]interface{}) (*provider.Image
 }
 
 // EnrichImage is a no-op
+// ScaledDownloadURL implements provider.ScaledDownloadProvider: the IIIF image server sends the
+// image already scaled while originals are capped at about 4K.
+func (p *Provider) ScaledDownloadURL(ctx context.Context, img provider.Image, fit func(w, h int) (int, int)) (string, bool) {
+	return provider.IIIFScaledURL(ctx, p.client, img.Path, img.Width, img.Height, fit)
+}
+
 func (p *Provider) EnrichImage(_ context.Context, img provider.Image) (provider.Image, error) {
 	return img, nil
 }
@@ -313,8 +305,6 @@ func (p *Provider) EnrichImage(_ context.Context, img provider.Image) (provider.
 
 func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.PanelSchema {
 	return schema.CreateMuseumSettingsPanel(schema.MuseumSettingsConfig{
-		MuseumFramingGetFunc: func() bool { return p.cfg.GetMuseumFraming(p.ID()) },
-		MuseumFramingSetFunc: func(val bool) { p.cfg.SetMuseumFraming(p.ID(), val) },
 		ID:                   "Getty",
 		Title:                i18n.T("The J. Paul Getty Museum"),
 		Location:             i18n.T("Los Angeles, CA, USA"),

@@ -63,3 +63,17 @@ func TestGenerateEULAHash(t *testing.T) {
 	assert.Equal(t, h1, h2, "Hash should be deterministic")
 	assert.NotEqual(t, h1, h3, "Hash should change with version")
 }
+
+// An acceptance of an earlier version is no longer valid, but it still shows the person has run
+// the program before (the first-run "Start with Windows" registration relies on this).
+func TestHasEverAcceptedEULA(t *testing.T) {
+	prefs := make(mapPreferences)
+	assert.False(t, HasEverAcceptedEULA(prefs), "nothing recorded: a first run")
+
+	prefs.SetString(EULAPreferenceKey, `{"eula_version":"0.9.0","hash":"old"}`)
+	assert.False(t, HasAcceptedEULA(prefs), "an earlier version asks again")
+	assert.True(t, HasEverAcceptedEULA(prefs), "but it was accepted before")
+
+	MarkEULAAccepted(prefs)
+	assert.True(t, HasEverAcceptedEULA(prefs))
+}

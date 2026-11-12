@@ -6,3 +6,6 @@ Makefile text eol=lf
 
 # Ignore generated HTML galleries for GitHub language statistics
 asset/galleries/**/*.html linguist-generated=true
+
+# Fonts are binary
+*.otf binary

@@ -3,6 +3,7 @@ package wallpaper
 import (
 	"context"
 	"fmt"
+	"maps"
 	"math/rand"
 	"os"
 	"path/filepath"
@@ -32,6 +33,12 @@ const (
 	CmdTuningStart
 	CmdTuningEnd
 
+	// CmdEnforceNudeFilter replaces the current image if it must now be hidden.
+	CmdEnforceNudeFilter
+
+	// CmdNextLockScreen gives the lock screen another image and leaves the desktop alone (T15).
+	CmdNextLockScreen
+
 	// Legacy Anchor commands
 	CmdAnchorAuto Command = 200
 	CmdAnchorTL   Command = 201
@@ -60,9 +67,13 @@ type StoreInterface interface {
 	Clear()
 	MarkSeen(filePath string)
 	SeenCount() int
+	ReadyUnseenCount() int
+	PruneToLimit(limit int, keep map[string]bool)
 	GetIDsForResolution(resolution string) []string
 	GetBucketSize(resolution string) int
 	GetUpdateChannel() <-chan struct{}
+	SetPurity(id string, purity string) bool
+	SetOutcomeFlag(id, key string, value bool) bool
 
 	// Administrative and Batch Operations
 	Sync(limit int, targetFlags map[string]bool, activeQueryIDs map[string]bool)
@@ -91,6 +102,11 @@ type MonitorState struct {
 	Paused           bool
 	TuningInProgress bool
 	ManualRecovery   bool // True if WaitingForImages was triggered by a manual request
+
+	// LastSetError is the error from the most recent attempt to set the desktop wallpaper, empty
+	// after a success. It is shown in /debug/state so a failed change is not mistaken for a
+	// working one.
+	LastSetError string
 }
 
 // MonitorController is an Actor that manages one specific monitor.
@@ -113,7 +129,10 @@ type MonitorController struct {
 	OnWallpaperChanged func(img provider.Image, monitorID int)
 	OnFavoriteRequest  func(img provider.Image)
 	OnFetchRequest     func()
-	pendingUpdate      bool // Flag to indicate Store content has changed
+	pendingUpdate      bool              // Flag to indicate Store content has changed
+	lockScreen         *lockScreenSyncer // Set only on the primary monitor of platforms that support it
+	lockImageID        string            // Image last sent to the lock screen; empty until the first update
+	tuneCache          *tuneRenderCache  // Renders of the current picture while Tune Image is open
 }
 
 // NewMonitorController creates a new actor for managing a specific monitor's state.
@@ -123,7 +142,7 @@ func NewMonitorController(id int, m Monitor, store StoreInterface, fm *FileManag
 		paused = cfg.IsMonitorPaused(m.DevicePath)
 	}
 
-	return &MonitorController{
+	mc := &MonitorController{
 		ID:         id,
 		Monitor:    m,
 		Commands:   make(chan Command, 50),
@@ -141,6 +160,10 @@ func NewMonitorController(id int, m Monitor, store StoreInterface, fm *FileManag
 			Paused:     paused,
 		},
 	}
+	if setter, ok := os.(lockScreenSetter); ok && id == 0 {
+		mc.lockScreen = &lockScreenSyncer{setter: setter}
+	}
+	return mc
 }
 
 // Start launches the actor loop.
@@ -178,11 +201,13 @@ func (mc *MonitorController) Run(ctx context.Context) {
 		case <-updateCh:
 			// Refresh channel immediately for next event (broadcast pattern)
 			updateCh = mc.Store.GetUpdateChannel()
+			mc.mu.Lock()
 			mc.pendingUpdate = true
 			if mc.State.WaitingForImages {
 				log.Debugf("[Monitor %d] Store updated while starving. Retrying next(manual=%v)...", mc.ID, mc.State.ManualRecovery)
 				mc.next(mc.State.ManualRecovery)
 			}
+			mc.mu.Unlock()
 		case cmd := <-mc.Commands:
 			mc.mu.Lock()
 			mc.handleCommand(cmd)
@@ -206,6 +231,8 @@ func (mc *MonitorController) handleCommand(cmd Command) {
 		}
 		resKey := fmt.Sprintf("%dx%d", mc.Monitor.Rect.Dx(), mc.Monitor.Rect.Dy())
 		opts := img.GetTuning(resKey)
+		// A keep-area shortcut replaces a dragged position (it counts as 0, 50 or 100 %).
+		opts.ResetCrop()
 		opts.Anchor = provider.CropAnchor(cmd)
 		mc.reprocessWithTuning(opts)
 		return
@@ -230,8 +257,42 @@ func (mc *MonitorController) handleCommand(cmd Command) {
 		mc.togglePause()
 	case CmdTuningStart:
 		mc.State.TuningInProgress = true
+		mc.tuneCache = nil
 	case CmdTuningEnd:
 		mc.State.TuningInProgress = false
+		mc.tuneCache = nil
+	case CmdEnforceNudeFilter:
+		mc.enforceNudeFilter()
+	case CmdNextLockScreen:
+		mc.nextLockScreen()
+	}
+}
+
+func (mc *MonitorController) isHidden(img provider.Image) bool {
+	return mc.cfg != nil && mc.cfg.IsImageHidden(img)
+}
+
+// enforceNudeFilter replaces the current image if it must now be hidden. It runs
+// through next(manual=true) so that a paused monitor is replaced too.
+func (mc *MonitorController) enforceNudeFilter() {
+	// The lock screen shows its own image, so it is checked whatever the desktop shows.
+	defer mc.enforceLockScreenFilter()
+
+	currentID := mc.State.CurrentImage.ID
+	if currentID == "" {
+		return
+	}
+	current := mc.State.CurrentImage
+	if stored, ok := mc.Store.GetByID(currentID); ok {
+		current = stored
+	}
+	if !mc.isHidden(current) {
+		return
+	}
+	mc.next(true)
+	if mc.State.CurrentImage.ID == currentID {
+		// Nothing can replace it; the wallpaper is kept, without a notification (prototype v35).
+		log.Debugf("[Monitor %d] No other image is available; keeping %s", mc.ID, currentID)
 	}
 }
 
@@ -290,7 +351,11 @@ func (mc *MonitorController) next(manual bool) {
 	// unplayed portion of the deck. This prevents provider clustering when
 	// images arrive in same-provider bursts. Full rebuilds only happen on
 	// deck exhaustion or pool shrinkage.
-	if len(mc.State.ShuffleIDs) != len(bucketIDs) {
+	if deckHasStaleIDs(mc.State.ShuffleIDs, bucketIDs) {
+		// Invalidation can leave a deck the same size as the bucket but holding different images.
+		log.Debugf("[Monitor %d] Shuffle rebuild: deck has images no longer in the bucket.", mc.ID)
+		mc.rebuildShuffle(bucketIDs)
+	} else if len(mc.State.ShuffleIDs) != len(bucketIDs) {
 		if len(bucketIDs) > len(mc.State.ShuffleIDs) && len(mc.State.ShuffleIDs) > 0 {
 			mc.growShuffle(bucketIDs)
 		} else {
@@ -302,6 +367,11 @@ func (mc *MonitorController) next(manual bool) {
 	mc.pendingUpdate = false // Always consume the pending update
 
 	// 4. Pick Next (with Skip/Retry Logic for Blocked/Missing images)
+	// The image on screen is not picked again while another can be shown: after a start restores
+	// last time's wallpaper (restoreLastShown), the new deck may hold it anywhere, even first. It is
+	// picked when its file changed (a new display mode, a rebuilt copy): showing it again then
+	// changes what the desktop shows.
+	skippedCurrent := false
 	for attempts := 0; attempts < len(mc.State.ShuffleIDs); attempts++ {
 		if mc.State.RandomPos >= len(mc.State.ShuffleIDs) {
 			mc.State.RandomPos = 0
@@ -318,6 +388,15 @@ func (mc *MonitorController) next(manual bool) {
 		}
 
 		if img, ok := mc.Store.GetByID(nextID); ok {
+			if mc.isHidden(img) {
+				log.Debugf("[Monitor %d] Skipping hidden image during rotation: %s", mc.ID, nextID)
+				continue
+			}
+			if nextID == mc.State.CurrentImage.ID && mc.resolveImagePath(img) == mc.State.CurrentImage.FilePath {
+				skippedCurrent = true
+				continue
+			}
+
 			mc.State.CurrentID = nextID
 			mc.State.History = append(mc.State.History, nextID)
 
@@ -333,9 +412,27 @@ func (mc *MonitorController) next(manual bool) {
 		}
 	}
 
+	if skippedCurrent {
+		log.Debugf("[Monitor %d] No other image can be shown; keeping %s", mc.ID, mc.State.CurrentID)
+		return
+	}
 	log.Printf("[Monitor %d] All images in shuffle list are blocked or missing. Waiting for fetch...", mc.ID)
 	mc.State.WaitingForImages = true
 	mc.State.ManualRecovery = manual
+}
+
+// deckHasStaleIDs reports whether the shuffle deck holds an ID that is not in the bucket.
+func deckHasStaleIDs(deck, bucket []string) bool {
+	inBucket := make(map[string]bool, len(bucket))
+	for _, id := range bucket {
+		inBucket[id] = true
+	}
+	for _, id := range deck {
+		if !inBucket[id] {
+			return true
+		}
+	}
+	return false
 }
 
 // rebuildShuffle performs a full shuffle of all IDs and resets position to 0.
@@ -421,10 +518,25 @@ func (mc *MonitorController) prev() {
 	if len(mc.State.History) <= 1 {
 		return // Nothing to go back to
 	}
-	// Pop current
-	mc.State.History = mc.State.History[:len(mc.State.History)-1]
+
+	// Find the newest earlier entry that may be shown, skipping hidden images.
+	target := len(mc.State.History) - 2
+	for target >= 0 {
+		img, ok := mc.Store.GetByID(mc.State.History[target])
+		if !ok || !mc.isHidden(img) {
+			break
+		}
+		target--
+	}
+	if target < 0 {
+		return // Every earlier image is hidden; stay on the current one
+	}
+	steps := len(mc.State.History) - 1 - target
+
+	// Pop current and any hidden entries
+	mc.State.History = mc.State.History[:target+1]
 	// Current is now last element
-	prevID := mc.State.History[len(mc.State.History)-1]
+	prevID := mc.State.History[target]
 	mc.State.CurrentID = prevID
 
 	// BACKTRACKING FIX:
@@ -434,11 +546,8 @@ func (mc *MonitorController) prev() {
 	// prev() implies we have history.
 	// RandomPos points to the *next* item to be shown.
 	// So if we go back, we decrement it.
-	if len(mc.State.ShuffleIDs) > 0 {
-		mc.State.RandomPos--
-		if mc.State.RandomPos < 0 {
-			mc.State.RandomPos = len(mc.State.ShuffleIDs) - 1
-		}
+	if n := len(mc.State.ShuffleIDs); n > 0 {
+		mc.State.RandomPos = ((mc.State.RandomPos-steps)%n + n) % n
 	}
 
 	if img, ok := mc.Store.GetByID(prevID); ok {
@@ -452,12 +561,9 @@ func (mc *MonitorController) deleteCurrent() {
 		return
 	}
 	log.Printf("[Monitor %d] Deleting image %s", mc.ID, img.ID)
-	// 1. Mark as blocked/deleted in store
-	mc.Store.Remove(img.ID)
-	// 2. Add to avoid set
-	if mc.cfg != nil {
-		mc.cfg.AddToAvoidSet(img.ID)
-	}
+	// 1-2. Remove from the store (deleting its files) and add to the avoid set,
+	// keeping a thumbnail and its details for the blocked-images page.
+	blockImage(mc.cfg, mc.Store, img)
 
 	// 3. Move to next
 	mc.next(true)
@@ -488,8 +594,8 @@ func (mc *MonitorController) syncState() {
 	}
 }
 
-func (mc *MonitorController) applyImage(img provider.Image) {
-	// Determine resolution-specific path
+// resolveImagePath returns the resolution-specific path of an image for this monitor.
+func (mc *MonitorController) resolveImagePath(img provider.Image) string {
 	path := img.FilePath
 	if len(img.DerivativePaths) > 0 {
 		// Try to find exact match for this monitor's resolution
@@ -502,6 +608,11 @@ func (mc *MonitorController) applyImage(img provider.Image) {
 			log.Debugf("[Monitor %d] Using primary fallback path", mc.ID)
 		}
 	}
+	return path
+}
+
+func (mc *MonitorController) applyImage(img provider.Image) {
+	path := mc.resolveImagePath(img)
 
 	if path == "" {
 		log.Printf("[ERROR] [Monitor %d] Cannot apply image %s: Path is empty (Derivatives: %v)", mc.ID, img.ID, img.DerivativePaths)
@@ -519,14 +630,26 @@ func (mc *MonitorController) applyImage(img provider.Image) {
 		return
 	}
 
-	mc.State.CurrentImage = img
-	mc.State.CurrentImage.FilePath = path // Ensure state reflects actual file used
-
 	log.Printf("[Monitor %d] Setting wallpaper: %s", mc.ID, path)
 	if err := mc.os.SetWallpaper(path, mc.ID); err != nil {
-		log.Printf("[ERROR] [Monitor %d] Failed to set wallpaper: %v", mc.ID, err)
+		// The desktop still shows the previous picture, so do not record this one as current.
+		log.Printf("[ERROR] [Monitor %d] Failed to set wallpaper %s (%s): %v; the current wallpaper is unchanged", mc.ID, img.ID, path, err)
+		mc.State.LastSetError = fmt.Sprintf("set wallpaper %s: %v", img.ID, err)
+		if mc.State.CurrentImage.ID != "" {
+			mc.State.CurrentID = mc.State.CurrentImage.ID
+		}
+		// next() recorded the image in the history before applying it; it was never shown.
+		if n := len(mc.State.History); n > 0 && mc.State.History[n-1] == img.ID && img.ID != mc.State.CurrentImage.ID {
+			mc.State.History = mc.State.History[:n-1]
+		}
+		return
 	}
+	mc.State.LastSetError = ""
+	mc.State.CurrentImage = img
+	mc.State.CurrentImage.FilePath = path // Ensure state reflects actual file used
+	mc.rememberShown(img.ID)
 	mc.Store.MarkSeen(path)
+	mc.updateLockScreen(img)
 
 	if mc.OnWallpaperChanged != nil {
 		log.Debugf("[Monitor %d] Triggering async UI refresh for %s", mc.ID, path)
@@ -535,18 +658,35 @@ func (mc *MonitorController) applyImage(img provider.Image) {
 }
 
 // reprocessWithTuning updates the tuning options on the current image, re-runs FitImage,
-// and sets the resulting derivative as the wallpaper.
+// and sets the resulting derivative as the wallpaper. While Tune Image is open, a render made
+// earlier in the session (the automatic crop before a drag, the picture without its frame) is
+// written back instead of being made again.
 func (mc *MonitorController) reprocessWithTuning(opts provider.TuningOptions) {
 	img := mc.State.CurrentImage
 	if img.ID == "" {
 		log.Printf("[Monitor %d] Cannot reprocess tuning: no current image", mc.ID)
 		return
 	}
+	// The current image is a shallow copy from the store, so its maps may be the store's own.
+	// They are changed below without the store's lock; work on copies.
+	img.Tuning = maps.Clone(img.Tuning)
+	img.ProcessingFlags = maps.Clone(img.ProcessingFlags)
+	started := time.Now()
 
 	log.Printf("[Monitor %d] Reprocessing with tuning %v for image %s", mc.ID, opts, img.ID)
 
-	// 1. Update tuning in image metadata for this monitor's resolution and persist
 	resKey := fmt.Sprintf("%dx%d", mc.Monitor.Rect.Dx(), mc.Monitor.Rect.Dy())
+
+	// The render on screen and the one wanted, keyed before the tuning and flags change.
+	cache := mc.tuneCacheFor(img, resKey)
+	var shownKey, wantKey tuneRenderKey
+	shownFramed := img.ProcessingFlags["VirtualFramed:"+resKey]
+	if cache != nil {
+		shownKey = mc.tuneRenderKey(img.GetTuning(resKey), img, resKey)
+		wantKey = mc.tuneRenderKey(opts, img, resKey)
+	}
+
+	// 1. Update tuning in image metadata for this monitor's resolution and persist
 	mc.Store.SetTuningOptions(img.ID, resKey, opts)
 
 	// Mirror the tuning change into the local image copy so that
@@ -564,7 +704,37 @@ func (mc *MonitorController) reprocessWithTuning(opts provider.TuningOptions) {
 	}
 	mc.State.CurrentImage = img
 
-	// 2. Find master path
+	// 2. Where the derivative for this resolution lives; it is overwritten below.
+	derivPath := ""
+	if p, ok := img.DerivativePaths[resKey]; ok {
+		derivPath = p
+	} else if p, ok := img.DerivativePaths["primary"]; ok {
+		derivPath = p
+	}
+	if derivPath == "" {
+		log.Printf("[ERROR] [Monitor %d] No derivative path found for %s", mc.ID, resKey)
+		return
+	}
+
+	if cache != nil {
+		// Keep the render on screen before it is replaced, so it can come back at once.
+		if derivPath == img.FilePath || derivPath == cache.shownPath {
+			cache.rememberShownRender(shownKey, derivPath, shownFramed)
+		}
+		if r, ok := cache.get(wantKey); ok {
+			// Remove first so the file gets a new inode (see step 6).
+			os.Remove(derivPath) // Ignore error — file may not exist yet
+			if err := os.WriteFile(derivPath, r.data, 0o644); err == nil {
+				mc.finishTuningRender(img, resKey, derivPath, r.framed)
+				log.Printf("[Monitor %d] Tuning applied in %v (render kept from this session)", mc.ID, time.Since(started).Round(time.Millisecond))
+				return
+			} else {
+				log.Printf("[WARN] [Monitor %d] Cannot write kept render %s: %v; rendering again", mc.ID, derivPath, err)
+			}
+		}
+	}
+
+	// 3. Find master path
 	ext := filepath.Ext(img.FilePath)
 	if ext == "" {
 		ext = ".jpg"
@@ -579,14 +749,19 @@ func (mc *MonitorController) reprocessWithTuning(opts provider.TuningOptions) {
 		return
 	}
 
-	// 3. Open and decode master
-	srcImg, err := imaging.Open(masterPath)
+	// 4. Open and decode master (large originals one at a time)
+	release, err := acquireMasterDecode(context.Background(), masterPath)
+	if err != nil {
+		return
+	}
+	defer release()
+	srcImg, err := openMaster(masterPath)
 	if err != nil {
 		log.Printf("[ERROR] [Monitor %d] Failed to open master: %v", mc.ID, err)
 		return
 	}
 
-	// 4. Re-run FitImage with new tuning
+	// 5. Re-run FitImage with new tuning
 	width, height := mc.Monitor.Rect.Dx(), mc.Monitor.Rect.Dy()
 	ctx := context.Background()
 	virtualFramed := false
@@ -598,30 +773,7 @@ func (mc *MonitorController) reprocessWithTuning(opts provider.TuningOptions) {
 		return
 	}
 
-	resKey = fmt.Sprintf("%dx%d", width, height)
-
-	// Keep the UI sync state fresh by tracking if VirtualFramer actually framed it
-	if img.ProcessingFlags == nil {
-		img.ProcessingFlags = make(map[string]bool)
-	}
-	if virtualFramed {
-		img.ProcessingFlags["VirtualFramed:"+resKey] = true
-	} else {
-		delete(img.ProcessingFlags, "VirtualFramed:"+resKey)
-	}
-
-	// 5. Determine derivative path and overwrite
-	derivPath := ""
-	if p, ok := img.DerivativePaths[resKey]; ok {
-		derivPath = p
-	} else if p, ok := img.DerivativePaths["primary"]; ok {
-		derivPath = p
-	}
-	if derivPath == "" {
-		log.Printf("[ERROR] [Monitor %d] No derivative path found for %s", mc.ID, resKey)
-		return
-	}
-
+	// 6. Overwrite the derivative.
 	// Remove old derivative before writing new one to force a new filesystem
 	// inode. On macOS/APFS, imaging.Save → os.Create truncates in-place (same
 	// inode), and the OS serves stale cached image data. Deleting first ensures
@@ -632,16 +784,48 @@ func (mc *MonitorController) reprocessWithTuning(opts provider.TuningOptions) {
 		log.Printf("[ERROR] [Monitor %d] Failed to save derivative: %v", mc.ID, err)
 		return
 	}
+	if cache != nil {
+		if data, err := os.ReadFile(derivPath); err == nil {
+			cache.put(tuneRender{key: wantKey, data: data, framed: virtualFramed})
+		}
+	}
+
+	mc.finishTuningRender(img, resKey, derivPath, virtualFramed)
+	log.Printf("[Monitor %d] Tuning applied in %v (rendered from the original)", mc.ID, time.Since(started).Round(time.Millisecond))
+}
+
+// finishTuningRender records a tuned derivative written to derivPath and puts it on the desktop.
+func (mc *MonitorController) finishTuningRender(img provider.Image, resKey, derivPath string, virtualFramed bool) {
 	now := time.Now()
 	_ = os.Chtimes(derivPath, now, now)
 
-	// 6. Set wallpaper
+	// Keep the UI sync state fresh by tracking if VirtualFramer actually framed it
+	if img.ProcessingFlags == nil {
+		img.ProcessingFlags = make(map[string]bool)
+	}
+	if virtualFramed {
+		img.ProcessingFlags["VirtualFramed:"+resKey] = true
+	} else {
+		delete(img.ProcessingFlags, "VirtualFramed:"+resKey)
+	}
+	mc.Store.SetOutcomeFlag(img.ID, "VirtualFramed:"+resKey, virtualFramed)
+
+	// Tuning applies in every display mode, so the files kept for other modes are now stale.
+	mc.fm.DeleteOtherDerivativesAtResolution(img.ID, resKey, derivPath)
+
+	// Set wallpaper
 	mc.State.CurrentImage = img
+	if mc.tuneCache != nil {
+		mc.tuneCache.shownPath = derivPath
+	}
 	if err := mc.os.SetWallpaper(derivPath, mc.ID); err != nil {
 		log.Printf("[ERROR] [Monitor %d] Failed to set wallpaper: %v", mc.ID, err)
+		mc.State.LastSetError = fmt.Sprintf("set wallpaper %s: %v", img.ID, err)
+	} else {
+		mc.State.LastSetError = ""
 	}
 
-	// 7. Refresh tray menu
+	// Refresh tray menu
 	if mc.OnWallpaperChanged != nil {
 		mc.OnWallpaperChanged(img, mc.ID)
 	}

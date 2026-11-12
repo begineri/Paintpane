@@ -10,9 +10,9 @@ func TestTranslationsLoaded(t *testing.T) {
 	for _, lang := range langs {
 		SetLanguage(lang)
 		// Check a known key that should exist in all
-		translated := T("Preferences")
-		if translated == "" || translated == "Preferences" && lang != "en" {
-			t.Errorf("Expected translation for 'Preferences' in %s, got: %s", lang, translated)
+		translated := T("Paintpane settings")
+		if translated == "" || translated == "Paintpane settings" && lang != "en" {
+			t.Errorf("Expected translation for 'Paintpane settings' in %s, got: %s", lang, translated)
 		}
 	}
 }
@@ -40,15 +40,15 @@ func TestSetLanguage(t *testing.T) {
 }
 
 func TestGetTranslationsForKeys(t *testing.T) {
-	keys := []string{"Preferences", "Active"}
+	keys := []string{"Paintpane settings", "Active"}
 	res := GetTranslationsForKeys(keys)
 
 	if len(res) == 0 {
 		t.Fatal("Expected translations map to be populated")
 	}
 
-	if dePrefs, ok := res["de"]["Preferences"]; !ok || dePrefs == "" {
-		t.Errorf("Expected 'de' translation for 'Preferences', got %v", dePrefs)
+	if dePrefs, ok := res["de"]["Paintpane settings"]; !ok || dePrefs == "" {
+		t.Errorf("Expected 'de' translation for 'Paintpane settings', got %v", dePrefs)
 	}
 
 	if frLang, ok := res["fr"]["Active"]; !ok || frLang == "" {

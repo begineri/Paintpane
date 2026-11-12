@@ -4,13 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+
+	"github.com/dixieflatline76/Spice/v2/pkg/ui/setting"
 )
 
 // CheckPexelsAPIKeyWithContext verifies if the given API key is valid using the provided context.
 // Uses the /v1/collections endpoint which requires authentication (unlike /v1/curated which is public).
 func CheckPexelsAPIKeyWithContext(ctx context.Context, apiKey string) error {
 	if len(apiKey) < 10 {
-		return fmt.Errorf("invalid Pexels API key (too short)")
+		return setting.Known(setting.ErrorInvalidKey, "Pexels", fmt.Errorf("invalid Pexels API key (too short)"))
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "GET", "https://api.pexels.com/v1/collections?per_page=1", nil)
@@ -22,7 +24,7 @@ func CheckPexelsAPIKeyWithContext(ctx context.Context, apiKey string) error {
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("network error: %w", err)
+		return setting.Known(setting.ErrorNetwork, "Pexels", fmt.Errorf("network error: %w", err))
 	}
 	defer resp.Body.Close()
 
@@ -31,7 +33,7 @@ func CheckPexelsAPIKeyWithContext(ctx context.Context, apiKey string) error {
 	}
 
 	if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
-		return fmt.Errorf("invalid Pexels API key")
+		return setting.Known(setting.ErrorInvalidKey, "Pexels", fmt.Errorf("invalid Pexels API key"))
 	}
 
 	return fmt.Errorf("Pexels API verification failed (status %d)", resp.StatusCode)

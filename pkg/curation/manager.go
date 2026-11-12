@@ -60,6 +60,9 @@ type Manager struct {
 	RemoteBaseURL string
 	CacheDir      string
 	httpClient    *http.Client
+
+	nudeMu  sync.Mutex
+	nudeIDs map[string]bool // Lazily built from collections; nil means rebuild.
 }
 
 var (
@@ -78,8 +81,8 @@ func NewManager() *Manager {
 	return &Manager{
 		collections:   make(map[string]*CuratedCollection),
 		embeddedData:  make(map[string][]byte),
-		RemoteBaseURL: "https://raw.githubusercontent.com/dixieflatline76/Spice/main/docs/collections/",
-		CacheDir:      filepath.Join(config.GetWorkingDir(), "cache", "curation"),
+		RemoteBaseURL: "https://raw.githubusercontent.com/begineri/Paintpane/main/docs/collections/",
+		CacheDir:      filepath.Join(config.GetCacheDir(), "curation"),
 		httpClient:    &http.Client{Timeout: 10 * time.Second},
 	}
 }
@@ -173,8 +176,9 @@ func (m *Manager) GetEntry(providerID, key string) *CollectionEntry {
 // ClearCache removes a collection from the in-memory cache, forcing a reload on next access.
 func (m *Manager) ClearCache(providerID string) {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	delete(m.collections, providerID)
+	m.mu.Unlock()
+	m.invalidateNudeIDs()
 }
 
 // SyncAll iterates through all known providers, downloads their remote JSON, compares versions,
@@ -254,6 +258,7 @@ func (m *Manager) syncSingle(ctx context.Context, providerID, filename string) (
 	m.mu.Lock()
 	m.collections[providerID] = &remoteCol
 	m.mu.Unlock()
+	m.invalidateNudeIDs()
 
 	log.Printf("Curation OTA: Updated %s to version %s", providerID, remoteCol.Version)
 	return true, nil

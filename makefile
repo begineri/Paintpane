@@ -4,6 +4,9 @@ VERSION := $(shell sh -c "cat version.txt" 2> /dev/null || cmd /c "type version.
 # --- Build flags ---
 LDFLAGS_SECRETS := $(shell go run cmd/util/load_secrets/main.go)
 LDFLAGS_COMMON := -X main.version=$(VERSION) $(LDFLAGS_SECRETS)
+# Release builds drop the symbol table and DWARF debug info (-s -w): about 23 MB smaller. Panics
+# still print function names and line numbers. Development builds keep them.
+LDFLAGS_RELEASE := -s -w $(LDFLAGS_COMMON)
 BUILD_NUMBER ?= 1
 WIN_SDK_VERSION := $(shell pwsh -NoProfile -Command "try { (Get-ChildItem 'C:/Program Files (x86)/Windows Kits/10/bin/10.*' -Directory | Sort-Object Name -Descending | Select-Object -First 1).Name } catch { '10.0.28000.0' }" 2>/dev/null || echo 10.0.28000.0)
 MAKEAPPX := "C:\Program Files (x86)\Windows Kits\10\bin\$(WIN_SDK_VERSION)\x64\makeappx.exe"
@@ -34,245 +37,102 @@ generate: gen-i18n
 
 # --- Build targets ---
 build-extension:
-	@echo "Checking if we should build Safari Extension..."
-ifneq ($(SKIP_EXTENSION_BUILD),)
-	@echo "SKIP_EXTENSION_BUILD is set. Skipping xcodebuild (assuming CI or manual skip)..."
-	@echo "Ensuring artifact exists..."
-	@if [ ! -d "Spice Wallpaper Manager Extension.app" ]; then echo "Warning: Extension app not found. Building without it."; fi
-else
-	@echo "Building Safari Extension..."
-	xcodebuild -project "Spice Wallpaper Manager Extension/Spice Wallpaper Manager Extension.xcodeproj" \
-		-scheme "Spice Wallpaper Manager Extension (macOS)" \
-		-configuration Release \
-		-derivedDataPath "build/extension" \
-		clean build
-	@echo "Moving built extension to root for packaging..."
-	rm -rf "Spice Wallpaper Manager Extension.app"
-	cp -R "build/extension/Build/Products/Release/Spice Wallpaper Manager Extension.app" .
-endif
+	@echo "Paintpane does not build the Safari extension. Skipping."
 
 build-win-amd64:
-	set GOOS=windows&& set GOARCH=amd64&& go build -tags release -o bin/Spice.exe -ldflags "-H=windowsgui $(LDFLAGS_COMMON)" ./cmd/spice
+	set GOOS=windows&& set GOARCH=amd64&& go build -tags release -o bin/paintpane.exe -ldflags "-H=windowsgui $(LDFLAGS_RELEASE)" ./cmd/spice
 
 build-win-console-amd64:
-	set GOOS=windows&& set GOARCH=amd64&& go build -tags release -o bin/Spice-console.exe -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	set GOOS=windows&& set GOARCH=amd64&& go build -tags release -o bin/paintpane-console.exe -ldflags "$(LDFLAGS_RELEASE)" ./cmd/spice
 
 build-win-arm64:
-	set GOOS=windows&& set GOARCH=arm64&& go build -tags release -o bin/Spice-arm64.exe -ldflags "-H=windowsgui $(LDFLAGS_COMMON)" ./cmd/spice
+	set GOOS=windows&& set GOARCH=arm64&& go build -tags release -o bin/paintpane-arm64.exe -ldflags "-H=windowsgui $(LDFLAGS_RELEASE)" ./cmd/spice
 
 build-linux-amd64:
-	GOOS=linux GOARCH=amd64 go build -tags release -o bin/Spice-amd64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	GOOS=linux GOARCH=amd64 go build -tags release -o bin/paintpane-amd64 -ldflags "$(LDFLAGS_RELEASE)" ./cmd/spice
 
 build-linux-arm64:
-	GOOS=linux GOARCH=arm64 go build -tags release -o bin/Spice-arm64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	GOOS=linux GOARCH=arm64 go build -tags release -o bin/paintpane-arm64 -ldflags "$(LDFLAGS_RELEASE)" ./cmd/spice
 
 build-darwin-amd64: build-extension
 	@echo "Building Go executable for darwin/amd64..."
-	GOOS=darwin GOARCH=amd64 go build -tags release -o bin/Spice-darwin-amd64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	GOOS=darwin GOARCH=amd64 go build -tags release -o bin/paintpane-darwin-amd64 -ldflags "$(LDFLAGS_RELEASE)" ./cmd/spice
 
-	@echo "Cleaning previous Spice.app bundle..."
-	rm -rf Spice.app
-	@echo "Packaging Spice.app..."
-	fyne package --os darwin --executable ./bin/Spice-darwin-amd64 --icon asset/icons/tray.png --name Spice --app-id com.dixieflatline76.spice
+	@echo "Cleaning previous Paintpane.app bundle..."
+	rm -rf Paintpane.app
+	@echo "Packaging Paintpane.app..."
+	fyne package --os darwin --executable ./bin/paintpane-darwin-amd64 --icon asset/icons/tray.png --name Paintpane --app-id io.github.begineri.paintpane
 
 	@echo "Modifying Info.plist to set LSUIElement=true..."
-	plutil -insert LSUIElement -bool true Spice.app/Contents/Info.plist
+	plutil -insert LSUIElement -bool true Paintpane.app/Contents/Info.plist
 
-	@echo "Moving final Spice.app to ./bin/..."
-	rm -rf ./bin/Spice.app && mv Spice.app ./bin/
+	@echo "Moving final Paintpane.app to ./bin/..."
+	rm -rf ./bin/Paintpane.app && mv Paintpane.app ./bin/
 
 build-darwin-arm64: build-extension
 	@echo "Building Go executable for darwin/arm64..."
-	GOOS=darwin GOARCH=arm64 go build -tags release -o bin/Spice-darwin-arm64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	GOOS=darwin GOARCH=arm64 go build -tags release -o bin/paintpane-darwin-arm64 -ldflags "$(LDFLAGS_RELEASE)" ./cmd/spice
 
-	@echo "Cleaning previous Spice.app bundle..."
-	rm -rf Spice.app
-	@echo "Packaging Spice.app..."
-	fyne package --os darwin --executable ./bin/Spice-darwin-arm64 --icon asset/icons/tray.png --name Spice --app-id com.dixieflatline76.spice
+	@echo "Cleaning previous Paintpane.app bundle..."
+	rm -rf Paintpane.app
+	@echo "Packaging Paintpane.app..."
+	fyne package --os darwin --executable ./bin/paintpane-darwin-arm64 --icon asset/icons/tray.png --name Paintpane --app-id io.github.begineri.paintpane
 
 	@echo "Modifying Info.plist to set LSUIElement=true..."
-	plutil -insert LSUIElement -bool true Spice.app/Contents/Info.plist
+	plutil -insert LSUIElement -bool true Paintpane.app/Contents/Info.plist
 
 ifneq ($(SIGNING_IDENTITY),)
 	@echo "Signing image processor binary..."
-	codesign --force --options=runtime --sign "$(SIGNING_IDENTITY)" --timestamp bin/Spice-darwin-arm64
+	codesign --force --options=runtime --sign "$(SIGNING_IDENTITY)" --timestamp bin/paintpane-darwin-arm64
 	@echo "Signing the application bundle..."
-	codesign --force --options=runtime --sign "$(SIGNING_IDENTITY)" --timestamp Spice.app
+	codesign --force --options=runtime --sign "$(SIGNING_IDENTITY)" --timestamp Paintpane.app
 	@echo "Verifying application bundle signature..."
-	codesign -dv --verbose=4 Spice.app
+	codesign -dv --verbose=4 Paintpane.app
 else
 	@echo "No SIGNING_IDENTITY set, skipping code signing."
 endif
 
-	@echo "Creating styled DMG..."
-	mkdir -p dist/dmg-staging
-	rm -rf dist/dmg-staging/*
-
-	# Copy Main App to Staging
-	cp -R "Spice.app" dist/dmg-staging/
-
-	# Copy and Sign Extension in Staging if it exists
-ifneq ($(SIGNING_IDENTITY),)
-	if [ -d "Spice Wallpaper Manager Extension.app" ]; then \
-		echo "Found Safari Extension, verifying paths..."; \
-		ls -la "Spice Wallpaper Manager Extension.app/Contents/"; \
-		cp -R "Spice Wallpaper Manager Extension.app" dist/dmg-staging/; \
-		if [ -d "dist/dmg-staging/Spice Wallpaper Manager Extension.app/Contents/Frameworks" ]; then \
-			echo "Signing Extension Frameworks..."; \
-			codesign --force --options=runtime --sign "$(SIGNING_IDENTITY)" --timestamp "dist/dmg-staging/Spice Wallpaper Manager Extension.app/Contents/Frameworks/"*.dylib; \
-		fi; \
-		echo "Signing Extension Appex..."; \
-		codesign --force --options=runtime --entitlements "Spice Wallpaper Manager Extension/macOS (Extension)/Spice Wallpaper Manager Extension.entitlements" --sign "$(SIGNING_IDENTITY)" --timestamp "dist/dmg-staging/Spice Wallpaper Manager Extension.app/Contents/PlugIns/Spice Wallpaper Manager Extension Extension.appex"; \
-		echo "Signing Extension Wrapper..."; \
-		codesign --force --options=runtime --entitlements "Spice Wallpaper Manager Extension/macOS (App)/Spice Wallpaper Manager Extension.entitlements" --sign "$(SIGNING_IDENTITY)" --timestamp "dist/dmg-staging/Spice Wallpaper Manager Extension.app"; \
-	fi
-else
-	if [ -d "Spice Wallpaper Manager Extension.app" ]; then \
-		echo "Found Safari Extension but no SIGNING_IDENTITY, skipping extension signing..."; \
-		cp -R "Spice Wallpaper Manager Extension.app" dist/dmg-staging/; \
-	fi
-endif
-	
-	rm -f "dist/Spice-$(VERSION)-arm64.dmg"
-	
-	@echo "Constructing create-dmg command..."
-	CMD="create-dmg --volname 'Spice Installer' --background 'images/Spice-dmg-bg.png' --window-pos 200 120 --window-size 640 480 --icon-size 130 --icon 'Spice.app' 175 200 --hide-extension 'Spice.app' --app-drop-link 465 200"; \
-	if [ -d "dist/dmg-staging/Spice Wallpaper Manager Extension.app" ]; then \
-		CMD="$$CMD --icon 'Spice Wallpaper Manager Extension.app' 175 350"; \
-	fi; \
-	CMD="$$CMD 'dist/Spice-$(VERSION)-arm64.dmg' 'dist/dmg-staging/'"; \
-	eval $$CMD
-
-	@echo "Moving final Spice.app to ./bin/..."
-	rm -rf ./bin/Spice.app && mv Spice.app ./bin/
-
-build-darwin-appstore-arm64: build-extension
-	@echo "Building Go executable for macOS App Store (arm64)..."
-	export MACOSX_DEPLOYMENT_TARGET=12.0; GOOS=darwin GOARCH=arm64 go build -tags "release appstore" -o bin/Spice-darwin-appstore-arm64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
-	
-	@echo "Cleaning previous Spice.app bundle..."
-	rm -rf Spice.app
-	@echo "Packaging .app for App Store..."
-	fyne package -os darwin --executable ./bin/Spice-darwin-appstore-arm64 -icon asset/icons/tray.png -name Spice --app-id com.dixieflatline76.spice
-	
-	@echo "Modifying Info.plist for App Store compliance..."
-	go run cmd/util/plist_modify/main.go Spice.app/Contents/Info.plist \
-		"LSApplicationCategoryType=string:public.app-category.utilities" \
-		"LSMinimumSystemVersion=string:12.0" \
-		"CFBundleVersion=string:$(BUILD_NUMBER)" \
-		"CFBundleShortVersionString=string:$(shell echo $(VERSION) | sed 's/^v//')" \
-		"ITSAppUsesNonExemptEncryption=bool:false" \
-		"NSAppleEventsUsageDescription=string:Spice requires permission to send Apple Events to System Events in order to actively change your desktop wallpaper." \
-		"LSUIElement=bool:true"
-
-
-	@echo "Injecting identifiers into entitlements..."
-	@if [ -n "$(APPLE_TEAM_ID)" ]; then \
-		/usr/libexec/PlistBuddy -c "Set :com.apple.application-identifier $(APPLE_TEAM_ID).com.dixieflatline76.spice" Spice-AppStore.entitlements || \
-		/usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $(APPLE_TEAM_ID).com.dixieflatline76.spice" Spice-AppStore.entitlements; \
-		/usr/libexec/PlistBuddy -c "Set :com.apple.developer.team-identifier $(APPLE_TEAM_ID)" Spice-AppStore.entitlements || \
-		/usr/libexec/PlistBuddy -c "Add :com.apple.developer.team-identifier string $(APPLE_TEAM_ID)" Spice-AppStore.entitlements; \
-	fi
-
-	@if [ -f "embedded.provisionprofile" ]; then \
-		echo "Embedding provisioning profile..."; \
-		cp embedded.provisionprofile "Spice.app/Contents/embedded.provisionprofile"; \
-	fi
-
-	@if [ -n "$(SIGNING_IDENTITY)" ]; then \
-		echo "Signing the inner binary with sandbox..."; \
-		codesign --force --options=runtime --entitlements Spice-AppStore.entitlements --sign "$(SIGNING_IDENTITY)" --timestamp Spice.app/Contents/MacOS/Spice-darwin-appstore-arm64; \
-		echo "Signing the application bundle with sandbox..."; \
-		codesign --force --options=runtime --entitlements Spice-AppStore.entitlements --sign "$(SIGNING_IDENTITY)" --timestamp Spice.app; \
-	fi
-
-	@echo "Creating final .pkg for App Store..."
-	@if [ -n "$(INSTALLER_IDENTITY)" ]; then \
-		productbuild --component Spice.app /Applications --sign "$(INSTALLER_IDENTITY)" Spice.pkg; \
-	else \
-		productbuild --component Spice.app /Applications Spice.pkg; \
-	fi
-
-	@echo "Moving final Spice.pkg to ./dist/..."
-	mkdir -p dist
-	mv Spice.pkg dist/Spice-$(VERSION)-macos-arm64-AppStore.pkg
-
-build-msix:
-	@echo "Preparing MSIX staging directory..."
-	pwsh -Command "if (Test-Path dist/msix-staging) { Remove-Item -Recurse -Force dist/msix-staging }"
-	pwsh -Command "New-Item -ItemType Directory -Force -Path dist/msix-staging/Assets"
-	
-	@echo "Building MSIX binary with msstore tag..."
-	set GOOS=windows&& set GOARCH=amd64&& go build -tags "release msstore" -o bin/Spice-msstore.exe -ldflags "-H=windowsgui $(LDFLAGS_COMMON)" ./cmd/spice
-
-	@echo "Copying application and assets..."
-	pwsh -Command "Copy-Item bin/Spice-msstore.exe dist/msix-staging/Spice.exe"
-	pwsh -Command "Copy-Item msix/AppxManifest.xml dist/msix-staging/"
-	pwsh -Command "Copy-Item msix/Assets/* dist/msix-staging/Assets/"
-	
-	@echo "Injecting Dynamic Version and Build Number into AppxManifest..."
-	go run cmd/util/bump_msix/main.go $(VERSION) $(BUILD_NUMBER) dist/msix-staging/AppxManifest.xml
-	
-	@echo "Creating MSIX package..."
-	pwsh -Command "if (Test-Path dist/Spice.msix) { Remove-Item -Force dist/Spice.msix }"
-	$(MAKEAPPX) pack /d dist/msix-staging /p dist/Spice.msix /nv
-	
-	@echo "MSIX package created: dist/Spice.msix"
-
-build-msix-dev: build-msix create-test-cert sign-msix
-
-sign-msix:
-	@echo "Signing MSIX package with local test cert..."
-	$(SIGNTOOL) sign /f SpiceTestCert.pfx /p $(PFX_PASSWORD) /fd SHA256 /v dist/Spice.msix
-
-create-test-cert:
-	@echo "Creating self-signed certificate for MSIX testing..."
-	pwsh -Command "if (-not (Test-Path 'SpiceTestCert.pfx')) { $$cert = New-SelfSignedCertificate -Type Custom -Subject 'CN=5F50AF71-B542-4430-94AC-30B112715346' -KeyUsage DigitalSignature -FriendlyName 'Spice MSIX Test Cert' -CertStoreLocation 'Cert:\CurrentUser\My'; $$password = ConvertTo-SecureString -String '$(PFX_PASSWORD)' -Force -AsPlainText; Export-PfxCertificate -Cert $$cert -FilePath 'SpiceTestCert.pfx' -Password $$password; Write-Host 'Certificate created: SpiceTestCert.pfx'; Write-Host 'IMPORTANT: You must double-click SpiceTestCert.pfx and install it to \"Trusted Root Certification Authorities\" before sideloading.' } else { Write-Host 'SpiceTestCert.pfx already exists, skipping creation.' }"
-
-upload-ms-store:
-	@echo "Installing Microsoft Store CLI..."
-	pwsh -Command "dotnet tool install --global Microsoft.Store.PartnerCenter.CLI" || true
-	@echo "Uploading MSIX to Microsoft Store..."
-	msstore publish --app-id 9NPBQ3C91WPF --package-path dist/Spice.msix
+	@echo "Moving final Paintpane.app to ./bin/..."
+	rm -rf ./bin/Paintpane.app && mv Paintpane.app ./bin/
 
 # --- Development build targets ---
 build-win-amd64-dev:
-	set GOOS=windows&& set GOARCH=amd64&& go build -o bin/Spice.exe -ldflags "-H=windowsgui $(LDFLAGS_COMMON)" ./cmd/spice
+	set GOOS=windows&& set GOARCH=amd64&& go build -o bin/paintpane-dev.exe -ldflags "-H=windowsgui $(LDFLAGS_COMMON)" ./cmd/spice
 
 build-win-console-amd64-dev:
-	set GOOS=windows&& set GOARCH=amd64&& go build -o bin/Spice-console.exe -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	set GOOS=windows&& set GOARCH=amd64&& go build -o bin/paintpane-console-dev.exe -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
 
 build-linux-amd64-dev:
-	GOOS=linux GOARCH=amd64 go build -o bin/Spice-amd64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	GOOS=linux GOARCH=amd64 go build -o bin/paintpane-amd64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
 
 build-linux-arm64-dev:
-	GOOS=linux GOARCH=arm64 go build -o bin/Spice-arm64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	GOOS=linux GOARCH=arm64 go build -o bin/paintpane-arm64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
 
 build-darwin-amd64-dev:
 	@echo "Building Go executable for darwin/amd64..."
-	GOOS=darwin GOARCH=amd64 go build -o bin/Spice-darwin-amd64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	GOOS=darwin GOARCH=amd64 go build -o bin/paintpane-darwin-amd64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
 
-	@echo "Packaging Spice.app..."
-	fyne package --os darwin --executable ./bin/Spice-darwin-amd64 --icon asset/icons/tray.png --name Spice --app-id com.dixieflatline76.spice
+	@echo "Packaging Paintpane.app..."
+	fyne package --os darwin --executable ./bin/paintpane-darwin-amd64 --icon asset/icons/tray.png --name Paintpane --app-id io.github.begineri.paintpane
 
 	@echo "Modifying Info.plist to set LSUIElement=true..."
-	plutil -insert LSUIElement -bool true Spice.app/Contents/Info.plist
+	plutil -insert LSUIElement -bool true Paintpane.app/Contents/Info.plist
 
-	@echo "Moving final Spice.app to ./bin/..."
-	rm -rf ./bin/Spice.app && mv Spice.app ./bin/
+	@echo "Moving final Paintpane.app to ./bin/..."
+	rm -rf ./bin/Paintpane.app && mv Paintpane.app ./bin/
 
 build-darwin-arm64-dev:
 	@echo "Building Go executable for darwin/arm64..."
-	GOOS=darwin GOARCH=arm64 go build -o bin/Spice-darwin-arm64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
+	GOOS=darwin GOARCH=arm64 go build -o bin/paintpane-darwin-arm64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
 
-	@echo "Packaging Spice.app..."
-	fyne package --os darwin --executable ./bin/Spice-darwin-arm64 --icon asset/icons/tray.png --name Spice --app-id com.dixieflatline76.spice
+	@echo "Packaging Paintpane.app..."
+	fyne package --os darwin --executable ./bin/paintpane-darwin-arm64 --icon asset/icons/tray.png --name Paintpane --app-id io.github.begineri.paintpane
 
 	@echo "Modifying Info.plist to set LSUIElement=true..."
-	plutil -insert LSUIElement -bool true Spice.app/Contents/Info.plist
+	plutil -insert LSUIElement -bool true Paintpane.app/Contents/Info.plist
 
-	@echo "Moving final Spice.app to ./bin/..."
-	rm -rf ./bin/Spice.app && mv Spice.app ./bin/
+	@echo "Moving final Paintpane.app to ./bin/..."
+	rm -rf ./bin/Paintpane.app && mv Paintpane.app ./bin/
 
 # --- Other targets ---
 lint:
@@ -284,6 +144,13 @@ security:
 
 test:
 	go test ./...
+
+# Render every preferences page (zh/en/de, light/dark) to PNG without opening a window.
+# SHOTS sets the output folder. The wallpaper plugin writes its cache under a throwaway LOCALAPPDATA.
+SHOTS ?= screenshots
+screenshots:
+	mkdir -p "$(SHOTS)"
+	LOCALAPPDATA="$$(mktemp -d)" SCREENSHOT_DIR="$(abspath $(SHOTS))" go test -tags screenshots ./ui/ -run TestPreferencesScreenshots -count=1
 
 test-coverage:
 	go test -coverprofile=coverage.out ./...
@@ -385,10 +252,4 @@ bump-major: build-version-bump
 	@echo "Bumping major version..."
 	./bin/util/version_bump major
 
-notarize-mac-arm64:
-	@echo "Uploading DMG for notarization..."
-	xcrun notarytool submit "dist/Spice-$(VERSION)-arm64.dmg" --keychain-profile "AC_PASSWORD" --wait
-	@echo "Stapling notarization ticket to DMG..."
-	xcrun stapler staple "dist/Spice-$(VERSION)-arm64.dmg"
-
-.PHONY: build-win-amd64 build-win-console-amd64 build-win-arm64 build-linux-amd64 build-darwin-amd64 build-darwin-arm64 build-win-amd64-dev build-win-console-amd64-dev build-linux-amd64-dev gen-i18n check-i18n lint test update-patch-deps update-minor-deps list-updates win-amd64 win-amd64-dev linux-amd64 linux-amd64-dev darwin-amd64 darwin-amd64-dev darwin-arm64 darwin-arm64-dev clean build-version-bump bump-patch bump-minor bump-major notarize-mac-arm64 coverage
+.PHONY: build-win-amd64 build-win-console-amd64 build-win-arm64 build-linux-amd64 build-darwin-amd64 build-darwin-arm64 build-win-amd64-dev build-win-console-amd64-dev build-linux-amd64-dev gen-i18n check-i18n lint test screenshots update-patch-deps update-minor-deps list-updates win-amd64 win-amd64-dev linux-amd64 linux-amd64-dev darwin-amd64 darwin-amd64-dev darwin-arm64 darwin-arm64-dev clean build-version-bump bump-patch bump-minor bump-major coverage

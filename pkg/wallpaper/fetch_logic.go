@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/dixieflatline76/Spice/v2/pkg/i18n"
 	"github.com/dixieflatline76/Spice/v2/pkg/provider"
 	"github.com/dixieflatline76/Spice/v2/util"
 	"github.com/dixieflatline76/Spice/v2/util/log"
@@ -50,11 +50,14 @@ func (wp *Plugin) FetchNewImages(force bool, providerID ...string) {
 			wp.downloadMutex.RUnlock()
 
 			totalQueued := util.NewSafeInt()
+			var answered, newImages atomic.Int64 // for the start-up "nothing new today" mark
 			activeSources := make(map[string]bool)
 			var sourcesMutex sync.Mutex
 
 			// Initialize the global fetch context to allow remote aborts
 			fetchCtx := wp.StartFetchContext()
+
+			newImageBudget := wp.newImageBudgetPerQuery(queries, targetProvider)
 
 			// Semaphore to limit concurrent fetches
 			sem := make(chan struct{}, 5)
@@ -106,28 +109,27 @@ func (wp *Plugin) FetchNewImages(force bool, providerID ...string) {
 						return
 					}
 
-					wp.fetchFromProvider(fetchCtx, q, p, isFavRequest, &sourcesMutex, activeSources, totalQueued)
+					ok, added := wp.fetchFromProvider(fetchCtx, q, p, isFavRequest, newImageBudget, &sourcesMutex, activeSources, totalQueued)
+					if ok {
+						answered.Add(1)
+					}
+					newImages.Add(int64(added))
 				}(q, p)
 			}
 
 			wg.Wait()
+
+			// Only a whole round of every active query, run to the end, says whether the sources
+			// have anything new (startupFetch).
+			if targetProvider == "" && !isFavRequest && fetchCtx.Err() == nil && (wp.interrupt == nil || !wp.interrupt.Value()) {
+				wp.noteFetchRound(int(answered.Load()), int(newImages.Load()))
+			}
 
 			// Batch Reshuffle Optimization (User Approach):
 			// Signal monitors to update their shuffle lists only after the entire batch is processed.
 			if totalQueued.Value() > 0 && (wp.interrupt == nil || !wp.interrupt.Value()) {
 				log.Debugf("[Fetch] Processed %d new images. Broadcasting shuffle update to monitors...", totalQueued.Value())
 				wp.dispatch(-1, CmdUpdateShuffle)
-
-				sources := []string{}
-				for s := range activeSources {
-					sources = append(sources, s)
-				}
-				sourceStr := strings.Join(sources, ", ")
-				if sourceStr != "" {
-					wp.manager.NotifyUser(i18n.T("Wallpaper Fetch"), i18n.Tf("Downloading {{.Count}} new images from {{.Sources}}...", map[string]any{"Count": totalQueued.Value(), "Sources": sourceStr}))
-				} else {
-					wp.manager.NotifyUser(i18n.T("Wallpaper Fetch"), i18n.Tf("Downloading {{.Count}} new images...", map[string]any{"Count": totalQueued.Value()}))
-				}
 			} else {
 				log.Println("Fetch returned 0 new images from all active queries.")
 			}
@@ -150,6 +152,9 @@ func (wp *Plugin) RefreshImagesAndPulse() {
 
 		// Robust Sync: Reconcile store and invalidate stale derivatives
 		wp.syncStoreWithConfig()
+
+		// Bring the existing library back without waiting for its pages to be fetched again
+		go wp.rebuildMissingDerivatives()
 
 		// Ensure tray menu is rebuilt (e.g. if Favorites was toggled)
 		if wp.manager != nil {
@@ -175,7 +180,44 @@ func (wp *Plugin) RefreshImagesAndPulse() {
 	}()
 }
 
-func (wp *Plugin) fetchFromProvider(fetchCtx context.Context, q ImageQuery, p provider.ImageProvider, isFavRequest bool, sourcesMutex *sync.Mutex, activeSources map[string]bool, totalQueued *util.SafeCounter) {
+// cacheLimit returns the configured maximum number of cached images. It falls back the
+// same way ImageStore.Sync does for an unrecognized setting.
+func (wp *Plugin) cacheLimit() int {
+	if limit := wp.cfg.GetCacheSize().Size(); limit > 0 {
+		return limit
+	}
+	return 50
+}
+
+// newImageBudgetPerQuery returns how many new images each active query may download in
+// this cycle. A cycle only tops the cache up with images still waiting to be shown,
+// split evenly so that fast providers don't crowd out rate-limited ones. Without this,
+// one cycle downloads every active collection in full, whatever the cache limit is.
+func (wp *Plugin) newImageBudgetPerQuery(queries []ImageQuery, targetProvider string) int {
+	activeQueries := 0
+	for _, q := range queries {
+		if q.Active && (targetProvider == "" || q.Provider == targetProvider) {
+			activeQueries++
+		}
+	}
+	room := wp.cacheLimit() - wp.store.ReadyUnseenCount()
+	if activeQueries == 0 || room <= 0 {
+		return 0
+	}
+	return (room + activeQueries - 1) / activeQueries // Round up so small rooms still fetch.
+}
+
+// fetchFromProvider fetches the query's current page and queues its images. It reports whether the
+// source answered (with or without images) and how many images new to the library it queued.
+func (wp *Plugin) fetchFromProvider(fetchCtx context.Context, q ImageQuery, p provider.ImageProvider, isFavRequest bool, newImageBudget int, sourcesMutex *sync.Mutex, activeSources map[string]bool, totalQueued *util.SafeCounter) (answered bool, newImages int) {
+	// While a source's image server cannot be reached its downloads are paused (A2 §12.9 #4).
+	// Fetching would only queue more jobs behind the pause and move past its pages, so the
+	// query is left for a later cycle.
+	if wait := wp.downloadBackoff().pausedFor(p.ID()); wait > 0 {
+		log.Printf("Skipping %s (query %s) for now: its downloads are paused for %v", p.ID(), q.ID, wait.Round(time.Second))
+		return false, 0
+	}
+
 	// Get or create per-query page counter
 	wp.downloadMutex.Lock()
 	pg, ok := wp.queryPages[q.ID]
@@ -198,7 +240,7 @@ func (wp *Plugin) fetchFromProvider(fetchCtx context.Context, q ImageQuery, p pr
 	images, err := p.FetchImages(ctx, q.URL, page)
 	if err != nil {
 		log.Printf("Provider %s fetch failed: %v", q.Provider, err)
-		return
+		return false, 0
 	}
 	if len(images) == 0 {
 		log.Printf("Provider %s returned no new images for query %s.", q.Provider, q.ID)
@@ -209,7 +251,7 @@ func (wp *Plugin) fetchFromProvider(fetchCtx context.Context, q ImageQuery, p pr
 			wp.saveQueryPages()
 			log.Debugf("Query %s: End of content reached on page %d. Wrapping back to page 1.", q.ID, page)
 		}
-		return
+		return true, 0
 	}
 
 	log.Debugf("[Fetch] Provider %s returned %d images. Submitting to pipeline.", q.Provider, len(images))
@@ -220,6 +262,11 @@ func (wp *Plugin) fetchFromProvider(fetchCtx context.Context, q ImageQuery, p pr
 	sourcesMutex.Unlock()
 
 	queuedForThisQuery := 0
+	newQueued := 0
+	budgetExhausted := false
+	aborted := false
+	// Favorites are local files the user chose to keep, so the cache budget doesn't apply.
+	budgeted := !isFavRequest && q.ID != FavoritesQueryID
 
 	// Defense in depth: the pipeline may not be ready yet (pre-Activate window) or may
 	// have been torn down by a concurrent Deactivate. Bail out without advancing pagination
@@ -229,7 +276,7 @@ func (wp *Plugin) fetchFromProvider(fetchCtx context.Context, q ImageQuery, p pr
 	wp.downloadMutex.RUnlock()
 	if submitter == nil {
 		log.Printf("Fetch aborted for query %s: pipeline not available (plugin activating or deactivating).", q.ID)
-		return
+		return true, 0
 	}
 
 	// Instantiate the background cancellation context for this specific query
@@ -257,7 +304,13 @@ func (wp *Plugin) fetchFromProvider(fetchCtx context.Context, q ImageQuery, p pr
 		// Pattern: Deduplication (At-the-Gate)
 		// Deadlock Break: We only skip an image if it exists AND already has derivatives for your current monitors.
 		// This allow "Backlog Healing": if you have 1000 images but 0 derivatives, this allows them back into the pipeline.
-		if existing, exists := wp.store.GetByID(img.ID); exists {
+		existing, known := wp.store.GetByID(img.ID)
+		if known {
+			// Images cached before ratings were stored would otherwise never receive one,
+			// because fully processed images are skipped below.
+			if existing.Purity == "" && img.Purity != "" {
+				wp.store.SetPurity(img.ID, img.Purity)
+			}
 			if wp.allMonitorDerivativesExist(existing) {
 				log.Debugf("Skipping image already in store with all derivatives: %s", img.ID)
 				continue
@@ -265,6 +318,13 @@ func (wp *Plugin) fetchFromProvider(fetchCtx context.Context, q ImageQuery, p pr
 			log.Debugf("Image %s exists but is missing derivatives. Allowing re-processing for backlog healing.", img.ID)
 			// Merge existing metadata (like already probed dimensions) into the fetch-result image
 			img.MergeExistingMetadata(existing)
+		} else if budgeted {
+			// Keep looping rather than breaking: later images on this page may still need healing.
+			if newQueued >= newImageBudget {
+				budgetExhausted = true
+				continue
+			}
+			newQueued++
 		}
 		job := DownloadJob{
 			Ctx:      queryCtx,
@@ -275,19 +335,26 @@ func (wp *Plugin) fetchFromProvider(fetchCtx context.Context, q ImageQuery, p pr
 		if submitter.Submit(fetchCtx, job) {
 			totalQueued.Increment()
 			queuedForThisQuery++
+			if !known {
+				newImages++
+			}
 		} else {
 			// If submit returns false, the pipeline stopped or the fetch cycle was aborted via fetchCtx.
 			// Do not attempt to process the rest of the images, and do NOT advance the pagination!
 			log.Printf("Fetch aborted or pipeline full. Dropping job and pausing fetch for query %s.", q.ID)
+			aborted = true
 			break
 		}
 	}
 
-	if len(images) > 0 {
+	// Stay on this page if it still has images we didn't have budget for, or that were not queued
+	// because the fetch was stopped; pages are kept across restarts, so moving on would skip them.
+	if len(images) > 0 && !budgetExhausted && !aborted {
 		pg.Increment()
 		wp.saveQueryPages() // Persist pagination state
 		log.Debugf("Query %s: Successfully processed page %d (Found: %d, Queued: %d). Incrementing to page %d", q.ID, page, len(images), queuedForThisQuery, pg.Value())
 	}
+	return true, newImages
 }
 
 // allMonitorDerivativesExist checks if the image has a processed file for every unique monitor resolution.

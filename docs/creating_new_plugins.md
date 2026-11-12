@@ -114,7 +114,7 @@ func (p *HelloPlugin) Init(mgr ui.PluginManager) {
 
 func (p *HelloPlugin) Activate() {
     p.enabled = true
-    p.manager.NotifyUser("Hello", "Plugin Activated!")
+    log.Println("Hello: plugin activated")
 }
 
 func (p *HelloPlugin) Deactivate() {
@@ -124,7 +124,7 @@ func (p *HelloPlugin) Deactivate() {
 func (p *HelloPlugin) CreateTrayMenuItems() []*fyne.MenuItem {
     return []*fyne.MenuItem{
         fyne.NewMenuItem(i18n.T("Say Hello"), func() {
-            p.manager.NotifyUser("Spice", "Hello from the tray!")
+            log.Println("Hello from the tray!") // the app sends no Windows notifications
         }),
     }
 }

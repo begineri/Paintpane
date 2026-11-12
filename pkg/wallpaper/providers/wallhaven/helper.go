@@ -8,6 +8,7 @@ import (
 	"net/url"
 	"strings"
 
+	"github.com/dixieflatline76/Spice/v2/pkg/ui/setting"
 	"github.com/dixieflatline76/Spice/v2/pkg/wallpaper"
 	"github.com/dixieflatline76/Spice/v2/util/log"
 )
@@ -33,12 +34,12 @@ func CheckWallhavenUsername(ctx context.Context, username, apiKey string) error 
 
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("network error during API key verification: %w", err)
+		return setting.Known(setting.ErrorNetwork, "wallhaven", fmt.Errorf("network error during API key verification: %w", err))
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API key verification failed (status %d)", resp.StatusCode)
+		return setting.Known(setting.ErrorInvalidKey, "wallhaven", fmt.Errorf("API key verification failed (status %d)", resp.StatusCode))
 	}
 
 	var colResp CollectionResponse
@@ -47,7 +48,7 @@ func CheckWallhavenUsername(ctx context.Context, username, apiKey string) error 
 	}
 
 	if len(colResp.Data) == 0 {
-		return fmt.Errorf("API key owner has no collections; favorites sync unavailable")
+		return setting.Known(setting.ErrorNoCollection, "wallhaven", fmt.Errorf("API key owner has no collections; favorites sync unavailable"))
 	}
 
 	// 2. Verify target username's collections exist and are accessible with this API key
@@ -63,13 +64,13 @@ func CheckWallhavenUsername(ctx context.Context, username, apiKey string) error 
 
 	uResp, err := http.DefaultClient.Do(uReq)
 	if err != nil {
-		return fmt.Errorf("network error during username verification: %w", err)
+		return setting.Known(setting.ErrorNetwork, "wallhaven", fmt.Errorf("network error during username verification: %w", err))
 	}
 	defer uResp.Body.Close()
 
 	if uResp.StatusCode != http.StatusOK {
 		if uResp.StatusCode == http.StatusNotFound {
-			return fmt.Errorf("username '%s' not found on Wallhaven", username)
+			return setting.Known(setting.ErrorUnknownUser, "wallhaven", fmt.Errorf("username '%s' not found on Wallhaven", username))
 		}
 		return fmt.Errorf("username verification failed (status %d)", uResp.StatusCode)
 	}
@@ -81,7 +82,7 @@ func CheckWallhavenUsername(ctx context.Context, username, apiKey string) error 
 	}
 
 	if len(userColResp.Data) == 0 {
-		return fmt.Errorf("username '%s' has no accessible collections (check privacy settings)", username)
+		return setting.Known(setting.ErrorUnknownUser, "wallhaven", fmt.Errorf("username '%s' has no accessible collections (check privacy settings)", username))
 	}
 
 	// Verify at least one collection has images
@@ -115,7 +116,7 @@ func CheckWallhavenAPIKeyWithContext(ctx context.Context, apiKey string) error {
 	if resp.StatusCode == http.StatusOK {
 		return nil // Success!
 	}
-	return fmt.Errorf("API key is invalid")
+	return setting.Known(setting.ErrorInvalidKey, "wallhaven", fmt.Errorf("API key is invalid"))
 }
 
 // CheckWallhavenAPIKey checks if the given API key is valid (legacy wrapper).

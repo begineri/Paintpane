@@ -12,6 +12,7 @@ import (
 	_ "image/png"  // For decoding png
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 
 	"github.com/disintegration/imaging"
@@ -695,4 +696,30 @@ func TestFitImage_CropAnchor_VisualVerification(t *testing.T) {
 	absReport, _ := filepath.Abs(reportPath)
 	t.Logf("\n\n📊 VISUAL REPORT: file:///%s\n", filepath.ToSlash(absReport))
 	t.Logf("Open the report in a browser to visually verify anchor shifts.\n")
+}
+
+// TestFitImage_ConcurrentDiagnostics covers pipeline workers fitting images at the same time while
+// the diagnostics are read. It finds problems when run with -race.
+func TestFitImage_ConcurrentDiagnostics(t *testing.T) {
+	ResetConfig()
+	defer ResetConfig()
+	cfg := GetConfig(NewMockPreferences())
+	cfg.SetSmartFitMode(SmartFitNormal)
+	cfg.SetFaceCropEnabled(false)
+	cfg.SetFaceBoostEnabled(false)
+	processor := NewSmartImageProcessor(nil, cfg, nil)
+	img := image.NewRGBA(image.Rect(0, 0, 200, 120))
+
+	var workers sync.WaitGroup
+	for i := 0; i < 8; i++ {
+		workers.Add(1)
+		go func() {
+			defer workers.Done()
+			for j := 0; j < 5; j++ {
+				_, _ = processor.FitImage(context.Background(), img, 100, 100, provider.TuningOptions{})
+				_ = processor.GetLastStats()
+			}
+		}()
+	}
+	workers.Wait()
 }

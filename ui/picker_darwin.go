@@ -18,7 +18,7 @@ func showOSFolderPicker(_ fyne.Window, callback func(string, error)) {
 
 	// Run in a separate goroutine to avoid blocking the main Fyne event loop
 	go func() {
-		prompt := i18n.T("Select Folder")
+		prompt := i18n.T("Select folder")
 		script := fmt.Sprintf(`POSIX path of (choose folder with prompt "%s")`, prompt)
 		cmd := exec.Command("osascript", "-e", script)
 

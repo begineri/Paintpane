@@ -45,7 +45,7 @@ func generateIndexHTML(dir string, galleries map[string][]galleryLink) {
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Spice &#127798;</title>
+    <title>Paintpane Gallery</title>
     <style>
         body { font-family: sans-serif; background: #2b2b2b; color: #eee; padding: 2rem; max-width: 800px; margin: 0 auto; }
         h1 { color: #f1c40f; }
@@ -57,7 +57,7 @@ func generateIndexHTML(dir string, galleries map[string][]galleryLink) {
     </style>
 </head>
 <body>
-    <h1>Spice &#127798;</h1>
+    <h1>Paintpane Gallery</h1>
 `)
 
 	for museum, links := range galleries {

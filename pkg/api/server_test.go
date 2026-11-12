@@ -26,7 +26,7 @@ func TestHealthCheck(t *testing.T) {
 		return
 	}
 
-	req, _ := http.NewRequest("GET", "/health", nil)
+	req := localRequest("/health")
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
 

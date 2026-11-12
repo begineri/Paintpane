@@ -37,8 +37,6 @@ type Config interface {
 	EnableImageQuery(id string) error
 	DisableImageQuery(id string) error
 	RemoveImageQuery(id string) error
-	GetMuseumFraming(providerID string) bool
-	SetMuseumFraming(providerID string, enabled bool)
 }
 
 type Provider struct {
@@ -66,6 +64,11 @@ func (t *aicSerializedRoundTripper) RoundTrip(req *http.Request) (*http.Response
 		return nil, req.Context().Err()
 	case <-time.After(1500 * time.Millisecond):
 	}
+
+	// AIC's API docs ask clients to identify themselves with AIC-User-Agent.
+	req = req.Clone(req.Context())
+	req.Header.Set("User-Agent", ClientUserAgent)
+	req.Header.Set("AIC-User-Agent", ClientIdentity)
 
 	resp, err := t.next.RoundTrip(req)
 	if err != nil {
@@ -110,6 +113,11 @@ func NewProvider(cfg *wallpaper.Config, httpClient *http.Client) *Provider {
 	next := httpClient.Transport
 	if next == nil {
 		next = http.DefaultTransport
+	}
+	// The shared client presents itself as a desktop browser, which www.artic.edu answers
+	// with a bot challenge. Skip that layer: this provider identifies itself instead.
+	if uaTransport, ok := next.(*wallpaper.UserAgentTransport); ok {
+		next = uaTransport.RoundTripper
 	}
 
 	serializedClient := &http.Client{
@@ -173,23 +181,6 @@ func (p *Provider) SupportsUserQueries() bool {
 
 func (p *Provider) HomeURL() string {
 	return "https://www.artic.edu"
-}
-
-// WithResolution implements ResolutionAwareProvider to dynamically scale IIIF images.
-func (p *Provider) WithResolution(apiURL string, width, height int) string {
-	// If it's a IIIF URL, we can adjust the size parameter
-	// Format: .../full/!1920,1080/0/default.jpg -> .../full/!W,H/0/default.jpg
-	if strings.Contains(apiURL, "/iiif/2/") && strings.Contains(apiURL, "/full/!") {
-		// Replace the size part
-		parts := strings.Split(apiURL, "/full/!")
-		if len(parts) == 2 {
-			subParts := strings.Split(parts[1], "/0/default.jpg")
-			if len(subParts) == 2 {
-				return fmt.Sprintf("%s/full/!%d,%d/0/default.jpg", parts[0], width, height)
-			}
-		}
-	}
-	return apiURL
 }
 
 // ParseURL transforms a web URL into an internal identifier.
@@ -335,14 +326,9 @@ func (p *Provider) fetchArtworkDetails(ctx context.Context, id int) (*provider.I
 		return nil, nil // No image available
 	}
 
-	// Use IIIF for high-res image
-	// We use 4K (4096x4096) as our "Ultra-Premium" target to ensure it looks great on all monitors.
-	// The downloader can further refine this via WithResolution if a specific screen size is known.
-	imgURL := getIIIFURL(result.Data.ImageID, 4096, 4096)
-
 	return &provider.Image{
 		ID:          fmt.Sprintf("%d", result.Data.ID),
-		Path:        imgURL,
+		Path:        getIIIFURL(result.Data.ImageID, FullImageWidth),
 		ViewURL:     fmt.Sprintf("https://www.artic.edu/artworks/%d", result.Data.ID),
 		Attribution: result.Data.ArtistDisplay,
 		Title:       result.Data.Title,
@@ -355,19 +341,6 @@ func (p *Provider) fetchArtworkDetails(ctx context.Context, id int) (*provider.I
 
 func (p *Provider) EnrichImage(ctx context.Context, img provider.Image) (provider.Image, error) {
 	return img, nil // No enrichment needed for AIC currently
-}
-
-func (p *Provider) GetDownloadHeaders() map[string]string {
-	return map[string]string{
-		"User-Agent":      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-		"AIC-User-Agent":  "SpiceWallpaper (spice@dixieflatline76.com)",
-		"Accept":          "image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8",
-		"Accept-Language": "en-US,en;q=0.9",
-		"Referer":         "https://www.artic.edu/",
-		"Sec-Fetch-Dest":  "image",
-		"Sec-Fetch-Mode":  "no-cors",
-		"Sec-Fetch-Site":  "same-site",
-	}
 }
 
 func (p *Provider) searchArtworkIDs(ctx context.Context, query string) ([]int, error) {
@@ -410,11 +383,16 @@ func (p *Provider) searchArtworkIDs(ctx context.Context, query string) ([]int, e
 	return ids, nil
 }
 
-// getIIIFURL constructs a dynamic resizing URL using the IIIF Image API.
-func getIIIFURL(imageID string, width, height int) string {
+// getIIIFURL constructs an image URL using the IIIF Image API. AIC only serves specific
+// widths and rejects the "!w,h" fit-within form, so width must be one of its documented sizes.
+func getIIIFURL(imageID string, width int) string {
 	// Format: {scheme}://{server}{/prefix}/{identifier}/{region}/{size}/{rotation}/{quality}.{format}
-	// We use full region, and !w,h for "fit within"
-	return fmt.Sprintf("https://www.artic.edu/iiif/2/%s/full/!%d,%d/0/default.jpg", imageID, width, height)
+	return fmt.Sprintf("https://www.artic.edu/iiif/2/%s/full/%d,/0/default.jpg", imageID, width)
+}
+
+// thumbnailURL rewrites a full-size image URL to the thumbnail width.
+func thumbnailURL(imageURL string) string {
+	return strings.Replace(imageURL, fmt.Sprintf("/full/%d,/", FullImageWidth), fmt.Sprintf("/full/%d,/", ThumbnailWidth), 1)
 }
 
 // FetchThumbnails implements provider.ThumbnailProvider.
@@ -440,7 +418,7 @@ func (p *Provider) FetchThumbnails(ctx context.Context, ids []string) ([]provide
 			if img != nil && img.Path != "" {
 				thumbnails[index] = provider.Thumbnail{
 					ID:      artworkID,
-					URL:     p.WithResolution(img.Path, 800, 800),
+					URL:     thumbnailURL(img.Path),
 					ViewURL: img.ViewURL,
 					Title:   img.Title,
 					Artist:  img.Artist,
@@ -465,8 +443,6 @@ func (p *Provider) FetchThumbnails(ctx context.Context, ids []string) ([]provide
 // CreateSettingsPanel returns the declarative UI for ArtIC settings.
 func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.PanelSchema {
 	return schema.CreateMuseumSettingsPanel(schema.MuseumSettingsConfig{
-		MuseumFramingGetFunc: func() bool { return p.cfg.GetMuseumFraming(p.ID()) },
-		MuseumFramingSetFunc: func(val bool) { p.cfg.SetMuseumFraming(p.ID(), val) },
 		ID:                   "AIC",
 		Title:                i18n.T("Art Institute of Chicago"),
 		Location:             i18n.T("Chicago, IL, USA"),

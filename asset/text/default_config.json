@@ -6,13 +6,13 @@
   "face_boost_enabled": false,
   "virtual_framing_fallback": true,
   "virtual_wall_color": 0,
-  "virtual_paper_matting": true,
+  "virtual_paper_matting": false,
   "virtual_frame_size": 0.85,
   "queries": [
     {
       "desc": "Wikimedia Featured",
       "url": "category:Featured_pictures_on_Wikimedia_Commons",
-      "active": true,
+      "active": false,
       "provider": "Wikimedia"
     },
     {
@@ -23,7 +23,7 @@
     },
     {
       "desc": "⭐ Best of The Met",
-      "url": "spice_melange",
+      "url": "metmuseum_best_of",
       "active": true,
       "provider": "MetMuseum"
     },
@@ -66,13 +66,13 @@
     {
       "desc": "Wikimedia Featured Astronomy",
       "url": "page:Commons:Featured_pictures/Astronomy",
-      "active": true,
+      "active": false,
       "provider": "Wikimedia"
     },
     {
       "desc": "Toplist last 3 months General",
       "url": "https://wallhaven.cc/api/v1/search?q=-video-games%20-pattern%20-flower%20-fabric%20-vehicle%20-car%20-folding-screen%20-suicide%20-typography%20-mosaic%20-artwork%20-logo%20-TV-series%20-asian%20-men%20-cartoon%20-plants%20-abstract%20-cgi%20-huge-breasts%20-humor%20-group-of-women%20-statue%20-DC-Comics%20-Star-Wars%20-latex%20-BDSM%20-gore%20-painting%20-dark-skin%20-weapon%20-feet%20-Marvel-Comics%20-video-game-characters%20-furry%20-gun%20-blood%20-books%20-screen-shot%20-bullet%20-text%20-drawing%20-illustration%20-military%20-war%20-Korean%20-motorcycle%20-banner%20-children%20-movie%20-baby%20-riot%20-Ukraine&categories=100&purity=100&atleast=3440x1440&ratios=landscape&topRange=3M&sorting=toplist&order=desc&ai_art_filter=1",
-      "active": true,
+      "active": false,
       "provider": "Wallhaven"
     },
     {

@@ -14,6 +14,17 @@ const (
 	// APIBaseURL is the base for all API calls
 	APIBaseURL = "https://api.artic.edu/api/v1"
 
+	// ClientUserAgent and ClientIdentity identify this application to AIC.
+	ClientUserAgent = "Paintpane"
+	ClientIdentity  = "Paintpane (https://github.com/begineri/Paintpane)"
+
+	// FullImageWidth requests the most detail AIC's image server offers: it caps the long
+	// edge at 3000 and never upscales. AIC's docs only list widths up to 1686, which looks
+	// soft on high-resolution screens, but the server does accept this size.
+	FullImageWidth = 3000
+	// ThumbnailWidth is the width AIC recommends for general use, and caches.
+	ThumbnailWidth = 843
+
 	// Collection IDs (Internal Query Strings)
 	CollectionHighlights = "artic_highlights"
 	CollectionImpression = "artic_impressionism"

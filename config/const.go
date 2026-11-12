@@ -11,7 +11,7 @@ import (
 var AppVersion string // Or get it from version.txt during build
 
 // AppName is the name of the service.
-const AppName = "Spice"
+const AppName = "Paintpane"
 
 // LogWinSubDir is the sub directory for the log files on windows.
 var LogWinSubDir = AppName
@@ -33,6 +33,26 @@ func GetWorkingDir() string {
 		cacheDir = os.TempDir() // Fallback
 	}
 	return filepath.Join(cacheDir, strings.ToLower(AppName))
+}
+
+// GetCacheDir returns the directory for cached gallery and curation files. Use it instead of
+// joining "cache" to GetWorkingDir, so a cache moved elsewhere by a link still works.
+func GetCacheDir() string {
+	return ResolveLinkedDir(filepath.Join(GetWorkingDir(), "cache"))
+}
+
+// ResolveLinkedDir returns the directory dir links to, or dir if it is not a link. A cache can be
+// moved to another drive with a junction, and on some Windows machines new directories cannot be
+// created through one, so callers should work on the target directly.
+func ResolveLinkedDir(dir string) string {
+	target, err := os.Readlink(dir)
+	if err != nil {
+		return dir
+	}
+	if !filepath.IsAbs(target) {
+		target = filepath.Join(filepath.Dir(dir), target)
+	}
+	return target
 }
 
 var appDir string

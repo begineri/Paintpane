@@ -152,7 +152,7 @@ func (p *Provider) GetProviderIcon() interface{} {
 }
 
 func (p *Provider) GetFavoritesDisplayName() string {
-	return "❤️  " + i18n.T("Personal Favorites")
+	return "❤️  " + i18n.T("Personal favorites")
 }
 
 func (p *Provider) Type() provider.ProviderType {
@@ -620,10 +620,10 @@ func (p *Provider) CreateSettingsPanel(_ setting.SettingsManager) *schema.PanelS
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title:   i18n.T("Favorites Management"),
+				Title:   i18n.T("Favorites management"),
 				Compact: true,
 				Items: []schema.ItemSchema{
-					schema.LabelItem{Text: i18n.T("Local favorites are stored persistently in your Spice application folder."), Importance: schema.ImportanceLow},
+					schema.LabelItem{Text: i18n.T("Local favorites are stored persistently in your Paintpane application folder."), Importance: schema.ImportanceLow},
 				},
 			},
 		},
@@ -635,14 +635,14 @@ func (p *Provider) CreateQueryPanel(sm setting.SettingsManager, _ string) *schem
 	return &schema.PanelSchema{
 		Sections: []schema.SectionSchema{
 			{
-				Title: i18n.T("Manage Favorites"),
+				Title: i18n.T("Manage favorites"),
 				Items: []schema.ItemSchema{
 					schema.QueryListItem{
 						GetQueries: func() []schema.Query {
 							queries := p.cfg.GetFavoritesQueries()
 							if len(queries) == 0 {
 								// Ensure at least the default favorites collection exists in config
-								_, _ = p.cfg.AddFavoritesQuery(i18n.T("Personal Collection"), wallpaper.FavoritesQueryID, true)
+								_, _ = p.cfg.AddFavoritesQuery(i18n.T("Personal collection"), wallpaper.FavoritesQueryID, true)
 								queries = p.cfg.GetFavoritesQueries()
 							}
 

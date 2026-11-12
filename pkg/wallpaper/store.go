@@ -2,6 +2,7 @@ package wallpaper
 
 import (
 	"encoding/json"
+	"maps"
 	"os"
 	"strings"
 	"sync"
@@ -13,6 +14,11 @@ import (
 
 // ImageStore is a thread-safe storage for wallpaper images.
 type ImageStore struct {
+	// Display mode of the last Sync, for dropping results processed before a switch.
+	hasSyncedDisplayMode bool
+	syncedDisplayFull    bool
+	syncedDisplayFramed  bool
+
 	mu       sync.RWMutex
 	images   []provider.Image
 	idSet    map[string]bool
@@ -134,6 +140,8 @@ func (s *ImageStore) replace(img provider.Image) bool {
 			s.images[i] = img
 			s.addToBucketsLocked(img.ID, img.DerivativePaths)
 			s.scheduleSaveLocked()
+			// A monitor starved by invalidation is waiting for exactly this.
+			s.notifyUpdateLocked()
 			return true
 		}
 	}
@@ -154,6 +162,20 @@ func (s *ImageStore) SetFavorited(id string, favorited bool) bool {
 	return false
 }
 
+// SetPurity updates only the source content rating for an image.
+func (s *ImageStore) SetPurity(id string, purity string) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.images {
+		if s.images[i].ID == id {
+			s.images[i].Purity = purity
+			s.scheduleSaveLocked()
+			return true
+		}
+	}
+	return false
+}
+
 // SetTuningOptions updates the tuning options for a specific resolution on an image.
 // Pass an empty TuningOptions struct to clear the overrides.
 func (s *ImageStore) SetTuningOptions(id string, resKey string, opts provider.TuningOptions) bool {
@@ -161,19 +183,52 @@ func (s *ImageStore) SetTuningOptions(id string, resKey string, opts provider.Tu
 	defer s.mu.Unlock()
 	for i := range s.images {
 		if s.images[i].ID == id {
-			if s.images[i].Tuning == nil {
-				s.images[i].Tuning = make(map[string]provider.TuningOptions)
+			// A new map, not a change in place: copies from GetByID and List share the old one
+			// and read it without the store's lock.
+			tuning := maps.Clone(s.images[i].Tuning)
+			if tuning == nil {
+				tuning = make(map[string]provider.TuningOptions)
 			}
 			// If it's the default/empty state, remove it from the map to clean up JSON
 			defaultOpts := provider.TuningOptions{Anchor: provider.AnchorAuto}
 			if opts == defaultOpts {
-				delete(s.images[i].Tuning, resKey)
+				delete(tuning, resKey)
 			} else {
-				s.images[i].Tuning[resKey] = opts
+				tuning[resKey] = opts
 			}
+			s.images[i].Tuning = tuning
 			s.scheduleSaveLocked()
 			return true
 		}
+	}
+	return false
+}
+
+// SetOutcomeFlag records an outcome flag of an image, such as "VirtualFramed:<WxH>" after Tune
+// Image rendered it again: set when value is true, removed when false. Like SetTuningOptions it
+// replaces the map rather than changing the one that handed-out copies share.
+func (s *ImageStore) SetOutcomeFlag(id, key string, value bool) bool {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for i := range s.images {
+		if s.images[i].ID != id {
+			continue
+		}
+		if s.images[i].ProcessingFlags[key] == value {
+			return true
+		}
+		flags := maps.Clone(s.images[i].ProcessingFlags)
+		if flags == nil {
+			flags = make(map[string]bool)
+		}
+		if value {
+			flags[key] = true
+		} else {
+			delete(flags, key)
+		}
+		s.images[i].ProcessingFlags = flags
+		s.scheduleSaveLocked()
+		return true
 	}
 	return false
 }
@@ -616,6 +671,9 @@ func (s *ImageStore) LoadCache() error {
 
 	// Namespacing Migration: Upgrade legacy IDs to namespaced format
 	migrationOccurred := s.migrateLegacyIDsLocked()
+	if s.fixCommonsViewURLsLocked() {
+		migrationOccurred = true
+	}
 
 	if migrationOccurred {
 		log.Printf("Migration: Namespacing upgrade complete. Saving updated cache.")
@@ -735,12 +793,18 @@ const (
 	ImageActionKeep       ImageSyncAction = iota
 	ImageActionDelete                     // Prune: Delete everything (Master + Derivatives)
 	ImageActionInvalidate                 // Refresh: Delete only derivatives (Keep Master)
+	ImageActionRepoint                    // Display mode changed: Forget derivative paths (Keep all files)
 )
 
 func (s *ImageStore) Sync(limit int, targetFlags map[string]bool, activeQueryIDs map[string]bool) {
 	if s.fm == nil {
 		return
 	}
+
+	s.mu.Lock()
+	s.syncedDisplayFull, s.syncedDisplayFramed = targetFlags[flagDisplayFull], targetFlags[flagDisplayFramed]
+	s.hasSyncedDisplayMode = len(targetFlags) > 0
+	s.mu.Unlock()
 
 	if limit <= 0 {
 		limit = 50
@@ -774,15 +838,17 @@ func (s *ImageStore) Sync(limit int, targetFlags map[string]bool, activeQueryIDs
 			continue
 		}
 
-		if action == ImageActionInvalidate {
-			// Invalidate: Keep Master, Reset Flags/Paths
+		if action == ImageActionInvalidate || action == ImageActionRepoint {
+			// Keep Master, Reset Flags/Paths
 			img.DerivativePaths = make(map[string]string)
 			img.ProcessingFlags = make(map[string]bool)
 			for k, v := range targetFlags {
 				img.ProcessingFlags[k] = v
 			}
 			finalImages = append(finalImages, img)
-			idsToInvalidate = append(idsToInvalidate, img.ID)
+			if action == ImageActionInvalidate {
+				idsToInvalidate = append(idsToInvalidate, img.ID)
+			}
 		} else {
 			// ActionDelete
 			idsToDelete = append(idsToDelete, img.ID)
@@ -813,6 +879,58 @@ func (s *ImageStore) Sync(limit int, targetFlags map[string]bool, activeQueryIDs
 		log.Debugf("[Sync] Deleting IDs: %v", idsToDelete)
 	}
 	s.performAsyncCleanup(idsToDelete, idsToInvalidate)
+}
+
+// PruneToLimit evicts the oldest images, and their files, until at most limit remain.
+// Unlike Sync it never invalidates derivatives, so it is cheap to run while images
+// are still arriving. Images in keep (the wallpapers and lock screen on show) are
+// never evicted: Tune Image, Favourite and Block need their files, so the store may
+// stay over the limit by those few. A non-positive limit does nothing.
+func (s *ImageStore) PruneToLimit(limit int, keep map[string]bool) {
+	if limit <= 0 {
+		return
+	}
+
+	s.mu.Lock()
+	excess := len(s.images) - limit
+	if excess <= 0 {
+		s.mu.Unlock()
+		return
+	}
+	idsToDelete := make([]string, 0, excess)
+	kept := make([]provider.Image, 0, limit+len(keep))
+	for _, img := range s.images {
+		if len(idsToDelete) < excess && !keep[img.ID] {
+			idsToDelete = append(idsToDelete, img.ID)
+			continue
+		}
+		kept = append(kept, img)
+	}
+	if len(idsToDelete) == 0 {
+		s.mu.Unlock()
+		return
+	}
+	s.images = kept
+	s.rebuildInternalStateLocked()
+	s.scheduleSaveLocked()
+	s.mu.Unlock()
+
+	log.Debugf("[PruneToLimit] Evicted %d images over limit %d.", len(idsToDelete), limit)
+	s.performAsyncCleanup(idsToDelete, nil)
+}
+
+// ReadyUnseenCount returns how many images can be displayed but have not been shown yet.
+func (s *ImageStore) ReadyUnseenCount() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	count := 0
+	for _, img := range s.images {
+		if !img.Seen && len(img.DerivativePaths) > 0 {
+			count++
+		}
+	}
+	return count
 }
 
 // determineSyncAction decides what to do with an image during sync.
@@ -847,6 +965,9 @@ func (s *ImageStore) determineSyncAction(img provider.Image, activeQueryIDs map[
 	// Flag Mismatch Check
 	if len(targetFlags) > 0 {
 		if !s.flagsMatch(img, targetFlags) {
+			if onlyDisplayModeDiffers(img, targetFlags) {
+				return ImageActionRepoint
+			}
 			return ImageActionInvalidate
 		}
 	}
@@ -895,7 +1016,7 @@ func (s *ImageStore) masterFileExists(id string) bool {
 
 func (s *ImageStore) flagsMatch(img provider.Image, target map[string]bool) bool {
 	// Compare only the processing-mode keys from `target`.
-	// img.ProcessingFlags may also contain "incompatible:<WxH>" metadata tags
+	// img.ProcessingFlags may also contain "incompatible:<WxH>" and "VirtualFramed:<WxH>" metadata tags
 	// that are NOT part of the processing mode, so a strict length comparison
 	// would always fail for images that have any incompatibility tags.
 	for k, v := range target {
@@ -906,7 +1027,7 @@ func (s *ImageStore) flagsMatch(img provider.Image, target map[string]bool) bool
 	// Reverse check: ensure the image doesn't have processing-mode keys
 	// that aren't in target (guards against future flag additions).
 	for k, v := range img.ProcessingFlags {
-		if strings.HasPrefix(k, "incompatible:") {
+		if isOutcomeFlag(k) {
 			continue // skip metadata tags
 		}
 		if target[k] != v {
@@ -914,6 +1035,60 @@ func (s *ImageStore) flagsMatch(img provider.Image, target map[string]bool) bool
 		}
 	}
 	return true
+}
+
+// isStaleDisplayMode reports whether a processed image was stamped with a different display mode
+// than the last Sync. A job that finishes after a switch must not point the image back at the old
+// mode: it would look complete, so nothing would ever correct it.
+func (s *ImageStore) isStaleDisplayMode(img provider.Image) bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.hasSyncedDisplayMode &&
+		(img.ProcessingFlags[flagDisplayFull] != s.syncedDisplayFull || img.ProcessingFlags[flagDisplayFramed] != s.syncedDisplayFramed)
+}
+
+// onlyDisplayModeDiffers reports whether an image's settings match the target apart from the
+// artwork display mode. Each mode has its own derivative directory, so the image's files stay
+// valid and can be reused on return to that mode.
+func onlyDisplayModeDiffers(img provider.Image, target map[string]bool) bool {
+	ignored := func(key string) bool {
+		return isOutcomeFlag(key) || key == flagDisplayFull || key == flagDisplayFramed
+	}
+	for k, v := range target {
+		if !ignored(k) && img.ProcessingFlags[k] != v {
+			return false
+		}
+	}
+	for k, v := range img.ProcessingFlags {
+		if !ignored(k) && target[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+// isOutcomeFlag reports whether a processing flag records what happened to an image,
+// such as being framed, rather than a setting it was processed with. Settings changes
+// must invalidate derivatives; outcomes must not.
+func isOutcomeFlag(key string) bool {
+	return strings.HasPrefix(key, "incompatible:") || strings.HasPrefix(key, "VirtualFramed:")
+}
+
+// stampProcessingFlags records the settings an image is being processed with, keeping
+// outcome flags. Sync compares these against the current settings to decide whether the
+// image's derivatives are stale, so they must cover every key in target.
+func stampProcessingFlags(img *provider.Image, target map[string]bool) {
+	if img.ProcessingFlags == nil {
+		img.ProcessingFlags = make(map[string]bool, len(target))
+	}
+	for k := range img.ProcessingFlags {
+		if !isOutcomeFlag(k) {
+			delete(img.ProcessingFlags, k)
+		}
+	}
+	for k, v := range target {
+		img.ProcessingFlags[k] = v
+	}
 }
 
 func (s *ImageStore) rebuildInternalStateLocked() {
@@ -960,6 +1135,32 @@ func (s *ImageStore) Close() {
 	if s.fm != nil {
 		s.fm.Close()
 	}
+}
+
+// commonsFilePrefix starts the link to a Commons file itself (imageinfo's url).
+const commonsFilePrefix = "https://upload.wikimedia.org/"
+
+// fixCommonsViewURLsLocked points Wikimedia images kept from before 2026-11-12 at the file's page
+// on Commons: their ViewURL was the file itself, so the tray's first row opened the bare picture.
+// The page by page ID is the one the provider now falls back to (wikimedia.FilePageURL).
+// CALLER MUST HOLD s.mu.Lock()
+func (s *ImageStore) fixCommonsViewURLsLocked() bool {
+	fixed := false
+	for i, img := range s.images {
+		if img.Provider != "Wikimedia" || !strings.HasPrefix(img.ViewURL, commonsFilePrefix) {
+			continue
+		}
+		pageID := strings.TrimPrefix(img.ID, "Wikimedia_")
+		if pageID == "" || strings.Trim(pageID, "0123456789") != "" {
+			continue
+		}
+		s.images[i].ViewURL = "https://commons.wikimedia.org/w/index.php?curid=" + pageID
+		fixed = true
+	}
+	if fixed {
+		log.Printf("Migration: Wikimedia images now link to their pages on Commons.")
+	}
+	return fixed
 }
 
 // migrateLegacyIDsLocked upgrades legacy image IDs to the namespaced format (Provider_ID).

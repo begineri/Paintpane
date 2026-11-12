@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Create a report to help us improve Spice
+about: Create a report to help us improve Paintpane
 title: '[BUG] '
 labels: bug
 assignees: ''
@@ -26,7 +26,7 @@ If applicable, add screenshots to help explain your problem.
 **Environment (please complete the following information):**
 - macOS Version: [e.g. 14.2.1]
 - Hardware: [e.g. M1 MacBook Air, Intel iMac]
-- Spice Version: [e.g. 1.0.0]
+- Paintpane Version: [e.g. 1.0.0]
 
 **Additional context**
 Add any other context about the problem here.

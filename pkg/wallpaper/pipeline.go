@@ -2,10 +2,12 @@ package wallpaper
 
 import (
 	"context"
+	"errors"
 	"golang.org/x/time/rate"
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dixieflatline76/Spice/v2/pkg/provider"
 	"github.com/dixieflatline76/Spice/v2/util/log"
@@ -93,6 +95,12 @@ func (p *Pipeline) Stop() {
 	log.Println("Pipeline Stopped.")
 }
 
+// SetDownloadHold makes each provider's jobs wait while hold returns a pause
+// for it (see downloadBackoff). Call it before the first Submit.
+func (p *Pipeline) SetDownloadHold(hold func(providerID string) time.Duration) {
+	p.dispatcher.hold = hold
+}
+
 // Submit submits a job to the pipeline perfectly paced by the Dispatcher.
 // Returns false if pipeline is stopped or if the provided context is cancelled.
 func (p *Pipeline) Submit(ctx context.Context, job DownloadJob) bool {
@@ -147,6 +155,10 @@ func (p *Pipeline) stateManagerLoop() {
 				}
 				continue
 			}
+			if p.store.isStaleDisplayMode(res.Image) {
+				log.Debugf("Pipeline: Dropping %s, processed for a previous display mode.", res.Image.ID)
+				continue
+			}
 			if !p.store.Add(res.Image) {
 				// Image already exists (re-processed via backlog healing).
 				// Update so the fully-processed result with DerivativePaths lands.
@@ -184,8 +196,12 @@ func (p *Pipeline) SendCommand(cmd StateCmd) {
 // logPipelineError categorizes and logs errors, ignoring expected ones.
 func (p *Pipeline) logPipelineError(err error) {
 	errMsg := err.Error()
-	if strings.Contains(errMsg, "avoid set") {
-		log.Debugf("Pipeline: %v", err)
+	if errors.Is(err, ErrImageInProgress) {
+		log.Debugf("Pipeline: skipped an image another job is processing (%v)", err)
+		return
+	}
+	if errors.Is(err, ErrInAvoidSet) {
+		log.Debugf("Pipeline: skipped a blocked image (%v)", err)
 	} else if strings.Contains(errMsg, "smart fit") || strings.Contains(errMsg, "aspect ratio") || strings.Contains(errMsg, "image resolution too low") {
 		log.Debugf("Pipeline: %v", err)
 	} else if strings.Contains(errMsg, "status 429") || strings.Contains(errMsg, "enrichment") {

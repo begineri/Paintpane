@@ -21,7 +21,6 @@ func TestSerializationIsolation(t *testing.T) {
 
 	// 1. Set primitive toggles via native setters
 	cfg.SetShortcutsDisabled(true)
-	cfg.SetTargetedShortcutsDisabled(true)
 	cfg.SetWallhavenSyncEnabled(true)
 
 	// 2. Trigger a save
@@ -38,7 +37,6 @@ func TestSerializationIsolation(t *testing.T) {
 	// 4. Assert that isolated keys strictly do NOT exist in the map
 	restrictedKeys := []string{
 		"shortcuts_disabled",
-		"targeted_shortcuts_disabled",
 		"wallhaven_sync_enabled",
 		"wallhaven_api_key",
 		"wallhaven_username",
@@ -61,9 +59,9 @@ func TestAntiClobberStateSurvival(t *testing.T) {
 		assetMgr:    mgr,
 	}
 
-	// 1. Set TargetedShortcutsDisabled to true (Native state)
-	cfg.SetTargetedShortcutsDisabled(true)
-	require.True(t, cfg.GetTargetedShortcutsDisabled())
+	// 1. Set ShortcutsDisabled to true (Native state)
+	cfg.SetShortcutsDisabled(true)
+	require.True(t, cfg.GetShortcutsDisabled())
 
 	// 2. Add a new dummy ImageQuery (triggers c.save() and internal state sync)
 	_, err := cfg.AddImageQuery("Anti-Clobber Test", "https://example.com/api", true)
@@ -72,12 +70,31 @@ func TestAntiClobberStateSurvival(t *testing.T) {
 	// 3. Assert it still returns true
 	// Previously, the stale struct field (default false) would have been marshaled into JSON,
 	// then potentially re-loaded or shadowed during the process.
-	assert.True(t, cfg.GetTargetedShortcutsDisabled(), "TargetedShortcutsDisabled must survive a JSON save/sync cycle")
+	assert.True(t, cfg.GetShortcutsDisabled(), "ShortcutsDisabled must survive a JSON save/sync cycle")
 
 	// Double check Wallhaven Sync too
 	cfg.SetWallhavenSyncEnabled(true)
 	_, _ = cfg.AddImageQuery("Another Query", "https://example.com/2", true)
 	assert.True(t, cfg.GetWallhavenSyncEnabled(), "WallhavenSyncEnabled must survive a JSON save/sync cycle")
+}
+
+// The single-display shortcuts switch is off by default, kept apart from Global shortcuts, and
+// out of the JSON config (S3-11, v21).
+func TestTargetedShortcutsSwitch(t *testing.T) {
+	prefs := test.NewApp().Preferences()
+	cfg := &Config{Preferences: prefs, assetMgr: &asset.Manager{}}
+	assert.True(t, cfg.GetTargetedShortcutsDisabled(), "off by default")
+	assert.False(t, cfg.GetShortcutsDisabled(), "global shortcuts are on by default")
+
+	cfg.SetTargetedShortcutsDisabled(false)
+	assert.False(t, cfg.GetTargetedShortcutsDisabled())
+	assert.False(t, cfg.GetShortcutsDisabled(), "the two switches are independent")
+
+	cfg.save()
+	var raw map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(prefs.String(WallhavenConfigPrefKey)), &raw))
+	_, exists := raw["targeted_shortcuts_disabled"]
+	assert.False(t, exists, "the switch is not part of the JSON blob")
 }
 
 func TestNativeIORoundTrip(t *testing.T) {
@@ -90,7 +107,6 @@ func TestNativeIORoundTrip(t *testing.T) {
 		Preferences: prefs,
 		assetMgr:    mgr,
 	}
-	cfgA.SetTargetedShortcutsDisabled(false)
 	cfgA.SetShortcutsDisabled(true)
 
 	// Instance B (Fresh instance, same storage)
@@ -99,7 +115,6 @@ func TestNativeIORoundTrip(t *testing.T) {
 		assetMgr:    mgr,
 	}
 
-	assert.False(t, cfgB.GetTargetedShortcutsDisabled(), "Fresh instance MUST read false from storage")
 	assert.True(t, cfgB.GetShortcutsDisabled(), "Fresh instance MUST read true from storage")
 
 	// Complex check: change in B, read in A

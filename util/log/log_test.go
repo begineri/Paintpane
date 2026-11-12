@@ -11,6 +11,10 @@ func TestLogging(t *testing.T) {
 	// Capture standard log output
 	var buf bytes.Buffer
 	log.SetOutput(&buf)
+	// Release builds start with debug output off; the Debug cases below need it on.
+	prevDebug := IsDebugEnabled()
+	SetDebugEnabled(true)
+	t.Cleanup(func() { SetDebugEnabled(prevDebug) })
 
 	// Since we can't easily undo the init() side effects on the real log file,
 	// we just test that our wrapper functions write to the standard logger.

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"fyne.io/fyne/v2"
+	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/test"
 	"fyne.io/fyne/v2/widget"
 	"github.com/dixieflatline76/Spice/v2/pkg/ui/schema"
@@ -105,6 +106,10 @@ func TestAsyncButtonReentrancy(t *testing.T) {
 
 	var callCount int32
 	blocker := make(chan bool)
+	// started and completed order the test's reads after the button's writes,
+	// which happen on the tap goroutine.
+	started := make(chan struct{}, 1)
+	completed := make(chan struct{}, 1)
 
 	p := schema.PanelSchema{
 		Sections: []schema.SectionSchema{
@@ -116,10 +121,11 @@ func TestAsyncButtonReentrancy(t *testing.T) {
 						LoadingText: "Loading...",
 						OnPressed: func() error {
 							atomic.AddInt32(&callCount, 1)
+							started <- struct{}{}
 							<-blocker // Wait for manual release
 							return nil
 						},
-						OnCompleted: func(err error) {},
+						OnCompleted: func(err error) { completed <- struct{}{} },
 					},
 				},
 			},
@@ -131,11 +137,9 @@ func TestAsyncButtonReentrancy(t *testing.T) {
 	// Verify initial state
 	assert.False(t, btn.Disabled())
 
-	// Trigger first tap
+	// Trigger first tap and wait until OnPressed is running
 	go test.Tap(btn)
-
-	// Brief sleep to ensure goroutine starts and enters OnPressed
-	time.Sleep(50 * time.Millisecond)
+	<-started
 
 	// Assert button is now disabled (Loading state)
 	assert.True(t, btn.Disabled(), "Button should be disabled while processing")
@@ -146,7 +150,7 @@ func TestAsyncButtonReentrancy(t *testing.T) {
 
 	// Release and wait for completion
 	blocker <- true
-	time.Sleep(50 * time.Millisecond)
+	<-completed
 
 	// Final verification
 	assert.Equal(t, int32(1), atomic.LoadInt32(&callCount), "Should NOT have called OnPressed a second time (Reentrancy protection failed)")
@@ -260,6 +264,7 @@ func TestAsyncButtonStatusAutoUpdate(t *testing.T) {
 	app := test.NewApp()
 	testWin := app.NewWindow("Test Async Status")
 	sm := NewSettingsManager(testWin)
+	completed := make(chan struct{}, 1)
 
 	p := schema.PanelSchema{
 		Sections: []schema.SectionSchema{
@@ -278,7 +283,7 @@ func TestAsyncButtonStatusAutoUpdate(t *testing.T) {
 							time.Sleep(50 * time.Millisecond)
 							return nil // Signal success
 						},
-						OnCompleted: func(err error) {},
+						OnCompleted: func(err error) { completed <- struct{}{} },
 					},
 				},
 			},
@@ -298,9 +303,8 @@ func TestAsyncButtonStatusAutoUpdate(t *testing.T) {
 
 	test.Tap(testBtn)
 
-	// Wait for async completion
-	// In a real app we'd use fyne.Do, in tests we can wait slightly
-	time.Sleep(200 * time.Millisecond)
+	// Wait for async completion; the status is set before OnCompleted runs.
+	<-completed
 
 	// Assert: Framework should have automatically updated the status to "Success" (via i18n translation or hardcoded default)
 	// Since we are using i18n.T("Success"), it might be "Success" in English.
@@ -405,10 +409,15 @@ func TestSchemaRendering(t *testing.T) {
 	// 3. Verify the generated tree
 	assert.NotNil(t, rendered)
 
-	// For panels without an expanding list (like museums), we expect a direct VBox
-	mainBox, ok := rendered.(*fyne.Container)
-	assert.True(t, ok, "Rendered output should be a VBox container")
-	assert.Equal(t, 2, len(mainBox.Objects), "VBox should have 2 sections")
+	// For panels without an expanding list (App tab, General sections, Museums),
+	// we expect a VScroll wrapping the VBox so short/HiDPI windows scroll cleanly.
+	scroll, ok := rendered.(*container.Scroll)
+	assert.True(t, ok, "Rendered output should be a VScroll container")
+	page, ok := scroll.Content.(*fyne.Container)
+	assert.True(t, ok, "VScroll content should be the page column's margins")
+	mainBox, ok := page.Objects[0].(*fyne.Container)
+	assert.True(t, ok, "inside the margins is the column of sections")
+	assert.Equal(t, 2, len(mainBox.Objects), "the column should have 2 sections")
 
 	// Check registry: The RenderSchema should have registered the widgets
 	assert.NotNil(t, sm.(*SettingsManager).allWidgets["enableNotifications"])
@@ -416,7 +425,7 @@ func TestSchemaRendering(t *testing.T) {
 	assert.NotNil(t, sm.(*SettingsManager).allWidgets["resetDatabase"])
 
 	// Check widget types
-	check := sm.(*SettingsManager).allWidgets["enableNotifications"].(*widget.Check)
+	check := sm.(*SettingsManager).allWidgets["enableNotifications"].(*toggleSwitch)
 	assert.True(t, check.Checked)
 
 	entry := sm.(*SettingsManager).allWidgets["username"].(*widget.Entry)

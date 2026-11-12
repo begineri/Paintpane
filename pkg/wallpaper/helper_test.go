@@ -6,6 +6,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// stateOf copies a monitor's state under mc.mu, the way the UI reads it, so a test can look
+// at it while the actor goroutine is running.
+func stateOf(mc *MonitorController) MonitorState {
+	mc.mu.RLock()
+	defer mc.mu.RUnlock()
+	return *mc.State
+}
+
 func TestExtractFilenameFromURL(t *testing.T) {
 	tests := []struct {
 		url      string

@@ -40,6 +40,7 @@ coverage*
 !user_guide.html
 !extension/*.html
 !asset/galleries/**/*.html
+!docs/mockups/**/*.html
 !asset/galleries/.hash_state.json
 *.test
 test_output_*.txt
@@ -64,3 +65,9 @@ pkg/wallpaper/testdata/regressions/
 
 # Prototyping scripts
 scratch/
+
+# Preferences screenshots (make screenshots)
+screenshots/
+
+# Source fonts for assets-src/fonts/subset.py (downloaded by the script; not shipped)
+assets-src/fonts/*.otf

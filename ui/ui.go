@@ -9,8 +9,6 @@ import (
 	"image/gif"
 	"net/url"
 	"os"
-	"os/exec"
-	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -18,22 +16,13 @@ import (
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
 	"fyne.io/fyne/v2/canvas"
-	"fyne.io/fyne/v2/layout"
-	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
-	"golang.org/x/image/font"
-	"golang.org/x/image/font/basicfont"
-	"golang.org/x/image/math/fixed"
 
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/driver/desktop"
-	"github.com/disintegration/imaging"
 	"github.com/dixieflatline76/Spice/v2/asset"
 	"github.com/dixieflatline76/Spice/v2/config"
-	"github.com/dixieflatline76/Spice/v2/pkg/api"
-	"github.com/dixieflatline76/Spice/v2/pkg/hotkey"
 	"github.com/dixieflatline76/Spice/v2/pkg/i18n"
-	"github.com/dixieflatline76/Spice/v2/pkg/provider"
 	"github.com/dixieflatline76/Spice/v2/pkg/sysinfo"
 	"github.com/dixieflatline76/Spice/v2/pkg/ui"
 	"github.com/dixieflatline76/Spice/v2/pkg/ui/schema"
@@ -47,16 +36,29 @@ type SpiceApp struct {
 	fyne.App
 	assetMgr     *asset.Manager
 	trayMenu     *fyne.Menu
-	splash       fyne.Window   // Splash window for initial setup
-	notifiers    []ui.Notifier // List of notifiers to activate
-	plugins      []ui.Plugin   // List of plugins to activate
-	os           OS            // Operating system interface
+	splash       fyne.Window // Splash window for initial setup
+	plugins      []ui.Plugin // List of plugins to activate
+	os           OS          // Operating system interface
 	appConfig    *config.AppConfig
-	prefsWindow  fyne.Window        // Singleton preferences window
-	prefsTabs    *container.AppTabs // Reference to the main tabs in preferences
-	tabItems     map[string]*container.TabItem
+	prefsWindow  fyne.Window      // Singleton preferences window
+	prefsNav     *prefsNavigation // Side navigation of the preferences window
+	prefsSM      *SettingsManager // Settings manager of the preferences window
 	trayMu       sync.Mutex
 	trayDebounce *time.Timer
+
+	// The tray menu the app draws itself (Windows); nil uses the native menu.
+	popup       trayPopup
+	popupFailed bool
+	trayIconMu  sync.Mutex
+	trayIcons   map[string]fyne.Resource
+	update      *trayUpdate // a newer version to offer, if any
+	tuneWindow  fyne.Window // the open Tune Image window, if any (T-L)
+}
+
+// trayUpdate is the "Update to …" item the update check adds to the tray.
+type trayUpdate struct {
+	version string
+	url     *url.URL
 }
 
 // OS interface defines methods for transforming the application state
@@ -131,11 +133,6 @@ func (sa *SpiceApp) GetAssetManager() *asset.Manager {
 	return sa.assetMgr
 }
 
-// RegisterNotifier registers a notifier with the application
-func (sa *SpiceApp) RegisterNotifier(notifier ui.Notifier) {
-	sa.notifiers = append(sa.notifiers, notifier)
-}
-
 // GetApplication returns the singleton instance of the application
 func GetApplication() ui.App {
 	return getInstance()
@@ -145,31 +142,27 @@ func GetApplication() ui.App {
 func getInstance() *SpiceApp {
 	// Create a new instance of the application if it doesn't exist
 	saOnce.Do(func() {
-		fmt.Fprintln(os.Stderr, "[Spice] getInstance: starting")
+		fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: starting")
 
 		// Initialize the wallpaper service for right OS
 		currentOS := getOS()
-		fmt.Fprintln(os.Stderr, "[Spice] getInstance: OS interface created")
+		fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: OS interface created")
 
 		a := app.NewWithID(config.AppName)
-		fmt.Fprintln(os.Stderr, "[Spice] getInstance: Fyne app created")
+		fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: Fyne app created")
 
 		if _, ok := a.(desktop.App); ok {
-			fmt.Fprintln(os.Stderr, "[Spice] getInstance: desktop.App confirmed")
+			fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: desktop.App confirmed")
 
 			saInstance = &SpiceApp{
 				App:      a,
 				assetMgr: asset.NewManager(),
 				trayMenu: fyne.NewMenu(""),
-				notifiers: []ui.Notifier{func(title, message string) {
-					a.SendNotification(fyne.NewNotification(title, message))
-				}},
 				plugins:  []ui.Plugin{},
 				os:       currentOS,
-				tabItems: make(map[string]*container.TabItem),
 			}
 			saInstance.appConfig = config.NewAppConfig(saInstance.Preferences())
-			fmt.Fprintln(os.Stderr, "[Spice] getInstance: app config loaded")
+			fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: app config loaded")
 
 			// Apply saved debug logging preference
 			if saInstance.appConfig.GetDebugLoggingEnabled() {
@@ -180,19 +173,11 @@ func getInstance() *SpiceApp {
 			i18n.SetLanguage(saInstance.appConfig.GetLanguage())
 
 			// Apply saved theme
-			currentTheme := saInstance.appConfig.GetTheme()
-			switch currentTheme {
-			case "Dark":
-				saInstance.Settings().SetTheme(&forcedVariantTheme{Theme: theme.DefaultTheme(), variant: theme.VariantDark})
-			case "Light":
-				saInstance.Settings().SetTheme(&forcedVariantTheme{Theme: theme.DefaultTheme(), variant: theme.VariantLight})
-			default:
-				saInstance.Settings().SetTheme(&spiceTheme{Theme: theme.DefaultTheme()})
-			}
-			fmt.Fprintln(os.Stderr, "[Spice] getInstance: theme applied")
+			applyTheme(saInstance.App, parseThemeMode(saInstance.appConfig.GetTheme()), saInstance.appConfig.GetAccent())
+			fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: theme applied")
 
 			saInstance.verifyEULA()
-			fmt.Fprintln(os.Stderr, "[Spice] getInstance: EULA verified")
+			fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: EULA verified")
 
 			// Setup OS-specific lifecycle hooks (e.g. Chrome OS Pseudo-Tray)
 			saInstance.os.SetupLifecycle(saInstance.App, saInstance)
@@ -206,25 +191,13 @@ func getInstance() *SpiceApp {
 					wp.SyncMonitors(false)
 				}
 			})
-			fmt.Fprintln(os.Stderr, "[Spice] getInstance: lifecycle hooks set")
+			fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: lifecycle hooks set")
 		} else {
-			fmt.Fprintln(os.Stderr, "[Spice] getInstance: FATAL — not a desktop.App")
-			utilLog.Fatal("Spice not supported on this platform")
+			fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: FATAL — not a desktop.App")
+			utilLog.Fatal("Paintpane not supported on this platform")
 		}
 	})
 	return saInstance
-}
-
-// NotifyUser sends a notification to the user via all registered notifiers
-func (sa *SpiceApp) NotifyUser(title, message string) {
-	// Check if notifications are enabled
-	if !sa.appConfig.GetAppNotificationsEnabled() {
-		return
-	}
-
-	for _, notify := range sa.notifiers {
-		notify(title, message)
-	}
 }
 
 // CreateTrayMenu creates the tray menu for the application
@@ -235,72 +208,116 @@ func (sa *SpiceApp) CreateTrayMenu() {
 		}
 	}()
 	utilLog.Debug("CreateTrayMenu: Starting...")
+	if _, ok := sa.App.(desktop.App); !ok {
+		return
+	}
+
+	var items []schema.MenuItemSchema
+	for i, plugin := range sa.plugins {
+		utilLog.Debugf("CreateTrayMenu: Processing plugin %s...", plugin.Name())
+		menuSchema := plugin.CreateTrayMenu()
+		if menuSchema == nil {
+			continue
+		}
+		if i == 0 {
+			items = append(items, menuSchema.Items...)
+		} else {
+			items = append(items, schema.MenuItemSchema{
+				Label:   plugin.Name(),
+				SubMenu: &schema.MenuSchema{Label: plugin.Name(), Items: menuSchema.Items},
+			})
+		}
+	}
+	items = append(items, sa.updateMenuItems()...)
+	sa.setTrayMenu(items)
+}
+
+// updateMenuItems is the tray's update item when a newer version was found (T14, prototype
+// v36): its own group just above the Settings / Quit footer, a download icon and bold text
+// "Update to v1.0.1", opening the release page. It is the only sign of a new version; the app
+// sends no notification (v35).
+func (sa *SpiceApp) updateMenuItems() []schema.MenuItemSchema {
+	u := sa.update
+	if u == nil {
+		return nil
+	}
+	return []schema.MenuItemSchema{{IsSeparator: true}, {
+		Label:    i18n.Tf("Update to {{.Version}}", map[string]any{"Version": u.version}),
+		IconName: "download.png",
+		Glyph:    "download",
+		Emphasis: true,
+		Action: func() {
+			if err := sa.OpenURL(u.url); err != nil {
+				utilLog.Printf("Failed to open release URL: %v", err)
+			}
+		},
+	}}
+}
+
+// trayFooter is the last row of the tray menu: Settings and Quit (T-S2).
+func (sa *SpiceApp) trayFooter() []schema.MenuItemSchema {
+	return []schema.MenuItemSchema{
+		{
+			Label:    i18n.T("Settings…"),
+			IconName: "prefs.png",
+			Glyph:    "settings",
+			Action:   func() { sa.CreatePreferencesWindow("") },
+		},
+		{
+			Label:    i18n.T("Quit"),
+			IconName: "quit.png",
+			Glyph:    "quit",
+			Action:   sa.quit,
+		},
+	}
+}
+
+// quit deactivates the plugins and leaves.
+func (sa *SpiceApp) quit() {
+	if sa.popup != nil {
+		sa.popup.close()
+	}
+	sa.os.TransformToForeground()     // Ensure the app is in the foreground before quitting
+	time.Sleep(50 * time.Millisecond) // Small delay to ensure the OS processes the state change
+	sa.deactivateAllPlugins()         // Deactivate all plugins before quitting
+	time.Sleep(2 * time.Second)       // Small delay to ensure plugins are deactivate
+	utilLog.Println("Quitting Paintpane application")
+	sa.Quit()
+}
+
+// setTrayMenu shows items (plus the footer) in the tray: in the app-drawn
+// menu on Windows, and in the native menu, which other platforms show and the
+// debug API reads.
+func (sa *SpiceApp) setTrayMenu(items []schema.MenuItemSchema) {
 	desk, ok := sa.App.(desktop.App)
 	if !ok {
 		return
 	}
+	footer := sa.trayFooter()
+	items = sa.closeTuneBefore(items)
 
-	items := []*fyne.MenuItem{}
-	for i, plugin := range sa.plugins {
-		utilLog.Debugf("CreateTrayMenu: Processing plugin %s...", plugin.Name())
-		menuSchema := plugin.CreateTrayMenu()
-		if menuSchema != nil {
-			pluginItems := sa.renderMenuSchema(menuSchema)
-			if i == 0 {
-				items = append(items, pluginItems...)
-			} else {
-				pluginSubmenu := fyne.NewMenuItem(plugin.Name(), nil)
-				pluginSubmenu.ChildMenu = fyne.NewMenu(plugin.Name(), pluginItems...)
-				items = append(items, pluginSubmenu)
-			}
-		}
-	}
-
-	items = append(items, fyne.NewMenuItemSeparator())
-	items = append(items, sa.CreateMenuItem(i18n.T("Preferences"), func() {
-		sa.CreatePreferencesWindow("")
-	}, "prefs.png"))
-
-	items = append(items, fyne.NewMenuItemSeparator())
-	items = append(items, sa.CreateMenuItem(i18n.T("Help"), func() {
-		u, _ := url.Parse("https://spicebox.dev/support.html")
-		if u != nil {
-			_ = sa.OpenURL(u)
-		}
-	}, "help.png"))
-	items = append(items, sa.CreateMenuItem(i18n.T("About Spice"), func() {
-		sa.CreateAboutSplash()
-	}, "tray.png"))
-
-	quitItem := sa.CreateMenuItem(i18n.T("Quit"), func() {
-		sa.os.TransformToForeground()     // Ensure the app is in the foreground before quitting
-		time.Sleep(50 * time.Millisecond) // Small delay to ensure the OS processes the state change
-		sa.deactivateAllPlugins()         // Deactivate all plugins before quitting
-		time.Sleep(2 * time.Second)       // Small delay to ensure plugins are deactivate
-		utilLog.Println("Quitting Spice application")
-		sa.Quit()
-	}, "quit.png")
+	native := sa.renderMenuSchema(&schema.MenuSchema{Items: items})
+	settingsItem := sa.CreateMenuItem(footer[0].Label, footer[0].Action, footer[0].IconName)
+	quitItem := sa.CreateMenuItem(footer[1].Label, footer[1].Action, footer[1].IconName)
 	quitItem.IsQuit = true
-	items = append(items, fyne.NewMenuItemSeparator(), quitItem)
+	native = append(native, fyne.NewMenuItemSeparator(), settingsItem, fyne.NewMenuItemSeparator(), quitItem)
+	sa.trayMenu = fyne.NewMenu("", native...)
 
-	sa.trayMenu = fyne.NewMenu("", items...)
 	trayIcon, err := sa.assetMgr.GetIcon("tray.png")
 	if err != nil {
 		utilLog.Printf("ERROR: Failed to load tray icon: %v", err)
 	}
-
 	sa.SetIcon(trayIcon)
 
 	utilLog.Debug("Calling desk.SetSystemTrayMenu...")
 	desk.SetSystemTrayMenu(sa.trayMenu)
-	utilLog.Debug("desk.SetSystemTrayMenu finished.")
-
 	if trayIcon != nil {
-		utilLog.Debug("Calling desk.SetSystemTrayIcon...")
 		desk.SetSystemTrayIcon(trayIcon)
-		utilLog.Debug("desk.SetSystemTrayIcon finished.")
-	} else {
-		utilLog.Debug("Skipping desk.SetSystemTrayIcon (icon is nil)")
+	}
+
+	sa.installTrayPopup()
+	if sa.popup != nil {
+		sa.popup.setMenu(items, footer)
 	}
 	utilLog.Debug("System Tray Menu and Icon setup process completed.")
 }
@@ -315,16 +332,22 @@ func (sa *SpiceApp) renderMenuSchema(m *schema.MenuSchema) []*fyne.MenuItem {
 			items = append(items, fyne.NewMenuItemSeparator())
 			continue
 		}
+		// An item with its own icon bytes (a provider logo) names the resource
+		// with IconName; it is not an embedded icon file, so do not look it up.
+		embeddedIcon := item.IconName
+		if len(item.IconBytes) > 0 {
+			embeddedIcon = ""
+		}
 		var mi *fyne.MenuItem
 		if item.SubMenu != nil {
 			subItems := sa.renderMenuSchema(item.SubMenu)
-			mi = sa.CreateMenuItem(item.Label, item.Action, item.IconName)
+			mi = sa.CreateMenuItem(item.Label, item.Action, embeddedIcon)
 			if len(item.IconBytes) > 0 {
 				mi.Icon = fyne.NewStaticResource(item.IconName, item.IconBytes)
 			}
 			mi.ChildMenu = fyne.NewMenu(item.Label, subItems...)
 		} else {
-			mi = sa.CreateMenuItem(item.Label, item.Action, item.IconName)
+			mi = sa.CreateMenuItem(item.Label, item.Action, embeddedIcon)
 			if len(item.IconBytes) > 0 {
 				mi.Icon = fyne.NewStaticResource(item.IconName, item.IconBytes)
 			}
@@ -340,48 +363,35 @@ func (sa *SpiceApp) renderMenuSchema(m *schema.MenuSchema) []*fyne.MenuItem {
 	return items
 }
 
-// LockTrayMenu replaces the system tray with a minimal locked menu during tuning
-func (sa *SpiceApp) LockTrayMenu(activeWindow fyne.Window) {
-	desk, ok := sa.App.(desktop.App)
-	if !ok {
-		return
+// closeTuneBefore returns a copy of items in which every item that changes the
+// image or the wallpaper first closes Tune Image (T-L, option 2): the tray
+// stays usable while Tune Image is open.
+func (sa *SpiceApp) closeTuneBefore(items []schema.MenuItemSchema) []schema.MenuItemSchema {
+	out := make([]schema.MenuItemSchema, len(items))
+	for i, it := range items {
+		if it.SubMenu != nil {
+			sub := *it.SubMenu
+			sub.Items = sa.closeTuneBefore(sub.Items)
+			it.SubMenu = &sub
+		}
+		if action := it.Action; it.ChangesWallpaper && action != nil {
+			it.Action = func() {
+				sa.closeTuneImage()
+				action()
+			}
+		}
+		out[i] = it
 	}
+	return out
+}
 
-	items := []*fyne.MenuItem{}
-
-	disabledItem := sa.CreateMenuItem(i18n.T("Controls Disabled"), nil, "")
-	disabledItem.Disabled = true
-	items = append(items, disabledItem)
-
-	items = append(items, sa.CreateMenuItem(i18n.T("Close Tuning to Resume"), func() {
-		if activeWindow != nil {
-			activeWindow.RequestFocus()
-		}
-	}, ""))
-
-	items = append(items, fyne.NewMenuItemSeparator())
-	items = append(items, sa.CreateMenuItem(i18n.T("Help"), func() {
-		u, _ := url.Parse("https://spicebox.dev/support.html")
-		if u != nil {
-			_ = sa.OpenURL(u)
-		}
-	}, "help.png"))
-	items = append(items, sa.CreateMenuItem(i18n.T("About Spice"), func() {
-		sa.CreateAboutSplash()
-	}, "tray.png"))
-
-	quitItem := sa.CreateMenuItem(i18n.T("Quit"), func() {
-		sa.os.TransformToForeground()
-		time.Sleep(50 * time.Millisecond)
-		sa.deactivateAllPlugins()
-		time.Sleep(2 * time.Second)
-		sa.Quit()
-	}, "quit.png")
-	quitItem.IsQuit = true
-	items = append(items, fyne.NewMenuItemSeparator(), quitItem)
-
-	menu := fyne.NewMenu("", items...)
-	desk.SetSystemTrayMenu(menu)
+// closeTuneImage closes the Tune Image window, if open, as if the user had
+// closed it. Call it on the main thread.
+func (sa *SpiceApp) closeTuneImage() {
+	if w := sa.tuneWindow; w != nil {
+		sa.tuneWindow = nil
+		w.Close()
+	}
 }
 
 // DeactivateAllPlugins deactivates all plugins in the application
@@ -447,122 +457,13 @@ func (sa *SpiceApp) CreateToggleMenuItem(label string, action func(bool), iconNa
 	return mi
 }
 
-// addVersionWatermark adds a version watermark to the given image.
-func (sa *SpiceApp) addVersionWatermark(img image.Image) (image.Image, error) {
-
-	versionString := fmt.Sprintf("Version: %s", config.AppVersion)
-
-	// Create a watermark image
-	watermark := imaging.New(img.Bounds().Dx(), img.Bounds().Dy(), color.Transparent)
-
-	// Add the label directly to the watermark image
-	col := color.RGBA{100, 50, 0, 200} // Dark brown with some transparency
-
-	// Calculate the width of the text
-	bounds, _ := font.BoundString(basicfont.Face7x13, versionString)
-	textWidth := bounds.Max.X.Ceil()
-
-	//nolint:gosec // G115: integer overflow conversion int -> int32. We assume reasonable usage for UI dimensions.
-	point := fixed.Point26_6{
-		X: fixed.Int26_6((img.Bounds().Dx() - textWidth - 10) * 64), // Offset from right edge, accounting for text width
-		Y: fixed.Int26_6((img.Bounds().Dy() - 10) * 64),             // Offset from bottom edge
-	}
-
-	d := &font.Drawer{
-		Dst:  watermark,
-		Src:  image.NewUniform(col),
-		Face: basicfont.Face7x13, // Use the basic font
-		Dot:  point,
-	}
-	d.DrawString(versionString)
-
-	// Overlay the watermark
-	dst := imaging.Overlay(img, watermark, image.Pt(0, 0), 1)
-	return dst, nil
-}
-
-// CreateSplashScreen creates a splash screen for the application
-func (sa *SpiceApp) CreateSplashScreen(seconds int) {
-	// Guard: skip splash if OpenGL is unavailable (Fyne GLFW would crash).
-	if !sysinfo.CanCreateWindows() {
-		utilLog.Println("OpenGL unavailable — skipping splash screen")
-		sa.os.TransformToBackground()
-		return
-	}
-
-	defer func() {
-		if r := recover(); r != nil {
-			errStr := fmt.Sprintf("%v", r)
-			utilLog.Printf("Recovered from splash screen creation panic: %v", errStr)
-			if strings.Contains(strings.ToLower(errStr), "apiunavailable") || strings.Contains(strings.ToLower(errStr), "wgl") || strings.Contains(strings.ToLower(errStr), "opengl") {
-				ShowNativeFallbackAlert(i18n.T("Graphics Error"), i18n.T("Spice requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
-			}
-		}
-	}()
-
-	if sa.splash == nil {
-		// Create a splash screen with the application icon
-		drv, ok := sa.Driver().(desktop.Driver)
-		if !ok {
-			utilLog.Println("Splash screen not supported")
-			return // Splash screen not supported
-		}
-
-		splashWindow := drv.CreateSplashWindow()
-		if splashWindow == nil {
-			utilLog.Println("Failed to create splash window (driver returned nil)")
-			ShowNativeFallbackAlert(i18n.T("Graphics Error"), i18n.T("Spice requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
-			return
-		}
-
-		// Load the splash image
-		splashImg, err := sa.assetMgr.GetImage("splash.png")
-		if err != nil {
-			utilLog.Fatalf("Failed to load splash image: %v", err)
-		}
-
-		// Create a watermark image
-		watermarkSplashImg, err := sa.addVersionWatermark(splashImg)
-		if err == nil {
-			splashImg = watermarkSplashImg
-		}
-
-		// Create an image canvas object
-		img := canvas.NewImageFromImage(splashImg)
-		img.FillMode = canvas.ImageFillOriginal // Ensure the image keeps its original size
-
-		// Set the splash window content and show it
-		splashWindow.SetContent(img)
-		splashWindow.Resize(fyne.NewSize(300, 300))
-		splashWindow.CenterOnScreen()
-		sa.splash = splashWindow
-	}
-
-	// Show the splash screen immediately after creation
-	sa.splash.Show()
-
-	// Hide the splash screen after the animation loop
-	// CRITICAL: We must NOT sleep on the main thread (fyne.Do), or the UI freezes and GIF won't animate.
-	go func() {
-		duration := time.Duration(seconds) * time.Second
-		time.Sleep(duration)
-		fyne.Do(func() {
-			if sa.splash != nil {
-				sa.splash.Hide() // Close the splash window
-				sa.splash = nil
-			}
-			sa.os.TransformToBackground() // Transform the app to background state
-		})
-	}()
-}
-
 // CreatePreferencesWindow creates and displays the preferences window.
 // If the window is already open, it brings it to the front.
 func (sa *SpiceApp) CreatePreferencesWindow(initialTab string) {
 	// Guard: skip if OpenGL is unavailable (Fyne GLFW would crash process)
 	if !sysinfo.CanCreateWindows() {
 		utilLog.Println("OpenGL unavailable — preferences window cannot be created")
-		ShowNativeFallbackAlert(i18n.T("Graphics Error"), i18n.T("Spice requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
+		ShowNativeFallbackAlert(i18n.T("Graphics error"), i18n.T("Paintpane requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
 		return
 	}
 
@@ -571,11 +472,6 @@ func (sa *SpiceApp) CreatePreferencesWindow(initialTab string) {
 	// If window already exists, just show it and switch tab if requested
 	if sa.prefsWindow != nil {
 		sa.RebuildPreferencesContent(initialTab) // Rebuild to pick up any new pendingAddUrls
-		if initialTab != "" && sa.tabItems != nil {
-			if item, ok := sa.tabItems[initialTab]; ok {
-				sa.prefsTabs.Select(item)
-			}
-		}
 		sa.prefsWindow.Show()
 		sa.prefsWindow.RequestFocus()
 		return
@@ -589,16 +485,16 @@ func (sa *SpiceApp) CreatePreferencesWindow(initialTab string) {
 				errStr := fmt.Sprintf("%v", r)
 				utilLog.Printf("Recovered from preferences window creation panic: %v", errStr)
 				if strings.Contains(strings.ToLower(errStr), "apiunavailable") || strings.Contains(strings.ToLower(errStr), "wgl") || strings.Contains(strings.ToLower(errStr), "opengl") {
-					ShowNativeFallbackAlert(i18n.T("Graphics Error"), i18n.T("Spice requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
+					ShowNativeFallbackAlert(i18n.T("Graphics error"), i18n.T("Paintpane requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
 				}
 			}
 		}()
-		prefsWindow = sa.NewWindow(fmt.Sprintf("%s %s", config.AppName, i18n.T("Preferences")))
+		prefsWindow = sa.NewWindow(i18n.T("Paintpane settings"))
 	}()
 
 	if prefsWindow == nil {
 		utilLog.Println("Preferences window creation failed (returned nil or recovered)")
-		ShowNativeFallbackAlert(i18n.T("Graphics Error"), i18n.T("Spice requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
+		ShowNativeFallbackAlert(i18n.T("Graphics error"), i18n.T("Paintpane requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
 		return
 	}
 
@@ -609,10 +505,10 @@ func (sa *SpiceApp) CreatePreferencesWindow(initialTab string) {
 		defer func() {
 			if r := recover(); r != nil {
 				utilLog.Printf("Recovered from preferences window setup panic: %v", r)
-				ShowNativeFallbackAlert(i18n.T("Graphics Error"), i18n.T("Spice requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
+				ShowNativeFallbackAlert(i18n.T("Graphics error"), i18n.T("Paintpane requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
 				// Clean up the broken window reference
 				sa.prefsWindow = nil
-				sa.prefsTabs = nil
+				sa.prefsNav = nil
 			}
 		}()
 
@@ -621,298 +517,42 @@ func (sa *SpiceApp) CreatePreferencesWindow(initialTab string) {
 		// Build and bind the UI contents first, so the layout engine knows existing elements.
 		sa.RebuildPreferencesContent(initialTab)
 
-		// Fyne is notoriously stubborn about window minimum sizes.
-		// Since UI scales dynamically, we cannot rely on hardcoded logical or physical sizes.
-		// We read the layout engine's absolute Minimum Size for this content:
-		minSize := prefsWindow.Content().MinSize()
-
-		// The user concluded that ~700 logical pixels at 175% Windows scaling was the perfect physical width.
-		// 700 * 1.75 = 1225 physical pixels.
-		// To prevent the window from being "microscopic" when Windows is set to 100% scaling,
-		// we calculate the required Fyne logical width to maintain a ~1225px physical footprint on screen.
+		// Size: the size the user last left the window at, or a fixed logical
+		// default, never smaller than the content needs or larger than 90% of the screen.
+		targetWidth, targetHeight := sa.savedPrefsWindowSize()
+		if minW := prefsWindow.Content().MinSize().Width; targetWidth < minW {
+			targetWidth = minW
+		}
 		osScale := sysinfo.GetOSDisplayScale()
 		if osScale <= 0 {
 			osScale = 1.0
 		}
-
-		targetWidth := float32(1225) / osScale
-
-		// Protect against Fyne's layout engine crushing the form fields if the text size demands more space.
-		if targetWidth < minSize.Width*1.25 {
-			targetWidth = minSize.Width * 1.25
+		if physWidth, physHeight, err := sysinfo.GetScreenDimensions(); err == nil && physWidth > 0 && physHeight > 0 {
+			maxW := float32(physWidth) / osScale * 0.9
+			maxH := float32(physHeight) / osScale * 0.9
+			targetWidth = fyne.Min(targetWidth, maxW)
+			targetHeight = fyne.Min(targetHeight, maxH)
 		}
 
-		// Derive height from actual screen height so it's always proportional to the display,
-		// regardless of scaling factor. Target 85% of logical screen height.
-		_, physHeight, err := sysinfo.GetScreenDimensions()
-		logicalScreenHeight := float32(physHeight) / osScale
-		targetHeight := targetWidth * 1.0 // Default: square (fallback if screen detection fails)
-
-		if err == nil && logicalScreenHeight > 0 {
-			targetHeight = logicalScreenHeight * 0.85
-
-			// Don't let the window be taller than it is wide
-			if targetHeight > targetWidth {
-				targetHeight = targetWidth
-			}
-		}
 		prefsWindow.SetOnClosed(func() {
+			// Apply any change made just before closing.
+			if sa.prefsSM != nil {
+				sa.prefsSM.FlushPending()
+				sa.prefsSM = nil
+			}
+			sa.savePrefsWindowSize(prefsWindow.Canvas().Size())
 			sa.os.TransformToBackground()
 			sa.prefsWindow = nil // Clear reference on close
-			sa.prefsTabs = nil   // Clear tabs reference
+			sa.prefsNav = nil    // Clear navigation reference
 		})
 
-		// Now that targetWidth and targetHeight are guaranteed to be >= MinSize,
-		// we can safely call Resize before Show. This ensures macOS and Wayland
-		// allocate the correct framebuffer size before the first paint, preventing
-		// viewport clipping and the need for manual resizing/refresh hacks.
+		// Resize before Show so macOS and Wayland allocate the right framebuffer
+		// size before the first paint.
 		prefsWindow.Resize(fyne.NewSize(targetWidth, targetHeight))
 		prefsWindow.CenterOnScreen()
 		prefsWindow.Show()
+		styleTitleBar(prefsWindow)
 	}()
-}
-
-// RebuildPreferencesContent rebuilds the content of the preferences window.
-// This allows refreshing the UI (e.g. to show "Add Query" dialogs) even if the window is already open.
-func (sa *SpiceApp) RebuildPreferencesContent(initialTab string) {
-	if sa.prefsWindow == nil {
-		return
-	}
-
-	sm := NewSettingsManager(sa.prefsWindow)
-	sm.RegisterOnSettingsSaved(func() {
-		sa.RebuildTrayMenu()
-	})
-
-	// --- General Tab ---
-	// Theme Selection
-	themeOptions := []string{i18n.T("System"), i18n.T("Dark"), i18n.T("Light")}
-	currentTheme := sa.appConfig.GetTheme()
-	initialThemeIndex := 0
-	for i, t := range themeOptions {
-		if t == currentTheme {
-			initialThemeIndex = i
-			break
-		}
-	}
-
-	// Language Selection
-	langOptions := i18n.GetLanguageNames()
-	langDisplayOptions := i18n.GetLanguageNames()
-	langDisplayOptions[0] = i18n.T("System Default")
-	currentLang := sa.appConfig.GetLanguage()
-	initialLangIndex := 0
-	for idx, l := range langOptions {
-		if l == currentLang {
-			initialLangIndex = idx
-			break
-		}
-	}
-
-	generalSchema := schema.PanelSchema{
-		Sections: []schema.SectionSchema{
-			{
-				Title: i18n.T("General Application Settings"),
-				Items: []schema.ItemSchema{
-					schema.ButtonItem{
-						Name:       "manageWindowsStartup",
-						Label:      i18n.T("Start with Windows:"),
-						Help:       i18n.T("Spice registers itself to start with Windows. Click to open Windows Settings to enable or disable this feature."),
-						ButtonText: i18n.T("Manage in Windows Settings"),
-						OnPressed: func() {
-							u, _ := url.Parse("ms-settings:startupapps")
-							if u != nil {
-								_ = sa.OpenURL(u)
-							}
-						},
-						VisibleIf: func() bool {
-							return runtime.GOOS == "windows"
-						},
-					},
-					schema.ButtonItem{
-						Name:       "manageMacStartup",
-						Label:      i18n.T("Start at Login:"),
-						Help:       i18n.T("Click to open macOS System Settings to add or remove Spice from your Login Items."),
-						ButtonText: i18n.T("Manage in macOS Settings"),
-						OnPressed: func() {
-							_ = exec.Command("open", "x-apple.systempreferences:com.apple.LoginItems-Settings.extension").Start()
-						},
-						VisibleIf: func() bool {
-							return runtime.GOOS == "darwin"
-						},
-					},
-					schema.BoolItem{
-						Name:         "enableNotifications",
-						InitialValue: sa.appConfig.GetAppNotificationsEnabled(),
-						Label:        i18n.T("Enable System Notifications:"),
-						Help:         i18n.T("Enable or disable system notifications from Spice."),
-						ApplyFunc: func(b bool) {
-							sa.appConfig.SetAppNotificationsEnabled(b)
-						},
-					},
-					schema.BoolItem{
-						Name:         "enableUpdateCheck",
-						InitialValue: sa.appConfig.GetUpdateCheckEnabled(),
-						Label:        i18n.T("Enable New Version Check:"),
-						Help:         i18n.T("Automatically check for new versions of Spice on startup."),
-						ApplyFunc: func(b bool) {
-							sa.appConfig.SetUpdateCheckEnabled(b)
-						},
-						VisibleIf: func() bool { return !config.IsStoreDistribution() },
-					},
-					schema.BoolItem{
-						Name:         "enableShortcuts",
-						InitialValue: !wallpaper.GetInstance().GetShortcutsDisabled(),
-						Label:        i18n.T("Enable global shortcuts:"),
-						Help:         i18n.T("Use keyboard shortcuts to control wallpapers. Disable if they conflict with other apps."),
-						ApplyFunc: func(val bool) {
-							wallpaper.GetInstance().SetShortcutsDisabled(!val)
-							hotkey.StartListeners(GetPluginManager())
-						},
-					},
-					schema.BoolItem{
-						Name:         "enableTargetedShortcuts",
-						InitialValue: !wallpaper.GetInstance().GetTargetedShortcutsDisabled(),
-						Label:        i18n.T("Enable Display Specific Shortcuts (Alt + Arrow + 1-9):"),
-						Help:         i18n.T("Disable this if Alt+Arrow conflicts with your browser or other apps."),
-						ApplyFunc: func(val bool) {
-							wallpaper.GetInstance().SetTargetedShortcutsDisabled(!val)
-							hotkey.StartListeners(GetPluginManager())
-						},
-						EnabledIf: func() bool {
-							val := sm.GetValue("enableShortcuts")
-							if val == nil {
-								return true
-							}
-							return val.(bool)
-						},
-					},
-					schema.HyperlinkItem{
-						ID:   "shortcutsLink",
-						Text: i18n.T("View all shortcuts →"),
-						URL:  "https://github.com/dixieflatline76/Spice/blob/main/docs/user_guide.md#keyboard-shortcuts",
-					},
-					schema.SelectItem{
-						Name:         "theme",
-						Options:      themeOptions,
-						InitialValue: initialThemeIndex,
-						Label:        i18n.T("Theme:"),
-						Help:         i18n.T("Select the application theme."),
-						ApplyFunc: func(val interface{}) {
-							selectedIndex := val.(int)
-							if selectedIndex < 0 || selectedIndex >= len(themeOptions) {
-								return
-							}
-							selectedTheme := themeOptions[selectedIndex]
-							sa.appConfig.SetTheme(selectedTheme)
-
-							switch selectedTheme {
-							case "Dark":
-								sa.Settings().SetTheme(&forcedVariantTheme{Theme: theme.DefaultTheme(), variant: theme.VariantDark})
-							case "Light":
-								sa.Settings().SetTheme(&forcedVariantTheme{Theme: theme.DefaultTheme(), variant: theme.VariantLight})
-							default:
-								sa.Settings().SetTheme(&spiceTheme{Theme: theme.DefaultTheme()})
-							}
-						},
-					},
-					schema.SelectItem{
-						Name:         "language",
-						Options:      langDisplayOptions,
-						InitialValue: initialLangIndex,
-						Label:        i18n.T("Language:"),
-						Help:         i18n.T("Select the application language. Restart may be required for full effect."),
-						NeedsRefresh: true,
-						ApplyFunc: func(val interface{}) {
-							selectedIndex := val.(int)
-							if selectedIndex < 0 || selectedIndex >= len(langOptions) {
-								return
-							}
-							selectedLang := langOptions[selectedIndex]
-							sa.appConfig.SetLanguage(selectedLang)
-							i18n.SetLanguage(selectedLang)
-
-							if srv := api.GetServer(); srv != nil {
-								if err := srv.BroadcastLanguage(i18n.GetLanguage()); err != nil {
-									utilLog.Printf("Failed to broadcast language change to extensions: %v", err)
-								}
-							}
-
-							activeID := "App"
-							selected := sa.prefsTabs.Selected()
-							for id, item := range sa.tabItems {
-								if item == selected {
-									activeID = id
-									break
-								}
-							}
-							sa.RebuildPreferencesContent(activeID)
-							sa.RebuildTrayMenu()
-						},
-					},
-					schema.BoolItem{
-						Name:         "enableDebugLogging",
-						InitialValue: sa.appConfig.GetDebugLoggingEnabled(),
-						Label:        i18n.T("Enable Debug Logging:"),
-						Help:         i18n.T("Write verbose debug entries to the log file. Useful for troubleshooting."),
-						ApplyFunc: func(b bool) {
-							sa.appConfig.SetDebugLoggingEnabled(b)
-							utilLog.SetDebugEnabled(b)
-						},
-					},
-				},
-			},
-		},
-	}
-
-	generalContainer := sm.RenderSchema(generalSchema)
-
-	// Initialize/Reset tab mapping
-	sa.tabItems = make(map[string]*container.TabItem)
-
-	generalTabItem := container.NewTabItem(i18n.T("App"), generalContainer)
-	sa.tabItems["App"] = generalTabItem
-
-	// --- Plugin Tabs ---
-	var pluginTabItems []*container.TabItem
-	for _, plugin := range sa.plugins {
-		// Create a tab for each plugin
-		prefsSchema := plugin.CreatePrefsSchema(sm)
-		if prefsSchema != nil {
-			pluginContainer := sm.RenderTabs(*prefsSchema)
-			item := container.NewTabItem(plugin.Name(), pluginContainer)
-			sa.tabItems[plugin.ID()] = item
-			pluginTabItems = append(pluginTabItems, item)
-		}
-	}
-
-	// Combine all tabs
-	tabs := container.NewAppTabs(generalTabItem)
-	sa.prefsTabs = tabs // Store reference for dynamic switching
-	for _, item := range pluginTabItems {
-		tabs.Append(item)
-	}
-
-	// Select the initial tab if specified
-	if initialTab != "" {
-		if item, ok := sa.tabItems[initialTab]; ok {
-			tabs.Select(item)
-		}
-	}
-
-	closeButton := widget.NewButton(i18n.T("Close"), func() {
-		sa.prefsWindow.Close()
-	})
-
-	// Layout: Tabs take up the main space, Apply/Close buttons at the bottom
-	prefsWindowLayout := container.NewBorder(nil, container.NewVBox(sm.GetApplySettingsButton(), container.NewHBox(layout.NewSpacer(), closeButton)), nil, nil, tabs)
-
-	// Wrap in a minSizeOverride so Fyne doesn't enforce the full content height
-	// as the window's minimum size. Without this, Fyne silently ignores Resize()
-	// when the content's MinSize exceeds the target (e.g., accordion panels at 1352px
-	// on a 1440px screen at 100% scaling).
-	sa.prefsWindow.SetContent(newMinSizeContainer(prefsWindowLayout))
-	sm.GetCheckAndEnableApplyFunc()() // Trigger initial UI dependency refresh
 }
 
 // minSizeContainer wraps a CanvasObject and overrides its MinSize to prevent
@@ -958,31 +598,6 @@ func (r *minSizeRenderer) Objects() []fyne.CanvasObject {
 
 func (r *minSizeRenderer) Destroy() {}
 
-// spiceTheme wraps any Fyne theme to apply the Spice brand accent color.
-type spiceTheme struct {
-	fyne.Theme
-}
-
-func (t *spiceTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVariant) color.Color {
-	if name == theme.ColorNamePrimary {
-		return color.NRGBA{R: 0xFF, G: 0x98, B: 0x00, A: 255} // Spice warm amber
-	}
-	return t.Theme.Color(name, variant)
-}
-
-// forcedVariantTheme forces a specific variant (Dark or Light) and applies the Spice accent.
-type forcedVariantTheme struct {
-	fyne.Theme
-	variant fyne.ThemeVariant
-}
-
-func (t *forcedVariantTheme) Color(name fyne.ThemeColorName, _ fyne.ThemeVariant) color.Color {
-	if name == theme.ColorNamePrimary {
-		return color.NRGBA{R: 0xFF, G: 0x98, B: 0x00, A: 255} // Spice warm amber
-	}
-	return t.Theme.Color(name, t.variant)
-}
-
 // Start activates all plugins and runs the Fyne application
 func (sa *SpiceApp) Start() {
 
@@ -991,6 +606,7 @@ func (sa *SpiceApp) Start() {
 	if !config.IsStoreDistribution() {
 		go sa.StartStartupUpdateCheck()
 	}
+	go refreshAutostart() // keep an existing "start with Windows" entry pointing at this exe
 
 	// Activate all plugins
 	go func() {
@@ -1041,75 +657,22 @@ func (sa *SpiceApp) StartStartupUpdateCheck() {
 	sa.updateTrayMenu(updateInfo)
 }
 
-// updateTrayMenu adds or removes the "Update Available" menu item based on check results.
+// updateTrayMenu adds or removes the "Update to …" tray item based on check results.
 func (sa *SpiceApp) updateTrayMenu(info *util.CheckForUpdatesResult) {
 	fyne.Do(func() {
-		// First, create a new slice of items that excludes any previous update item.
-		newItems := make([]*fyne.MenuItem, 0)
-		for _, item := range sa.trayMenu.Items {
-			if !strings.HasPrefix(item.Label, updateMenuItemPrefix) {
-				newItems = append(newItems, item)
+		var next *trayUpdate
+		if info.UpdateAvailable {
+			releaseURL, err := url.Parse(info.ReleaseURL)
+			if err != nil {
+				utilLog.Printf("Could not parse release URL for update menu item: %v", err)
+				return
 			}
+			utilLog.Printf("New version available: %s", info.LatestVersion)
+			next = &trayUpdate{version: info.LatestVersion, url: releaseURL}
 		}
-		sa.trayMenu.Items = newItems
-
-		// If no update is available, we're done.
-		if !info.UpdateAvailable {
-			sa.trayMenu.Refresh()
-			return
-		}
-
-		// If an update IS available, create the new menu item.
-		releaseURL, err := url.Parse(info.ReleaseURL)
-		if err != nil {
-			utilLog.Printf("Could not parse release URL for update menu item: %v", err)
-			return
-		}
-		utilLog.Printf("New version available: %s", info.LatestVersion)
-
-		updateItem := sa.CreateMenuItem(
-			fmt.Sprintf("%s%s", updateMenuItemPrefix, info.LatestVersion),
-			func() {
-				if err := sa.OpenURL(releaseURL); err != nil {
-					utilLog.Printf("Failed to open release URL: %v", err)
-				}
-			},
-			"download.png",
-		)
-
-		// Find the insertion index (just before the separator above "About Spice").
-		insertIndex := -1
-		for i, item := range sa.trayMenu.Items {
-			if item.Label == i18n.T("About Spice") {
-				if i > 0 && sa.trayMenu.Items[i-1].IsSeparator {
-					insertIndex = i - 1
-				} else {
-					insertIndex = i
-				}
-				break
-			}
-		}
-
-		// Insert the new item at the correct position.
-		if insertIndex != -1 {
-			sa.trayMenu.Items = append(sa.trayMenu.Items[:insertIndex], append([]*fyne.MenuItem{updateItem}, sa.trayMenu.Items[insertIndex:]...)...)
-		} else {
-			// Fallback: add before the Quit button's separator if "About" isn't found.
-			for i, item := range sa.trayMenu.Items {
-				if item.Label == i18n.T("Quit") {
-					insertIndex = i - 1
-					break
-				}
-			}
-			if insertIndex != -1 {
-				sa.trayMenu.Items = append(sa.trayMenu.Items[:insertIndex], append([]*fyne.MenuItem{updateItem}, sa.trayMenu.Items[insertIndex:]...)...)
-			}
-		}
-
-		// Notify user of new version available
-		sa.NotifyUser(i18n.T("Spice: Update Available"), i18n.Tf("Click the tray icon to download version {{.Version}}.", map[string]any{"Version": info.LatestVersion}))
-
-		sa.trayMenu.Refresh()
+		sa.update = next
+		// The tray item is the only sign of a new version; no notification (prototype v35).
+		sa.CreateTrayMenu()
 	})
 }
 
@@ -1200,7 +763,7 @@ func (sa *SpiceApp) CreateAboutSplash() {
 			errStr := fmt.Sprintf("%v", r)
 			utilLog.Printf("ERROR: PANIC in CreateAboutSplash (likely stale GLFW context): %v", errStr)
 			if strings.Contains(strings.ToLower(errStr), "apiunavailable") || strings.Contains(strings.ToLower(errStr), "wgl") || strings.Contains(strings.ToLower(errStr), "opengl") {
-				ShowNativeFallbackAlert(i18n.T("Graphics Error"), i18n.T("Spice requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
+				ShowNativeFallbackAlert(i18n.T("Graphics error"), i18n.T("Paintpane requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
 			}
 		}
 	}()
@@ -1242,7 +805,21 @@ func (sa *SpiceApp) CreateAboutSplash() {
 
 	// Layout: Layer the version text over the image
 	textContainer := container.NewPadded(container.NewBorder(nil, versionLabel, nil, nil))
-	content := container.NewStack(img, textContainer)
+	// A click on the animation, or Esc, stops it and closes the splash (A).
+	closeSplash := func() {
+		if sa.splash == nil {
+			return
+		}
+		sa.splash.Hide()
+		sa.splash = nil
+		sa.os.TransformToBackground()
+	}
+	content := container.NewStack(img, textContainer, newTapCatcher(closeSplash))
+	splashWindow.Canvas().SetOnTypedKey(func(ev *fyne.KeyEvent) {
+		if ev.Name == fyne.KeyEscape {
+			closeSplash()
+		}
+	})
 
 	splashWindow.SetContent(content)
 	splashWindow.Resize(fyne.NewSize(300, 300)) // Scaled to 300px (Original)
@@ -1252,15 +829,7 @@ func (sa *SpiceApp) CreateAboutSplash() {
 
 	// Start manual animation loop with pre-rendered frames
 	go func() {
-		defer func() {
-			fyne.Do(func() {
-				if sa.splash != nil {
-					sa.splash.Hide()
-					sa.splash = nil
-				}
-				sa.os.TransformToBackground()
-			})
-		}()
+		defer fyne.Do(closeSplash)
 
 		// One full cycle
 		for i, frame := range frames {
@@ -1279,627 +848,4 @@ func (sa *SpiceApp) CreateAboutSplash() {
 			time.Sleep(delays[i])
 		}
 	}()
-}
-
-// Anchor popup shared palette — theme-aware highlight colors.
-// Active amber is consistent across themes; inactive/text adapt for readability.
-func anchorIsDarkTheme() bool {
-	settings := fyne.CurrentApp().Settings()
-	// Check if Spice has forced a specific theme variant
-	if ft, ok := settings.Theme().(*forcedVariantTheme); ok {
-		return ft.variant == theme.VariantDark
-	}
-	// Fall back to system theme
-	return settings.ThemeVariant() == theme.VariantDark
-}
-
-func anchorCellInactiveColor() color.NRGBA {
-	if anchorIsDarkTheme() {
-		return color.NRGBA{R: 50, G: 50, B: 58, A: 255} // dark slate
-	}
-	return color.NRGBA{R: 220, G: 220, B: 225, A: 255} // light gray
-}
-
-func anchorCellActiveColor() color.NRGBA {
-	return color.NRGBA{R: 0xFF, G: 0x98, B: 0x00, A: 255} // warm amber (both themes)
-}
-
-func anchorTextActiveColor() color.NRGBA {
-	return color.NRGBA{R: 30, G: 30, B: 35, A: 255} // dark text on amber (both themes)
-}
-
-func anchorTextInactiveColor() color.NRGBA {
-	if anchorIsDarkTheme() {
-		return color.NRGBA{R: 200, G: 200, B: 210, A: 255} // light text on dark
-	}
-	return color.NRGBA{R: 50, G: 50, B: 58, A: 255} // dark text on light
-}
-
-func anchorHeaderColor() color.NRGBA {
-	if anchorIsDarkTheme() {
-		return color.NRGBA{R: 220, G: 220, B: 225, A: 255}
-	}
-	return color.NRGBA{R: 40, G: 40, B: 45, A: 255}
-}
-
-func anchorDescColor() color.NRGBA {
-	if anchorIsDarkTheme() {
-		return color.NRGBA{R: 120, G: 120, B: 130, A: 255}
-	}
-	return color.NRGBA{R: 100, G: 100, B: 110, A: 255}
-}
-
-func anchorMonitorColor() color.NRGBA {
-	if anchorIsDarkTheme() {
-		return color.NRGBA{R: 150, G: 150, B: 160, A: 255}
-	}
-	return color.NRGBA{R: 70, G: 70, B: 80, A: 255}
-}
-
-// anchorCell is a tappable canvas-based grid cell for the anchor popup.
-// It renders a colored rectangle background with a centered pixel art icon.
-type anchorCell struct {
-	widget.BaseWidget
-	active   bool
-	disabled bool
-	icon     image.Image
-	onTapped func()
-	bg       *canvas.Rectangle
-	img      *canvas.Image
-}
-
-func newAnchorCell(icon image.Image, active bool, disabled bool, onTapped func()) *anchorCell {
-	c := &anchorCell{
-		icon:     icon,
-		active:   active,
-		disabled: disabled,
-		onTapped: onTapped,
-	}
-	c.ExtendBaseWidget(c)
-	return c
-}
-
-func (c *anchorCell) Tapped(_ *fyne.PointEvent) {
-	if c.disabled {
-		return
-	}
-	if c.onTapped != nil {
-		c.onTapped()
-	}
-}
-
-func (c *anchorCell) CreateRenderer() fyne.WidgetRenderer {
-	bgColor := anchorCellInactiveColor()
-	if c.active {
-		bgColor = anchorCellActiveColor()
-	}
-	if c.disabled {
-		bgColor.A = 80
-	}
-
-	c.bg = canvas.NewRectangle(bgColor)
-	c.bg.CornerRadius = 6
-
-	c.img = canvas.NewImageFromImage(c.icon)
-	c.img.FillMode = canvas.ImageFillContain
-	c.img.ScaleMode = canvas.ImageScalePixels // Preserve pixel art crispness
-	if c.disabled {
-		c.img.Translucency = 0.6
-	}
-
-	return &anchorCellRenderer{
-		cell:    c,
-		objects: []fyne.CanvasObject{c.bg, c.img},
-	}
-}
-
-type anchorCellRenderer struct {
-	cell    *anchorCell
-	objects []fyne.CanvasObject
-}
-
-func (r *anchorCellRenderer) Layout(size fyne.Size) {
-	r.cell.bg.Resize(size)
-	r.cell.bg.Move(fyne.NewPos(0, 0))
-
-	// Center the icon with padding inside the cell
-	pad := float32(8)
-	iconSize := fyne.NewSize(size.Width-pad*2, size.Height-pad*2)
-	r.cell.img.Resize(iconSize)
-	r.cell.img.Move(fyne.NewPos(pad, pad))
-}
-
-func (r *anchorCellRenderer) MinSize() fyne.Size {
-	return fyne.NewSize(64, 56)
-}
-
-func (r *anchorCellRenderer) Refresh() {
-	bgColor := anchorCellInactiveColor()
-	if r.cell.active {
-		bgColor = anchorCellActiveColor()
-	}
-	if r.cell.disabled {
-		bgColor.A = 80
-	}
-	r.cell.bg.FillColor = bgColor
-	r.cell.bg.Refresh()
-
-	if r.cell.disabled {
-		r.cell.img.Translucency = 0.6
-	} else {
-		r.cell.img.Translucency = 0.0
-	}
-	r.cell.img.Refresh()
-}
-
-func (r *anchorCellRenderer) Destroy() {}
-
-func (r *anchorCellRenderer) Objects() []fyne.CanvasObject {
-	return r.objects
-}
-
-// tappableContainer is a simple tappable wrapper for any content.
-type tappableContainer struct {
-	widget.BaseWidget
-	onTapped func()
-	content  fyne.CanvasObject
-}
-
-func newTappableContainer(onTapped func(), content fyne.CanvasObject) *tappableContainer {
-	t := &tappableContainer{onTapped: onTapped, content: content}
-	t.ExtendBaseWidget(t)
-	return t
-}
-
-func (t *tappableContainer) Tapped(_ *fyne.PointEvent) {
-	if t.onTapped != nil {
-		t.onTapped()
-	}
-}
-
-func (t *tappableContainer) CreateRenderer() fyne.WidgetRenderer {
-	return widget.NewSimpleRenderer(t.content)
-}
-
-// loadAnchorIcons derives all 9 directional icons from the existing next.png asset
-// via imaging transforms. For center, a clean crosshair is drawn programmatically.
-func (sa *SpiceApp) loadAnchorIcons(size int) [9]image.Image {
-	var icons [9]image.Image
-
-	// Load the existing next.png icon (glossy red arrow pointing →)
-	res, err := sa.assetMgr.GetIcon("next.png")
-	if err != nil {
-		utilLog.Printf("[WARN] Failed to load next.png for anchor icons: %v", err)
-		return icons
-	}
-
-	baseImg, _, err := image.Decode(bytes.NewReader(res.Content()))
-	if err != nil {
-		utilLog.Printf("[WARN] Failed to decode next.png: %v", err)
-		return icons
-	}
-
-	// Resize to target size for crisp display
-	arrow := imaging.Resize(baseImg, size, size, imaging.Lanczos)
-
-	// Grid layout:  ↖(0)  ↑(1)  ↗(2)
-	//               ←(3)  ●(4)  →(5)
-	//               ↙(6)  ↓(7)  ↘(8)
-
-	// Cardinal directions from the → base
-	icons[5] = arrow                    // → = original
-	icons[3] = imaging.FlipH(arrow)     // ← = flip horizontal
-	icons[1] = imaging.Rotate90(arrow)  // ↑ = rotate 90° CCW
-	icons[7] = imaging.Rotate270(arrow) // ↓ = rotate 90° CW
-
-	// Diagonal directions: rotate the base arrow 45°
-	diag := imaging.Rotate(arrow, 45, color.Transparent)
-	// Rotate produces a larger canvas; crop back to size
-	diag = imaging.CropCenter(diag, size, size)
-	icons[2] = diag                               // ↗ = 45° CCW
-	icons[0] = imaging.FlipH(diag)                // ↖ = flip horizontal
-	icons[8] = imaging.FlipV(diag)                // ↘ = flip vertical
-	icons[6] = imaging.FlipH(imaging.FlipV(diag)) // ↙ = flip both
-
-	// Center: draw a clean crosshair programmatically
-	icons[4] = drawCrosshair(size, color.NRGBA{R: 220, G: 60, B: 40, A: 255})
-
-	return icons
-}
-
-// drawCrosshair renders a simple crosshair/target icon with real alpha transparency.
-func drawCrosshair(size int, col color.NRGBA) image.Image {
-	img := image.NewNRGBA(image.Rect(0, 0, size, size))
-	cx, cy := size/2, size/2
-	radius := size * 3 / 8
-	thickness := max(size/12, 2)
-	dotRadius := max(size/10, 2)
-
-	// Draw circle outline
-	for y := 0; y < size; y++ {
-		for x := 0; x < size; x++ {
-			dx := x - cx
-			dy := y - cy
-			dist := dx*dx + dy*dy
-			outer := radius * radius
-			inner := (radius - thickness) * (radius - thickness)
-			if dist <= outer && dist >= inner {
-				img.SetNRGBA(x, y, col)
-			}
-		}
-	}
-
-	// Draw center dot
-	for y := cy - dotRadius; y <= cy+dotRadius; y++ {
-		for x := cx - dotRadius; x <= cx+dotRadius; x++ {
-			dx := x - cx
-			dy := y - cy
-			if dx*dx+dy*dy <= dotRadius*dotRadius {
-				img.SetNRGBA(x, y, col)
-			}
-		}
-	}
-
-	return img
-}
-
-// ShowAnchorPopup displays the 3×3 crop anchor selection popup.
-// This is the ADAPTER implementation — it owns window lifecycle and OpenGL recovery.
-// The window stays open after selection, showing a processing overlay and redrawing
-// with the updated active anchor when reprocessing completes.
-// ShowTuneImagePopup displays the popup for tuning images.
-func (sa *SpiceApp) ShowTuneImagePopup(monitorID int, currentOpts provider.TuningOptions, effectiveOpts provider.TuningOptions, labels [9]string, values [9]provider.CropAnchor, lockFrame bool, onSelect func(opts provider.TuningOptions, onDone func()), onClose func()) {
-	// Guard: skip if OpenGL is unavailable.
-	if !sysinfo.CanCreateWindows() {
-		utilLog.Println("OpenGL unavailable — anchor popup cannot be created")
-		ShowNativeFallbackAlert(i18n.T("Graphics Error"), i18n.T("Spice requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
-		return
-	}
-
-	sa.os.TransformToForeground()
-
-	title := fmt.Sprintf("%s — %s %d", i18n.T("Tune Image"), i18n.T("Display"), monitorID+1)
-
-	// Create window with OpenGL panic recovery (matches CreatePreferencesWindow pattern)
-	var w fyne.Window
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				errStr := fmt.Sprintf("%v", r)
-				utilLog.Printf("Recovered from anchor popup window creation panic: %v", errStr)
-				if strings.Contains(strings.ToLower(errStr), "apiunavailable") || strings.Contains(strings.ToLower(errStr), "wgl") || strings.Contains(strings.ToLower(errStr), "opengl") {
-					ShowNativeFallbackAlert(i18n.T("Graphics Error"), i18n.T("Spice requires OpenGL 2.0+ or hardware acceleration to show windows. The application will continue to run in the background. Please try rebooting your machine to restore graphics functionality."))
-				}
-			}
-		}()
-		w = sa.NewWindow(title)
-	}()
-
-	if w == nil {
-		utilLog.Println("Anchor popup window creation failed (returned nil or recovered)")
-		return
-	}
-
-	w.SetFixedSize(true)
-	sa.LockTrayMenu(w)
-
-	// -- Load icons from existing next.png asset --
-	icons := sa.loadAnchorIcons(48)
-
-	// -- Shared state --
-	activeOpts := effectiveOpts
-	processing := false
-
-	// -- Mutable content container (swapped between grid and overlay) --
-	contentStack := container.NewStack()
-
-	// -- Build the interactive grid content --
-	var buildContent func()
-	buildContent = func() {
-		// -- Header --
-		headerText := canvas.NewText(i18n.T("Crop Anchor"), anchorHeaderColor())
-		headerText.TextSize = 16
-		headerText.TextStyle = fyne.TextStyle{Bold: true}
-		headerText.Alignment = fyne.TextAlignCenter
-
-		// -- Description label --
-		descText := canvas.NewText(i18n.T("Anchor Description"), anchorDescColor())
-		descText.TextSize = 11
-		descText.Alignment = fyne.TextAlignCenter
-
-		// -- Monitor label --
-		monitorText := canvas.NewText(
-			fmt.Sprintf("%s %d", i18n.T("Display"), monitorID+1),
-			anchorMonitorColor(),
-		)
-		monitorText.TextSize = 11
-		monitorText.TextStyle = fyne.TextStyle{Bold: true}
-		monitorText.Alignment = fyne.TextAlignCenter
-
-		isFramed := activeOpts.FrameOverride == provider.FrameOverrideForceOn
-
-		// -- 3×3 grid of icon cells --
-		gridContainer := container.NewGridWithColumns(3)
-		for i := 0; i < 9; i++ {
-			idx := i
-			anchor := values[idx]
-			isActive := anchor == activeOpts.Anchor && !isFramed
-
-			cell := newAnchorCell(icons[idx], isActive, isFramed, func() {
-				if processing {
-					return // Ignore clicks while processing
-				}
-				processing = true
-
-				// Show processing overlay
-				fyne.Do(func() {
-					overlayText := canvas.NewText(i18n.T("Applying..."), color.NRGBA{R: 240, G: 240, B: 245, A: 255})
-					overlayText.TextSize = 14
-					overlayText.TextStyle = fyne.TextStyle{Bold: true}
-					overlayText.Alignment = fyne.TextAlignCenter
-
-					// Semi-transparent dark overlay
-					overlayBg := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 35, A: 200})
-
-					overlay := container.NewStack(
-						overlayBg,
-						container.NewCenter(overlayText),
-					)
-					contentStack.Objects = []fyne.CanvasObject{overlay}
-					contentStack.Refresh()
-				})
-
-				// Update local state first
-				activeOpts.Anchor = anchor
-
-				// Dispatch anchor change with done callback
-				onSelect(activeOpts, func() {
-					processing = false
-					// Redraw grid on UI thread with new active state
-					fyne.Do(func() {
-						buildContent()
-					})
-				})
-			})
-			gridContainer.Add(cell)
-		}
-
-		// -- Auto button (custom tappable — uses exact same highlight color as grid cells) --
-		autoActive := (activeOpts.Anchor == provider.AnchorAuto || activeOpts.Anchor == 0) && !isFramed
-		autoBgColor := anchorCellInactiveColor()
-		autoTextColor := anchorTextInactiveColor()
-		if isFramed {
-			autoBgColor.A = 80
-			autoTextColor.A = 80
-		} else if autoActive {
-			autoBgColor = anchorCellActiveColor()
-			autoTextColor = anchorTextActiveColor()
-		}
-
-		autoBg := canvas.NewRectangle(autoBgColor)
-		autoBg.CornerRadius = 6
-		autoLabel := canvas.NewText(i18n.T("Auto"), autoTextColor)
-		autoLabel.TextSize = 14
-		autoLabel.TextStyle = fyne.TextStyle{Bold: true}
-		autoLabel.Alignment = fyne.TextAlignCenter
-
-		autoBtn := container.NewStack(autoBg, container.NewPadded(container.NewCenter(autoLabel)))
-
-		autoTap := newTappableContainer(func() {
-			if isFramed || processing {
-				return
-			}
-			processing = true
-
-			fyne.Do(func() {
-				overlayText := canvas.NewText(i18n.T("Applying..."), color.NRGBA{R: 240, G: 240, B: 245, A: 255})
-				overlayText.TextSize = 14
-				overlayText.TextStyle = fyne.TextStyle{Bold: true}
-				overlayText.Alignment = fyne.TextAlignCenter
-
-				overlayBg := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 35, A: 200})
-
-				overlay := container.NewStack(
-					overlayBg,
-					container.NewCenter(overlayText),
-				)
-				contentStack.Objects = []fyne.CanvasObject{overlay}
-				contentStack.Refresh()
-			})
-
-			activeOpts.Anchor = provider.AnchorAuto
-			onSelect(activeOpts, func() {
-				processing = false
-				fyne.Do(func() {
-					buildContent()
-				})
-			})
-		}, autoBtn)
-
-		// -- Separator line --
-		frameSep := canvas.NewRectangle(color.NRGBA{R: 70, G: 70, B: 80, A: 255})
-		frameSep.SetMinSize(fyne.NewSize(0, 1))
-
-		// -- Header --
-		frameHeader := canvas.NewText(i18n.T("Virtual Museum Frame"), anchorHeaderColor())
-		frameHeader.TextSize = 16
-		frameHeader.TextStyle = fyne.TextStyle{Bold: true}
-		frameHeader.Alignment = fyne.TextAlignCenter
-
-		frameDesc := canvas.NewText(i18n.T("Display the entire uncropped image on a generated background"), anchorDescColor())
-		frameDesc.TextSize = 11
-		frameDesc.Alignment = fyne.TextAlignCenter
-
-		// -- Framing Controls --
-		frameGroup := container.NewVBox(
-			container.NewPadded(frameSep),
-			container.NewCenter(frameHeader),
-			container.NewCenter(frameDesc),
-		)
-
-		triggerApply := func() {
-			if processing {
-				return
-			}
-			processing = true
-			fyne.Do(func() {
-				overlayText := canvas.NewText(i18n.T("Applying..."), color.NRGBA{R: 240, G: 240, B: 245, A: 255})
-				overlayText.TextSize = 14
-				overlayText.TextStyle = fyne.TextStyle{Bold: true}
-				overlayText.Alignment = fyne.TextAlignCenter
-				overlayBg := canvas.NewRectangle(color.NRGBA{R: 30, G: 30, B: 35, A: 200})
-				overlay := container.NewStack(overlayBg, container.NewCenter(overlayText))
-				contentStack.Objects = []fyne.CanvasObject{overlay}
-				contentStack.Refresh()
-			})
-			onSelect(activeOpts, func() {
-				processing = false
-				fyne.Do(func() { buildContent() })
-			})
-		}
-
-		frameToggle := widget.NewCheck("Enable Frame", nil)
-		sizeLabel := widget.NewLabel("Frame Size (%):")
-		sizeSlider := widget.NewSlider(50, 90)
-		mattingToggle := widget.NewCheck("Paper Matting", nil)
-		wallColorLabel := widget.NewLabel("Wall Color:")
-		wallColorSelect := widget.NewSelect([]string{"Algorithmic", "Neutral"}, nil)
-
-		// Setup initial state FIRST (before attaching callbacks that trigger backend sync)
-		frameToggle.SetChecked(activeOpts.FrameOverride == provider.FrameOverrideForceOn)
-		if lockFrame {
-			frameToggle.Disable()
-		}
-		mattingToggle.SetChecked(activeOpts.Matting == provider.MattingOverrideOn)
-
-		if activeOpts.WallColor == provider.WallColorOverrideAlgorithmic {
-			wallColorSelect.SetSelected("Algorithmic")
-		} else {
-			wallColorSelect.SetSelected("Neutral")
-		}
-
-		sizeSlider.Step = 1
-		sizeSlider.SetValue(activeOpts.FrameSize * 100)
-		sizeLabel.SetText(fmt.Sprintf("Frame Size (%d%%):", int(sizeSlider.Value)))
-
-		// Now attach the callbacks
-		mattingToggle.OnChanged = func(checked bool) {
-			if checked {
-				activeOpts.Matting = provider.MattingOverrideOn
-			} else {
-				activeOpts.Matting = provider.MattingOverrideOff
-			}
-			triggerApply()
-		}
-
-		wallColorSelect.OnChanged = func(s string) {
-			if s == "Algorithmic" {
-				activeOpts.WallColor = provider.WallColorOverrideAlgorithmic
-			} else {
-				activeOpts.WallColor = provider.WallColorOverrideNeutral
-			}
-			triggerApply()
-		}
-
-		sizeSlider.OnChanged = func(val float64) {
-			sizeLabel.SetText(fmt.Sprintf("Frame Size (%d%%):", int(val)))
-			activeOpts.FrameSize = val / 100.0
-		}
-		sizeSlider.OnChangeEnded = func(val float64) {
-			activeOpts.FrameSize = val / 100.0
-			triggerApply()
-		}
-
-		// Dependency logic: Only enable size/matting/color if frame is toggled on
-		updateDependencies := func() {
-			if frameToggle.Checked {
-				sizeSlider.Enable()
-				mattingToggle.Enable()
-				wallColorSelect.Enable()
-			} else {
-				sizeSlider.Disable()
-				mattingToggle.Disable()
-				wallColorSelect.Disable()
-			}
-		}
-
-		frameToggle.OnChanged = func(checked bool) {
-			if checked {
-				activeOpts.FrameOverride = provider.FrameOverrideForceOn
-				activeOpts.Anchor = provider.AnchorAuto
-			} else {
-				activeOpts.FrameOverride = provider.FrameOverrideForceOff
-			}
-			updateDependencies()
-			triggerApply()
-		}
-
-		updateDependencies() // Run once initially
-
-		frameGroup.Add(frameToggle)
-		frameGroup.Add(sizeLabel)
-		frameGroup.Add(sizeSlider)
-		frameGroup.Add(mattingToggle)
-		frameGroup.Add(wallColorLabel)
-		frameGroup.Add(wallColorSelect)
-
-		// -- Separator line --
-		separator := canvas.NewRectangle(color.NRGBA{R: 70, G: 70, B: 80, A: 255})
-		separator.SetMinSize(fyne.NewSize(0, 1))
-		separator2 := canvas.NewRectangle(color.NRGBA{R: 70, G: 70, B: 80, A: 255})
-		separator2.SetMinSize(fyne.NewSize(0, 1))
-
-		// -- Close button (same styling as Auto for consistency) --
-		closeBg := canvas.NewRectangle(anchorCellInactiveColor())
-		closeBg.CornerRadius = 6
-		closeLabel := canvas.NewText(i18n.T("Close"), anchorTextInactiveColor())
-		closeLabel.TextSize = 14
-		closeLabel.TextStyle = fyne.TextStyle{Bold: true}
-		closeLabel.Alignment = fyne.TextAlignCenter
-
-		closeBtnContent := container.NewStack(closeBg, container.NewPadded(container.NewCenter(closeLabel)))
-		closeTap := newTappableContainer(func() {
-			w.Close()
-		}, closeBtnContent)
-
-		// -- Assemble layout --
-		content := container.NewVBox(
-			container.NewCenter(headerText),
-			container.NewCenter(descText),
-			layout.NewSpacer(),
-			container.NewCenter(monitorText),
-			gridContainer,
-			layout.NewSpacer(),
-			separator,
-			autoTap,
-			layout.NewSpacer(),
-			separator,
-			frameGroup,
-			separator2,
-			closeTap,
-		)
-
-		contentStack.Objects = []fyne.CanvasObject{content}
-		contentStack.Refresh()
-	}
-
-	// Initial build
-	buildContent()
-
-	w.SetContent(container.NewPadded(contentStack))
-
-	// Size to content — no dead space
-	minSize := contentStack.MinSize()
-	w.Resize(fyne.NewSize(minSize.Width+32, minSize.Height+24))
-	w.CenterOnScreen()
-
-	w.SetOnClosed(func() {
-		sa.os.TransformToBackground()
-		if onClose != nil {
-			onClose()
-		}
-		sa.CreateTrayMenu()
-	})
-
-	w.Show()
 }

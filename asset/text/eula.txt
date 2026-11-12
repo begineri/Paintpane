@@ -1,8 +1,12 @@
-# End-User License Agreement (EULA) for Spice
+# End-User License Agreement (EULA) for Paintpane
 
-Effective Date: February 22, 2026
+Effective Date: November 5, 2026
 
-Copyright © 2026 Karl Kwong. All rights reserved.
+Paintpane is an unofficial, modified version of Spice. It is not made, endorsed or supported by the author of Spice.
+
+Copyright © 2026 Karl Kwong (original Spice software). All rights reserved.
+
+Modifications copyright © 2026 begineri, under the same license.
 
 This software is provided under the **PolyForm Noncommercial License 1.0.0**. By downloading, installing, or using the Software, you agree to be bound by the terms of that license and this Agreement.
 
@@ -12,25 +16,35 @@ This software is for personal, non-commercial use only. You are free to view, cl
 
 ## 2. Third-Party Services and Content
 
-Spice integrates with various third-party services. Your use of these services within the app is subject to their respective terms:
+Paintpane integrates with various third-party services. Your use of these services within the app is subject to their respective terms:
 
-### 2.1 Google Photos
-Use of Google Photos integration is subject to Google’s Terms of Service and Privacy Policy. The Software uses the Google Photos Picker API to access only the specific photos you select. Spice is 100% client-side; your photo data is never sent to a central Spice server.
+### 2.1 wallhaven
 
-### 2.2 Wallhaven
-You are responsible for using your own Wallhaven API key in compliance with Wallhaven’s terms of service.
+You are responsible for using your own wallhaven API key in compliance with wallhaven’s terms of service.
 
-### 2.3 Pexels
+### 2.2 Pexels
+
 Use of Pexels content is subject to the Pexels License.
 
-### 2.4 Wikimedia Commons
+### 2.3 Wikimedia Commons
+
 Content from Wikimedia Commons is subject to the specific Creative Commons license (CC BY-SA, etc.) applicable to each image.
 
-### 2.5 The Metropolitan Museum of Art
-Open Access masterpieces from The Met are provided under Creative Commons Zero (CC0) for non-commercial use as part of The Met’s Open Access policy.
+### 2.4 The Metropolitan Museum of Art
 
-### 2.6 Art Institute of Chicago
+Open Access images and data from The Met are provided under Creative Commons Zero (CC0), as set out in The Met’s Open Access policy.
+
+### 2.5 Art Institute of Chicago
+
 Open Access images from the Art Institute of Chicago are subject to their specific Open Access terms and conditions.
+
+### 2.6 National Palace Museum, Taipei
+
+Mid-resolution images from the National Palace Museum are licensed under CC BY 4.0. The museum’s credit:
+
+國立故宮博物院，臺北，CC BY 4.0 @ www.npm.gov.tw
+
+The National Palace Museum, Taipei, CC BY 4.0 @ www.npm.gov.tw
 
 ## 3. Disclaimers
 
@@ -42,4 +56,4 @@ To verify your acceptance, the application stores a local record on your machine
 
 ## 5. Contact
 
-For questions regarding this license, contact: dixieflatline76@gmail.com
+For questions about this build, open an issue at: https://github.com/begineri/Paintpane/issues

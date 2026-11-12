@@ -125,7 +125,6 @@ func TestDownloadAllImages(t *testing.T) {
 	wp.providers["Wallhaven"] = mockProvider
 
 	// Expectations
-	mockPM.On("NotifyUser", mock.Anything, mock.Anything).Return()
 	mockOS.On("GetDesktopDimension").Return(1920, 1080, nil)
 	mockOS.On("GetMonitors").Return([]Monitor{{ID: 0, Name: "Primary", Rect: image.Rect(0, 0, 1920, 1080)}}, nil)
 
@@ -245,7 +244,6 @@ func TestDownloadAllImages_EnrichmentFailure(t *testing.T) {
 	defer wp.pipeline.Stop()
 	wp.providers["MockProvider"] = mockProvider
 
-	mockPM.On("NotifyUser", mock.Anything, mock.Anything).Return()
 	mockOS.On("GetDesktopDimension").Return(1920, 1080, nil)
 	mockOS.On("GetMonitors").Return([]Monitor{{ID: 0, Name: "Primary", Rect: image.Rect(0, 0, 1920, 1080)}}, nil)
 
@@ -314,7 +312,6 @@ func TestNavigation(t *testing.T) {
 	mockOS.On("SetWallpaper", mock.Anything, 0).Return(nil)
 
 	// Mock PM
-	mockPM.On("NotifyUser", mock.Anything, mock.Anything).Return()
 	mockPM.On("RefreshTrayMenu").Return()
 	// Create Monitor Controller
 	mockIP := new(MockImageProcessor)
@@ -770,8 +767,9 @@ func TestSetNextWallpaper_Stagger(t *testing.T) {
 	}
 }
 
-func TestTogglePauseMonitorAction_Notification(t *testing.T) {
-	mockPM := new(MockPluginManager)
+// Pausing a display sends it CmdPause and nothing else: no notification (prototype v35).
+func TestTogglePauseMonitorAction_DispatchesPause(t *testing.T) {
+	mockPM := new(MockPluginManager) // any call on it would fail the test
 	cfg := GetConfig(NewMockPreferences())
 
 	wp := &Plugin{
@@ -779,34 +777,23 @@ func TestTogglePauseMonitorAction_Notification(t *testing.T) {
 		cfg:      cfg,
 		Monitors: make(map[int]*MonitorController),
 	}
+	mon0 := &MonitorController{ID: 0, Commands: make(chan Command, 2), State: &MonitorState{}}
+	mon1 := &MonitorController{ID: 1, Commands: make(chan Command, 2), State: &MonitorState{}}
+	wp.Monitors[0], wp.Monitors[1] = mon0, mon1
 
-	// 1. Test Transition Play -> Pause
-	// Current state: Playing
-	mon0 := &MonitorController{
-		ID:       0,
-		Commands: make(chan Command, 1), // Buffer to avoid blocking
-		State:    &MonitorState{Paused: false},
-	}
-	wp.Monitors[0] = mon0
-
-	// Expectation: "Display 1: Pausing Play"
-	mockPM.On("NotifyUser", "Wallpaper Rotation", "Display 1: Pausing Play").Return()
 	wp.TogglePauseMonitorAction(0)
-	mockPM.AssertExpectations(t)
+	assert.Equal(t, CmdPause, <-mon0.Commands)
+	assert.Empty(t, mon1.Commands, "only the targeted display")
 
-	// 2. Test Transition Pause -> Play
-	// Current state: Paused
-	mon0.State.Paused = true
-	// Expectation: "Display 1: Resuming Play"
-	mockPM.On("NotifyUser", "Wallpaper Rotation", "Display 1: Resuming Play").Return()
-	wp.TogglePauseMonitorAction(0)
+	wp.TogglePauseMonitorAction(-1)
+	assert.Equal(t, CmdPause, <-mon0.Commands)
+	assert.Equal(t, CmdPause, <-mon1.Commands)
 	mockPM.AssertExpectations(t)
 }
 
 func TestFrequencyChange_RedundancyCheck(t *testing.T) {
 	ResetConfig()
 	mockPM := &MockPluginManager{}
-	mockPM.On("NotifyUser", mock.Anything, mock.Anything).Return().Maybe()
 	mockPM.On("RebuildTrayMenu").Return().Maybe()
 
 	wp := &Plugin{

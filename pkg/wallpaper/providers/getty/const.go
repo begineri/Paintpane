@@ -7,5 +7,5 @@ const (
 	apiEndpoint = "https://data.getty.edu/museum/collection/object/%s"
 
 	// CdnUrl is the endpoint to fetch the curation json
-	cdnUrl = "https://raw.githubusercontent.com/dixieflatline76/Spice/main/docs/collections/getty.json"
+	cdnUrl = "https://raw.githubusercontent.com/begineri/Paintpane/main/docs/collections/getty.json"
 )

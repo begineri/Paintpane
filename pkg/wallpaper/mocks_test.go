@@ -31,14 +31,6 @@ func (m *MockPluginManager) Deregister(p ui.Plugin) {
 	m.Called(p)
 }
 
-func (m *MockPluginManager) NotifyUser(title, message string) {
-	m.Called(title, message)
-}
-
-func (m *MockPluginManager) RegisterNotifier(n ui.Notifier) {
-	m.Called(n)
-}
-
 func (m *MockPluginManager) CreateMenuItem(label string, action func(), iconName string) *fyne.MenuItem {
 	args := m.Called(label, action, iconName)
 	if args.Get(0) == nil {
@@ -98,7 +90,7 @@ func (m *MockPluginManager) RebuildTrayMenu() {
 	}
 }
 
-func (m *MockPluginManager) ShowTuneImagePopup(_ int, _ provider.TuningOptions, _ provider.TuningOptions, _ [9]string, _ [9]provider.CropAnchor, _ bool, _ func(provider.TuningOptions, func()), _ func()) {
+func (m *MockPluginManager) ShowTuneImagePopup(_ int, _ string, _ provider.TuningOptions, _ provider.TuningOptions, _ [9]string, _ [9]provider.CropAnchor, _ ui.TunePreview, _ bool, _ func(provider.TuningOptions, func()), _ func()) {
 }
 
 // MockOS is a mock implementation of the OS interface.
@@ -178,6 +170,10 @@ func (m *MockImageStore) SeenCount() int {
 	return args.Int(0)
 }
 
+func (m *MockImageStore) ReadyUnseenCount() int { return 0 }
+
+func (m *MockImageStore) PruneToLimit(limit int, keep map[string]bool) {}
+
 func (m *MockImageStore) GetIDsForResolution(resolution string) []string {
 	args := m.Called(resolution)
 	return args.Get(0).([]string)
@@ -205,6 +201,14 @@ func (m *MockImageStore) SetTuningOptions(id string, resKey string, opts provide
 
 func (m *MockImageStore) ClearDerivatives(id string) bool {
 	args := m.Called(id)
+	return args.Bool(0)
+}
+
+// SetOutcomeFlag only records a render result; tests that care use a real store.
+func (m *MockImageStore) SetOutcomeFlag(id, key string, value bool) bool { return true }
+
+func (m *MockImageStore) SetPurity(id string, purity string) bool {
+	args := m.Called(id, purity)
 	return args.Bool(0)
 }
 

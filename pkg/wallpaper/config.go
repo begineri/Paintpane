@@ -53,17 +53,23 @@ type Config struct {
 	assetMgr          *asset.Manager  // Asset manager
 	AvoidSet          map[string]bool `json:"avoid_set"` // Set of image URLs to avoid
 	avoidMap          sync.Map        // Thread-safe map for InAvoidSet checks
+	NudeMarks         map[string]bool `json:"nude_marks,omitempty"` // Image IDs manually marked as nude
 	userid            string
 	mu                sync.RWMutex // Mutex for thread-safe access
+
+	// Details of blocked images, by ID, for the blocked-images page (S4-B).
+	// Images blocked before details were kept are in AvoidSet only.
+	BlockedImages map[string]BlockedImage `json:"blocked_images,omitempty"`
+
 	// Advanced
-	LogLevel                string          `json:"-"`
-	MaxConcurrentProcessors int             `json:"-"`
-	VirtualFramingFallback  bool            `json:"virtual_framing_fallback"`
-	MuseumFraming           map[string]bool `json:"museum_framing"`
-	VirtualWallColor        VirtualWallMode `json:"virtual_wall_color"`
-	VirtualPaperMatting     bool            `json:"virtual_paper_matting"`
-	VirtualFrameSize        float64         `json:"virtual_frame_size"`
-	Tuning                  TuningConfig    `json:"tuning"`
+	LogLevel                string             `json:"-"`
+	MaxConcurrentProcessors int                `json:"-"`
+	MuseumFraming           map[string]bool    `json:"museum_framing"`
+	VirtualWallColor        VirtualWallMode    `json:"virtual_wall_color"`
+	VirtualPaperMatting     bool               `json:"virtual_paper_matting"`
+	VirtualFrameSize        float64            `json:"virtual_frame_size"`
+	ArtworkDisplayMode      ArtworkDisplayMode `json:"artwork_display_mode"`
+	Tuning                  TuningConfig       `json:"tuning"`
 
 	// Callbacks
 	QueryRemovedCallback      func(queryID string) `json:"-"`
@@ -90,6 +96,71 @@ const (
 	WallAlgorithmic VirtualWallMode = iota
 	WallNeutral
 )
+
+// ArtworkDisplayMode defines how every image is presented on screen.
+// See docs/artwork_display_modes.md.
+type ArtworkDisplayMode int
+
+const (
+	ArtworkDisplaySmartCrop ArtworkDisplayMode = iota // Crop to fill, or auto-frame on a large mismatch
+	ArtworkDisplayFull                                // Whole image, as large as it fits, on the wall color (default)
+	ArtworkDisplayFramed                              // Whole image in the gallery frame
+)
+
+// defaultArtworkDisplayMode applies to anyone who has not chosen a mode.
+var defaultArtworkDisplayMode = ArtworkDisplayFull
+
+// String returns the translated name of the mode.
+func (m ArtworkDisplayMode) String() string {
+	switch m {
+	case ArtworkDisplaySmartCrop:
+		return i18n.T("Smart crop")
+	case ArtworkDisplayFull:
+		return i18n.T("Full artwork")
+	case ArtworkDisplayFramed:
+		return i18n.T("Museum frame")
+	default:
+		return i18n.T("Unknown")
+	}
+}
+
+// artworkDisplayModes lists the modes in the order they appear in the UI: the
+// two modes that never crop come first. The order is independent of the saved
+// values, so the settings page maps list positions to modes with
+// artworkDisplayModeAt and artworkDisplayModeIndex.
+func artworkDisplayModes() []ArtworkDisplayMode {
+	return []ArtworkDisplayMode{ArtworkDisplayFull, ArtworkDisplayFramed, ArtworkDisplaySmartCrop}
+}
+
+// artworkDisplayModeAt returns the mode at position i of artworkDisplayModes,
+// or Full Artwork, the default, when i is out of range.
+func artworkDisplayModeAt(i int) ArtworkDisplayMode {
+	modes := artworkDisplayModes()
+	if i < 0 || i >= len(modes) {
+		return ArtworkDisplayFull
+	}
+	return modes[i]
+}
+
+// artworkDisplayModeIndex returns the position of mode in artworkDisplayModes.
+func artworkDisplayModeIndex(mode ArtworkDisplayMode) int {
+	for i, m := range artworkDisplayModes() {
+		if m == mode {
+			return i
+		}
+	}
+	return artworkDisplayModeIndex(ArtworkDisplayFull)
+}
+
+// GetArtworkDisplayModes returns the available artwork display modes as strings.
+func GetArtworkDisplayModes() []string {
+	modes := artworkDisplayModes()
+	names := make([]string, len(modes))
+	for i, m := range modes {
+		names[i] = m.String()
+	}
+	return names
+}
 
 // ImageQuery struct to hold the URL of an image and whether it is active
 type ImageQuery struct {
@@ -214,15 +285,21 @@ func (c *Config) loadFromPrefs() error {
 	}
 	cfgText := c.StringWithFallback(WallhavenConfigPrefKey, defaultCfg)
 
+	// Decoding leaves this alone when the saved config has no mode, and overwrites it otherwise,
+	// so only people who never chose a mode get the default.
+	c.ArtworkDisplayMode = defaultArtworkDisplayMode
+
 	if err := json.Unmarshal([]byte(cfgText), c); err != nil {
 		return err
 	}
 
 	if c.VirtualFrameSize == 0 || c.VirtualFrameSize == 0.8 {
-		// Enforce new defaults for new users (0) and upgrade existing users (0.8)
+		// Enforce new defaults for new users (0) and upgrade existing users (0.8). The paper mat is
+		// off for new users (J9, v26); an existing user keeps what they saved.
+		if c.VirtualFrameSize == 0 {
+			c.VirtualPaperMatting = false
+		}
 		c.VirtualFrameSize = 0.85
-		c.VirtualFramingFallback = true
-		c.VirtualPaperMatting = true
 		c.VirtualWallColor = WallAlgorithmic
 	}
 
@@ -544,6 +621,44 @@ func (c *Config) AddToAvoidSet(id string) {
 	c.save()
 }
 
+// BlockImage adds an image to the avoid set and keeps its details for the
+// blocked-images page.
+func (c *Config) BlockImage(info BlockedImage) {
+	c.avoidMap.Store(info.ID, true)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.AvoidSet == nil {
+		c.AvoidSet = make(map[string]bool)
+	}
+	c.AvoidSet[info.ID] = true
+	if c.BlockedImages == nil {
+		c.BlockedImages = make(map[string]BlockedImage)
+	}
+	c.BlockedImages[info.ID] = info
+	c.save()
+}
+
+// RemoveFromAvoidSet unblocks one image.
+func (c *Config) RemoveFromAvoidSet(id string) {
+	c.avoidMap.Delete(id)
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	delete(c.AvoidSet, id)
+	delete(c.BlockedImages, id)
+	c.save()
+}
+
+// GetBlockedImages returns the details kept for blocked images, by ID.
+func (c *Config) GetBlockedImages() map[string]BlockedImage {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	out := make(map[string]BlockedImage, len(c.BlockedImages))
+	for id, info := range c.BlockedImages {
+		out[id] = info
+	}
+	return out
+}
+
 // ResetAvoidSet clears the avoid set
 func (c *Config) ResetAvoidSet() {
 	c.avoidMap.Range(func(key, value interface{}) bool {
@@ -553,6 +668,7 @@ func (c *Config) ResetAvoidSet() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.AvoidSet = make(map[string]bool)
+	c.BlockedImages = nil
 	c.save()
 }
 
@@ -570,7 +686,7 @@ func (c *Config) GetAvoidSet() map[string]bool {
 func (c *Config) GetCacheSize() CacheSize {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
-	val := c.IntWithFallback(CacheSizePrefKey, int(Cache300Images)) // Default to 300 images
+	val := c.IntWithFallback(CacheSizePrefKey, int(DefaultCacheSize)) // 150 images unless chosen
 	if val == 0 || val == 2 {
 		val = int(Cache300Images) // Migrate None (0) and 200 (2) to 300
 	}
@@ -982,20 +1098,6 @@ func (c *Config) GetGooglePhotosQueries() []ImageQuery {
 	return queries
 }
 
-// SetChgImgOnStart returns the change image on start preference.
-func (c *Config) SetChgImgOnStart(enable bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.SetBool(ChgImgOnStartPrefKey, enable)
-}
-
-// GetChgImgOnStart returns the change image on start preference.
-func (c *Config) GetChgImgOnStart() bool {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
-	return c.BoolWithFallback(ChgImgOnStartPrefKey, true) // Return the change image on start preference with a fallback value of true if not set
-}
-
 // SetNightlyRefresh sets the nightly refresh preference.
 func (c *Config) SetNightlyRefresh(enable bool) {
 	c.mu.Lock()
@@ -1029,6 +1131,29 @@ func (c *Config) SetStaggerMonitorChanges(enable bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.SetBool(StaggerMonitorChangesPrefKey, enable)
+}
+
+// GetHighResOriginals reports whether originals are kept at full size. Off by default: originals
+// are then capped at about 4K (master_cap.go). SMK reads it too, by name (docs/smk-download.md
+// §7). A config without preferences behind it (as in tests) reads off.
+func (c *Config) GetHighResOriginals() bool {
+	if c == nil {
+		return false
+	}
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	if c.Preferences == nil {
+		return false
+	}
+	return c.BoolWithFallback(HighResOriginalsPrefKey, false)
+}
+
+// SetHighResOriginals sets whether originals are kept at full size. It applies to originals
+// downloaded from then on; those already on disk stay as they are.
+func (c *Config) SetHighResOriginals(enable bool) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.SetBool(HighResOriginalsPrefKey, enable)
 }
 
 // GetFaceBoostEnabled returns the face boost preference.
@@ -1141,12 +1266,12 @@ func (c *Config) save() {
 	// and then marshal that object.
 
 	clone := &Config{
-		Tuning:                 c.Tuning,
-		VirtualFramingFallback: c.VirtualFramingFallback,
-		MuseumFraming:          c.cloneMuseumFraming(),
-		VirtualWallColor:       c.VirtualWallColor,
-		VirtualPaperMatting:    c.VirtualPaperMatting,
-		VirtualFrameSize:       c.VirtualFrameSize,
+		Tuning:              c.Tuning,
+		MuseumFraming:       c.cloneMuseumFraming(),
+		VirtualWallColor:    c.VirtualWallColor,
+		VirtualPaperMatting: c.VirtualPaperMatting,
+		VirtualFrameSize:    c.VirtualFrameSize,
+		ArtworkDisplayMode:  c.ArtworkDisplayMode,
 	}
 
 	// Sync avoidMap to AvoidSet for JSON marshaling
@@ -1155,6 +1280,18 @@ func (c *Config) save() {
 		clone.AvoidSet[key.(string)] = true
 		return true
 	})
+
+	if len(c.BlockedImages) > 0 {
+		clone.BlockedImages = make(map[string]BlockedImage, len(c.BlockedImages))
+		for id, info := range c.BlockedImages {
+			clone.BlockedImages[id] = info
+		}
+	}
+
+	clone.NudeMarks = make(map[string]bool, len(c.NudeMarks))
+	for id := range c.NudeMarks {
+		clone.NudeMarks[id] = true
+	}
 
 	// Deep copy slices to avoid data races when marshaling in the background
 	if c.Queries != nil {
@@ -1506,6 +1643,26 @@ func (c *Config) SetMuseumFraming(providerID string, enabled bool) {
 		c.MuseumFraming = make(map[string]bool)
 	}
 	c.MuseumFraming[providerID] = enabled
+	c.save()
+}
+
+// GetArtworkDisplayMode returns the artwork display mode. Unknown values read as Smart Crop.
+func (c *Config) GetArtworkDisplayMode() ArtworkDisplayMode {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	switch c.ArtworkDisplayMode {
+	case ArtworkDisplayFull, ArtworkDisplayFramed:
+		return c.ArtworkDisplayMode
+	default:
+		return ArtworkDisplaySmartCrop
+	}
+}
+
+// SetArtworkDisplayMode sets and saves the artwork display mode.
+func (c *Config) SetArtworkDisplayMode(mode ArtworkDisplayMode) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.ArtworkDisplayMode = mode
 	c.save()
 }
 
