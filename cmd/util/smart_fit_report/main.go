@@ -167,8 +167,8 @@ func main() {
 
 	ctx := context.Background()
 
-	// 3. Scan test_assets/tuning_images for test images
-	sourceDir := filepath.Join("test_assets", "tuning_images")
+	// 3. Scan pkg/wallpaper/testdata/tuning_images for test images
+	sourceDir := filepath.Join("pkg", "wallpaper", "testdata", "tuning_images")
 	tmpFiles, err := os.ReadDir(sourceDir)
 	if err != nil {
 		log.Fatalf("Failed to read source directory %s: %v", sourceDir, err)
@@ -187,7 +187,7 @@ func main() {
 	}
 
 	if len(testImages) == 0 {
-		log.Fatal("No images found in test_assets/tuning_images")
+		log.Fatal("No images found in pkg/wallpaper/testdata/tuning_images")
 	}
 
 	// 4. Loop Images

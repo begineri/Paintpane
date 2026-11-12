@@ -38,7 +38,6 @@ coverage*
 !privacy.html
 !support.html
 !user_guide.html
-!extension/*.html
 !asset/galleries/**/*.html
 !docs/mockups/**/*.html
 !asset/galleries/.hash_state.json
@@ -53,8 +52,6 @@ build/
 report_output/
 *.obj
 
-# Unignore implementation of the mac extension
-!Spice Wallpaper Manager Extension/**
 # Certificates and Packages
 *.pfx
 *.msix

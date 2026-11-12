@@ -13,12 +13,12 @@ RSRC_VERSION=v0.10.2   # github.com/akavel/rsrc, pinned
 here="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 root="$(cd "$here/../.." && pwd)"
 
-# 1. Draw all images (installer/Paintpane.ico, tray.png, splash.png, about_splash.gif,
-#    installer/Paintpane.bmp).
+# 1. Draw all images (assets-src/installer/Paintpane.ico, tray.png, splash.png, about_splash.gif,
+#    assets-src/installer/Paintpane.bmp).
 (cd "$here" && go run . -root "$root" ${PREVIEW:+-preview "$PREVIEW"})
 
-# 2. Embed installer/Paintpane.ico into the Windows exe (icon only, no version info).
+# 2. Embed assets-src/installer/Paintpane.ico into the Windows exe (icon only, no version info).
 (cd "$root" && go run "github.com/akavel/rsrc@$RSRC_VERSION" \
-	-ico installer/Paintpane.ico -arch amd64 -o cmd/spice/spice_windows_amd64.syso)
+	-ico assets-src/installer/Paintpane.ico -arch amd64 -o cmd/spice/spice_windows_amd64.syso)
 
 echo "done: icons written under $root"

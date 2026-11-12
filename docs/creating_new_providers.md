@@ -356,20 +356,9 @@ For full details, see `internal_developer_context.md` §9.
 
 ## 10. Browser Extension Integration
 
-If your provider supports "copy-pasting" URLs from the browser (like Wallhaven or Pexels), you can integrate with the Spice Safari/Chrome extension.
-
-1.  **Define Regex**: In your `pkg/wallpaper/providers/<name>/const.go`, define a constant for your URL pattern.
-    *   Naming Convention: ` <Name>URLRegexp` (e.g., `BingURLRegexp`).
-    *   Value: A regex string matching the URLs you want to intercept (e.g., `^https://bing.com/images/.*`).
-
-2.  **Enable Discovery**:
-    *   Ensure your provider is imported in `cmd/spice/main.go` (e.g., `_ "github.com/.../providers/bing"`).
-    *   The build tool ` cmd/util/sync_regex` will automatically parse `main.go`, find your enabled provider, and extract the regex from your `const.go` to inject it into the extension's `background.js`.
-
-3.  **Manual Sync**: If you need to force a sync during development, run:
-    ```bash
-    make sync-extension
-    ```
+Paintpane does not ship the Spice browser extension, so there is nothing to integrate. The
+`<Name>URLRegexp` constants some providers define in `const.go` are kept from Spice; the extension
+and its sync tool live in the Spice project.
 
 
 ## 11. Rate Limiting — Decision Tree

@@ -196,7 +196,7 @@ type tuneScreen struct {
 }
 
 func tuneScreens() []tuneScreen {
-	preview := filepath.Join("..", "test_assets", "tuning_images", "4ld7or.jpg")
+	preview := filepath.Join("..", "pkg", "wallpaper", "testdata", "tuning_images", "4ld7or.jpg")
 	base := provider.TuningOptions{
 		CropOffset:    30,
 		HasCropOffset: true,

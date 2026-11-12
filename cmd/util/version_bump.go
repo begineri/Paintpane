@@ -67,19 +67,7 @@ func main() {
 	}
 
 	// Commit the version change before tagging
-	// Also commit the manifest if it was updated
 	filesToCommit := []string{"version.txt"}
-
-	// Attempt to update manifest.json
-	// We treat this as "best effort" or "if exists" logic, or strict if we know it must exist.
-	// Given this tool is part of the repo, strict is better.
-	if err := updateManifestVersion("extension/manifest.json", newVersion); err == nil {
-		filesToCommit = append(filesToCommit, "extension/manifest.json")
-		fmt.Println("Updated extension/manifest.json")
-	} else if !os.IsNotExist(err) {
-		// Only error if file exists but failed to write/read
-		fmt.Printf("Warning: Failed to update extension/manifest.json: %v\n", err)
-	}
 
 	err = commitVersionFiles(filesToCommit, newVersion.String())
 	if err != nil {
@@ -101,37 +89,6 @@ func main() {
 	}
 
 	fmt.Printf("Successfully bumped to %s, tagged, and pushed.\n", newVersion.String())
-}
-
-// updateManifestVersion reads the manifest, updates the "version" field, and writes it back.
-// It explicitly avoids full JSON marshalling to preserve formatting/order if possible,
-// or just regex replace for simplicity and safety against reordering.
-func updateManifestVersion(filename string, v Version) error {
-	data, err := os.ReadFile(filename)
-	if err != nil {
-		return err
-	}
-
-	// Simple regex replace for "version": "X.Y" or "X.Y.Z"
-	// We want to match "version": "..."
-	// Note: Chrome extensions usually prefer X.Y or X.Y.Z. Our v.String() is v1.4.0.
-	// Extension manifest versions should NOT have 'v'.
-
-	versionStr := fmt.Sprintf("%d.%d", v.Major, v.Minor)
-	// If patch > 0, include it. If 0, maybe keep X.Y? Let's check existing style.
-	// User had "1.0", so "1.4" is fine. "1.4.0" is also fine.
-	// Let's use strict Major.Minor if Patch is 0, else Major.Minor.Patch.
-	if v.Patch > 0 {
-		versionStr = fmt.Sprintf("%d.%d.%d", v.Major, v.Minor, v.Patch)
-	}
-
-	re := regexp.MustCompile(`"version":\s*"[^"]+"`)
-	replacement := fmt.Sprintf(`"version": "%s"`, versionStr)
-
-	newData := re.ReplaceAll(data, []byte(replacement))
-
-	// G306: Expect WriteFile permissions to be 0600
-	return os.WriteFile(filename, newData, 0600)
 }
 
 // readVersionFromFile reads the version string from the specified file.

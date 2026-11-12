@@ -17,13 +17,6 @@ PFX_PASSWORD ?= SpicePassword123
 # Prevent MSYS2/Git-for-Windows bash from converting /d to D:/ etc.
 export MSYS_NO_PATHCONV := 1
 
-# --- Extension Utils ---
-sync-extension:
-	go run cmd/util/sync_regex/main.go
-
-pack-extension:
-	go run cmd/util/pack_extension/main.go
-
 # --- Code Generation ---
 gen-i18n:
 	go run cmd/util/gen_i18n/main.go
@@ -36,9 +29,6 @@ generate: gen-i18n
 	go run cmd/gallerygen/main.go
 
 # --- Build targets ---
-build-extension:
-	@echo "Paintpane does not build the Safari extension. Skipping."
-
 build-win-amd64:
 	set GOOS=windows&& set GOARCH=amd64&& go build -tags release -o bin/paintpane.exe -ldflags "-H=windowsgui $(LDFLAGS_RELEASE)" ./cmd/spice
 
@@ -54,7 +44,7 @@ build-linux-amd64:
 build-linux-arm64:
 	GOOS=linux GOARCH=arm64 go build -tags release -o bin/paintpane-arm64 -ldflags "$(LDFLAGS_RELEASE)" ./cmd/spice
 
-build-darwin-amd64: build-extension
+build-darwin-amd64:
 	@echo "Building Go executable for darwin/amd64..."
 	GOOS=darwin GOARCH=amd64 go build -tags release -o bin/paintpane-darwin-amd64 -ldflags "$(LDFLAGS_RELEASE)" ./cmd/spice
 
@@ -69,7 +59,7 @@ build-darwin-amd64: build-extension
 	@echo "Moving final Paintpane.app to ./bin/..."
 	rm -rf ./bin/Paintpane.app && mv Paintpane.app ./bin/
 
-build-darwin-arm64: build-extension
+build-darwin-arm64:
 	@echo "Building Go executable for darwin/arm64..."
 	GOOS=darwin GOARCH=arm64 go build -tags release -o bin/paintpane-darwin-arm64 -ldflags "$(LDFLAGS_RELEASE)" ./cmd/spice
 

@@ -70,7 +70,7 @@ func NewServer() *Server {
 //   - /local/ serves the program's own sources (Favorites, Local Folder, Google Photos), which call
 //     it with Go's HTTP client: no Origin, no Fetch Metadata. Every browser request is refused.
 //   - /health, /add and /ws are the Spice browser extension's. Paintpane does not ship it, and the
-//     program itself never calls them, but a person may load it from extension/. Its manifest has
+//     program itself never calls them, but a person may load it from the Spice project. Its manifest has
 //     host permissions for 127.0.0.1:49452, so it needs no CORS headers: requests from an
 //     extension origin are accepted, those from web pages are not.
 //   - Every route requires a loopback Host header, which shuts out a page that rebinds its own

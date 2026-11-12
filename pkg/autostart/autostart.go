@@ -21,7 +21,7 @@ import (
 	"strings"
 )
 
-// ValueName is the name of the Run value. installer/Paintpane.iss writes the same one.
+// ValueName is the name of the Run value. assets-src/installer/Paintpane.iss writes the same one.
 const ValueName = "Paintpane"
 
 // Flag is what the Run command passes, so the program knows Windows started it at logon
@@ -105,7 +105,7 @@ func sameCommand(a, b string) bool {
 	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
 }
 
-// SetupMarker is the file installer/Paintpane.iss writes next to the exe it installs. Its presence means the
+// SetupMarker is the file assets-src/installer/Paintpane.iss writes next to the exe it installs. Its presence means the
 // installer has already asked whether to start with Windows (its "Start with Windows" task), so the
 // first run leaves that choice alone, ticked or not. The portable exe has no such file.
 const SetupMarker = "setup.ini"

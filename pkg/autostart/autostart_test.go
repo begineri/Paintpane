@@ -12,7 +12,7 @@ const exe = `C:\Program Files\Paintpane\paintpane.exe`
 
 func TestCommandQuotesThePathAndPassesTheFlag(t *testing.T) {
 	assert.Equal(t, `"C:\Program Files\Paintpane\paintpane.exe" --autostart`, Command(exe))
-	assert.Equal(t, "--autostart", Flag, "pkg/wallpaper and installer/Paintpane.iss use this exact flag")
+	assert.Equal(t, "--autostart", Flag, "pkg/wallpaper and assets-src/installer/Paintpane.iss use this exact flag")
 	assert.Equal(t, "Paintpane", ValueName, "the installer writes the same value name")
 }
 

@@ -1,5 +1,5 @@
-; Paths are relative to this script (installer/). Compile from anywhere: iscc installer\Paintpane.iss
-#define VerFileNum FileOpen(AddBackslash(SourcePath) + "..\version.txt")
+; Paths are relative to this script (assets-src/installer/). Compile from anywhere: iscc assets-src\installer\Paintpane.iss
+#define VerFileNum FileOpen(AddBackslash(SourcePath) + "..\..\version.txt")
 #define MyAppVersion Trim(StringChange(FileRead(VerFileNum),"v",""))
 
 // Define platform based on command-line define from CI (or default)
@@ -22,7 +22,7 @@ AppPublisher=begineri/Paintpane
 SetupIconFile=Paintpane.ico
 Compression=lzma2
 SolidCompression=yes
-OutputDir=..\bin
+OutputDir=..\..\bin
 WizardStyle=modern
 AppVerName=Paintpane - Museum Art Wallpapers v{#MyAppVersion}
 DisableWelcomePage=no
@@ -31,7 +31,7 @@ UninstallDisplayIcon={app}\paintpane.exe
 DisableProgramGroupPage=Yes
 
 [Files]
-Source: ..\bin\paintpane.exe; DestDir: {app}; Flags: ignoreversion
+Source: ..\..\bin\paintpane.exe; DestDir: {app}; Flags: ignoreversion
 Source: Paintpane.ico; DestDir: {app}; Flags: ignoreversion
 
 [Icons]

@@ -108,12 +108,12 @@ func main() {
 	for _, s := range sizes {
 		icons = append(icons, icon(s))
 	}
-	writeICO(out("installer/Paintpane.ico"), icons)
+	writeICO(out("assets-src/installer/Paintpane.ico"), icons)
 	writePNG(out("asset/icons/tray.png"), icon(118))
 	writePNG(out("asset/images/splash.png"), splash(1, -1, true))
 	frames, delays := aboutFrames()
 	writeGIF(out("asset/images/about_splash.gif"), frames, delays)
-	writeBMP(out("installer/Paintpane.bmp"), wizardImage())
+	writeBMP(out("assets-src/installer/Paintpane.bmp"), wizardImage())
 
 	if *preview != "" {
 		writePNG(*preview, previewSheet(append(icons[:3:3], icon(48), icon(64), icon(118))))

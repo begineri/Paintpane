@@ -1,6 +1,6 @@
 <!-- markdownlint-disable MD033 MD041 -->
-<!-- README.zh-CN.md mirrors this file block for block; change both together. -->
-<p align="center"><b>English</b> | <a href="README.zh-CN.md">简体中文</a></p>
+<!-- docs/README.zh-CN.md mirrors this file block for block; change both together. -->
+<p align="center"><b>English</b> | <a href="docs/README.zh-CN.md">简体中文</a></p>
 
 <p align="center"><img src="site/assets/icon-256.png" width="96" height="96" alt="Paintpane"></p>
 
@@ -60,7 +60,7 @@ The website is plain HTML and CSS in [`site/`](site/); open `site/index.html` in
 
 ## Contributing
 
-Ideas and bug reports are welcome in [Issues](https://github.com/begineri/Paintpane/issues). Please report Paintpane problems here, not to the Spice project. If you would like to contribute code, see [CONTRIBUTING.md](CONTRIBUTING.md).
+Ideas and bug reports are welcome in [Issues](https://github.com/begineri/Paintpane/issues). Please report Paintpane problems here, not to the Spice project. If you would like to contribute code, see [CONTRIBUTING.md](.github/CONTRIBUTING.md).
 
 ## Credits
 

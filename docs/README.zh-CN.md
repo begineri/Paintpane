@@ -1,8 +1,8 @@
 <!-- markdownlint-disable MD033 MD041 -->
 <!-- Chinese README, mirrors README.md block for block; change both together. -->
-<p align="center"><a href="README.md">English</a> | <b>简体中文</b></p>
+<p align="center"><a href="../README.md">English</a> | <b>简体中文</b></p>
 
-<p align="center"><img src="site/assets/icon-256.png" width="96" height="96" alt="观画壁纸"></p>
+<p align="center"><img src="../site/assets/icon-256.png" width="96" height="96" alt="观画壁纸"></p>
 
 <h1 align="center">观画壁纸（Paintpane）</h1>
 
@@ -10,7 +10,7 @@
 
 <p align="center"><a href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe"><b>下载 Windows 版</b></a> · <a href="https://begineri.github.io/Paintpane/zh/">介绍页</a></p>
 
-<p align="center"><img src="site/assets/img/s1-desktop.jpg" width="720" alt="Windows 桌面上完整显示雷诺阿的《两姐妹（在露台上）》"><br><sub>《两姐妹（在露台上）》— 皮埃尔-奥古斯特·雷诺阿 · 芝加哥艺术博物馆</sub></p>
+<p align="center"><img src="../site/assets/img/s1-desktop.jpg" width="720" alt="Windows 桌面上完整显示雷诺阿的《两姐妹（在露台上）》"><br><sub>《两姐妹（在露台上）》— 皮埃尔-奥古斯特·雷诺阿 · 芝加哥艺术博物馆</sub></p>
 
 把你的 Windows 壁纸换成博物馆里的名画，随时欣赏，自由选择。
 
@@ -56,11 +56,11 @@ go build -tags release -o bin/paintpane.exe -ldflags "-s -w -H=windowsgui -X mai
 
 Go 模块路径仍是 `github.com/dixieflatline76/Spice/v2`，有意保留，方便和 Spice 的代码对照。
 
-介绍页是 [`site/`](site/) 里的纯 HTML 和 CSS，用浏览器打开 `site/zh/index.html` 即可预览。
+介绍页是 [`site/`](../site/) 里的纯 HTML 和 CSS，用浏览器打开 `site/zh/index.html` 即可预览。
 
 ## 参与贡献
 
-欢迎在 [Issues](https://github.com/begineri/Paintpane/issues) 提建议、报 bug。观画壁纸的问题请报到这里，不要报给 Spice 项目。想提交代码，请看 [CONTRIBUTING.md](CONTRIBUTING.md)。
+欢迎在 [Issues](https://github.com/begineri/Paintpane/issues) 提建议、报 bug。观画壁纸的问题请报到这里，不要报给 Spice 项目。想提交代码，请看 [CONTRIBUTING.md](../.github/CONTRIBUTING.md)。
 
 ## 致谢
 
@@ -68,4 +68,4 @@ Go 模块路径仍是 `github.com/dixieflatline76/Spice/v2`，有意保留，方
 
 ## 许可证
 
-与 Spice 相同，使用 [PolyForm Noncommercial License 1.0.0](LICENSE)，并保留 Karl Kwong 的版权声明。**仅限非商业用途**：可以使用、修改、分享，但不能用于商业目的或获取报酬。详见 [NOTICE.md](NOTICE.md)。
+与 Spice 相同，使用 [PolyForm Noncommercial License 1.0.0](../LICENSE)，并保留 Karl Kwong 的版权声明。**仅限非商业用途**：可以使用、修改、分享，但不能用于商业目的或获取报酬。详见 [NOTICE.md](../NOTICE.md)。
