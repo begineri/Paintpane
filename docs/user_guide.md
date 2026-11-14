@@ -300,6 +300,9 @@ Art has no borders. Spice integrates with the world’s leading cultural institu
 - **Statens Museum for Kunst** (Copenhagen, Denmark)
 - **National Palace Museum** (Taipei, Taiwan)
 - **J. Paul Getty Museum** (Los Angeles, CA, USA)
+- **National Gallery of Art** (Washington, DC, USA)
+- **Yale University Art Collections** (New Haven, CT, USA)
+- **Paris Musées** (Paris, France)
 
 **The "Director's Cut" Collections:**
 Each museum provides curated collections designed to showcase institutional highlights:

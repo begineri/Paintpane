@@ -13,7 +13,8 @@ import (
 func museumOrFavoritesProvider(provider string) bool {
 	switch provider {
 	case "Favorites", "MetMuseum", "ArtInstituteChicago", "Rijksmuseum", "ClevelandMuseum",
-		"Getty", "NationalPalaceMuseum", "StatensMuseumForKunst":
+		"Getty", "NationalPalaceMuseum", "StatensMuseumForKunst", "NationalGalleryOfArt",
+		"YaleUniversityArtCollections", "ParisMusees":
 		return true
 	}
 	return false

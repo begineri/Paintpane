@@ -86,3 +86,53 @@ func TestIIIFScaledURL_LeavesTheURLAlone(t *testing.T) {
 		})
 	}
 }
+
+func TestIIIFImageURL(t *testing.T) {
+	assert.Equal(t, "https://iiif.example/abc/full/!3840,3840/0/default.jpg", IIIFImageURL("https://iiif.example/abc", 3840))
+	assert.Equal(t, "https://iiif.example/abc/full/!800,800/0/default.jpg", IIIFImageURL("https://iiif.example/abc/", 800))
+}
+
+func TestIIIFBase(t *testing.T) {
+	const prefix = "https://iiif.example/"
+	assert.Equal(t, "https://iiif.example/abc", IIIFBase("https://iiif.example/abc/full/!3840,3840/0/default.jpg", prefix))
+	assert.Equal(t, "https://iiif.example/abc", IIIFBase("https://iiif.example/abc", prefix))
+	assert.Equal(t, "https://iiif.example/abc", IIIFBase("https://iiif.example/abc/", prefix))
+	assert.Empty(t, IIIFBase("https://other.example/abc/full/max/0/default.jpg", prefix), "another service is not rewritten")
+	assert.Empty(t, IIIFBase("https://iiif.example/abc", ""))
+}
+
+func TestIIIFScaledSize(t *testing.T) {
+	w, h := IIIFScaledSize(12070, 15257, 3840)
+	assert.Equal(t, 3840, h)
+	assert.InDelta(t, 3038, w, 1)
+
+	w, h = IIIFScaledSize(30000, 10000, 3840)
+	assert.Equal(t, 3840, w)
+	assert.InDelta(t, 1280, h, 1)
+
+	w, h = IIIFScaledSize(2000, 1500, 3840) // never enlarged
+	assert.Equal(t, 2000, w)
+	assert.Equal(t, 1500, h)
+
+	w, h = IIIFScaledSize(0, 1500, 3840)
+	assert.Zero(t, w)
+	assert.Zero(t, h)
+}
+
+func TestIIIFLargeImageURL(t *testing.T) {
+	u, w, h := IIIFLargeImageURL("https://iiif.example/abc/", 10104, 7479, 100_000_000)
+	assert.Equal(t, "https://iiif.example/abc/full/max/0/default.jpg", u, "within the limit: the full size")
+	assert.Equal(t, 10104, w)
+	assert.Equal(t, 7479, h)
+
+	u, w, h = IIIFLargeImageURL("https://iiif.example/abc", 13994, 9000, 100_000_000)
+	assert.Equal(t, "https://iiif.example/abc/full/!12469,8019/0/default.jpg", u, "over the limit: the largest copy within it")
+	assert.LessOrEqual(t, int64(w)*int64(h), int64(100_000_000))
+	assert.Equal(t, 12469, w)
+	assert.Equal(t, 8019, h)
+
+	u, w, h = IIIFLargeImageURL("https://iiif.example/abc", 0, 9000, 100_000_000)
+	assert.Empty(t, u)
+	assert.Zero(t, w)
+	assert.Zero(t, h)
+}

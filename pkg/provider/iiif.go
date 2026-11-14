@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"regexp"
 	"strings"
@@ -111,4 +112,55 @@ func fetchIIIFInfo(ctx context.Context, client *http.Client, base string) (iiifI
 		return iiifInfo{}, err
 	}
 	return info, nil
+}
+
+// IIIFImageURL is the IIIF Image API request for an image scaled to fit an edge x edge box:
+// the longest side of the result is at most edge pixels. base is the image identifier URL
+// (the service address plus the image id, without "/full/...").
+func IIIFImageURL(base string, edge int) string {
+	return fmt.Sprintf("%s/full/!%d,%d/0/default.jpg", strings.TrimRight(base, "/"), edge, edge)
+}
+
+// IIIFBase returns the image identifier URL from a full IIIF image request, or from the bare
+// identifier itself. It returns "" when rawURL does not start with prefix, so a URL from
+// another service is never rewritten.
+func IIIFBase(rawURL, prefix string) string {
+	if prefix == "" || !strings.HasPrefix(rawURL, prefix) {
+		return ""
+	}
+	if i := strings.Index(rawURL, "/full/"); i >= 0 {
+		return rawURL[:i]
+	}
+	return strings.TrimRight(rawURL, "/")
+}
+
+// IIIFLargeImageURL is the request for an image of w x h at its full size, or, when it has more
+// than maxPixels, for the largest copy within maxPixels; it also returns the size the request
+// gets. It is the request while High-resolution originals is on, for servers that send the full
+// size. It returns "", 0, 0 when the size is not known.
+func IIIFLargeImageURL(base string, w, h int, maxPixels int64) (string, int, int) {
+	if w <= 0 || h <= 0 {
+		return "", 0, 0
+	}
+	base = strings.TrimRight(base, "/")
+	if maxPixels <= 0 || int64(w)*int64(h) <= maxPixels {
+		return base + "/full/max/0/default.jpg", w, h
+	}
+	s := math.Sqrt(float64(maxPixels) / (float64(w) * float64(h)))
+	sw, sh := max(1, int(float64(w)*s)), max(1, int(float64(h)*s))
+	return fmt.Sprintf("%s/full/!%d,%d/0/default.jpg", base, sw, sh), sw, sh
+}
+
+// IIIFScaledSize is the size of an image of w x h once requested with IIIFImageURL(_, edge).
+// IIIF does not enlarge, so an image that already fits keeps its size. It returns 0, 0 when
+// the size is not known.
+func IIIFScaledSize(w, h, edge int) (int, int) {
+	if w <= 0 || h <= 0 || edge <= 0 {
+		return 0, 0
+	}
+	long := max(w, h)
+	if long <= edge {
+		return w, h
+	}
+	return max(1, w*edge/long), max(1, h*edge/long)
 }

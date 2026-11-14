@@ -230,7 +230,7 @@ func GenerateHTML(title string, titleTranslations map[string]string, items []Gal
             {{end}}
             {{if or .Title .Artist}}
             <div class="paper-label">
-                {{if .Title}}<div class="title">{{.Title}}</div>{{end}}
+                {{if .Title}}<div class="title"{{if .TitleKey}} data-i18n="{{.TitleKey}}"{{end}}>{{.Title}}</div>{{end}}
                 {{if .Artist}}<div class="artist">{{.Artist}}</div>{{end}}
                 {{if .Year}}<div class="year">{{.Year}}</div>{{end}}
             </div>
@@ -320,13 +320,29 @@ func GenerateHTML(title string, titleTranslations map[string]string, items []Gal
 		URL       template.URL
 		ViewURL   template.URL
 		Title     string
+		TitleKey  string
 		Artist    string
 		Year      string
 	}
 
+	// Artwork titles in other languages go into the same dictionary as the page strings, under a
+	// key per work ("artwork:<id>"), so two works that share an English title can differ.
+	artworkTrans := map[string]map[string]string{}
+
 	var safeItems []SafeItem
 	for _, it := range items {
+		titleKey := ""
+		if it.Title != "" && len(it.TitleTranslations) > 0 {
+			titleKey = ArtworkTitleKey(it)
+			for lang, t := range it.TitleTranslations {
+				if artworkTrans[lang] == nil {
+					artworkTrans[lang] = map[string]string{}
+				}
+				artworkTrans[lang][titleKey] = t
+			}
+		}
 		safeItems = append(safeItems, SafeItem{
+			TitleKey:  titleKey,
 			LeftPct:   it.LeftPct,
 			TopPct:    it.TopPct,
 			WidthPct:  it.WidthPct,
@@ -378,6 +394,14 @@ func GenerateHTML(title string, titleTranslations map[string]string, items []Gal
 		}
 		uiTrans[langCode][title] = localizedTitle
 	}
+	for langCode, titles := range artworkTrans {
+		if uiTrans[langCode] == nil {
+			uiTrans[langCode] = make(map[string]string)
+		}
+		for k, v := range titles {
+			uiTrans[langCode][k] = v
+		}
+	}
 
 	transBytes, _ := json.Marshal(uiTrans)
 
@@ -401,4 +425,13 @@ func GenerateHTML(title string, titleTranslations map[string]string, items []Gal
 	}
 
 	return buf.String(), nil
+}
+
+// ArtworkTitleKey is the page dictionary key for a work's title in other languages: the title
+// label carries it as data-i18n, so the page's script swaps the text like any other string.
+func ArtworkTitleKey(it GalleryItem) string {
+	if it.ID == "" {
+		return "artwork:" + it.Title
+	}
+	return "artwork:" + it.ID
 }

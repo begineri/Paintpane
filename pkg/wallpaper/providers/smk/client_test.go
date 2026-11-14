@@ -117,22 +117,29 @@ func TestHedgeTransportReturnsImmediateErrors(t *testing.T) {
 
 // A body that keeps arriving, however slowly, is not cut off; the app's shared client gave up on
 // any download after 60 s in total.
+//
+// The whole body takes longer than the stall timeout, but no gap between reads comes near it. The
+// timer counts real time between reads, so a gap that is close to it fails the test whenever the
+// machine holds up the server or the reader for the difference: with 60 ms gaps against 200 ms it
+// failed once under memory pressure, and a single 250 ms pause of the reader failed it every time.
+// Now a pause has to last almost a second.
 func TestStallBodyKeepsSlowBodies(t *testing.T) {
+	const chunks, gap, stall = 25, 50 * time.Millisecond, time.Second // 1.25 s in all
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		for i := 0; i < 6; i++ {
+		for i := 0; i < chunks; i++ {
 			_, _ = w.Write([]byte("0123456789"))
 			w.(http.Flusher).Flush()
-			time.Sleep(60 * time.Millisecond)
+			time.Sleep(gap)
 		}
 	}))
 	defer srv.Close()
 
-	resp, err := testClient(time.Second, time.Second, 200*time.Millisecond, 3).Get(srv.URL)
+	resp, err := testClient(time.Second, time.Second, stall, 3).Get(srv.URL)
 	require.NoError(t, err)
 	defer resp.Body.Close()
 	b, err := io.ReadAll(resp.Body)
 	require.NoError(t, err)
-	assert.Len(t, b, 60)
+	assert.Len(t, b, chunks*10)
 }
 
 // A body that stops moving ends with a timeout error, which the downloader retries.

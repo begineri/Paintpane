@@ -1,0 +1,1969 @@
+{
+    "version": "v1.0.0",
+    "description": "Paris Musées: Curated Collections (CC0 Open Content)",
+    "collections": [
+        {
+            "key": "pm_masterpieces",
+            "name": "⭐ Best of Paris Musées",
+            "name_translations": {
+                "de": "⭐ Das Beste der Paris Musées",
+                "es": "⭐ Lo mejor de Paris Musées",
+                "fr": "⭐ Le meilleur de Paris Musées",
+                "it": "⭐ Il meglio di Paris Musées",
+                "ja": "⭐ パリ・ミュゼのベスト",
+                "pt": "⭐ O melhor dos Paris Musées",
+                "ru": "⭐ Лучшее из Paris Musées",
+                "uk": "⭐ Найкраще з Paris Musées",
+                "zh-CN": "⭐ 巴黎市立博物馆精选",
+                "zh-TW": "⭐ 巴黎市立博物館精選"
+            },
+            "type": "curated",
+            "items": [
+                {
+                    "id": "soleil-couchant-sur-la-seine-a-lavacourt-effet-d-hiver",
+                    "title": "Soleil couchant sur la Seine à Lavacourt, effet d'hiver",
+                    "artist": "Claude Monet",
+                    "year": "1880",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_143990-30.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/soleil-couchant-sur-la-seine-a-lavacourt-effet-d-hiver",
+                    "width": 5519,
+                    "height": 3691,
+                    "title_translations": {
+                        "en": "Sunset on the Seine at Lavacourt, Winter Effect",
+                        "zh-CN": "拉瓦库尔的塞纳河日落，冬日景象",
+                        "zh-TW": "拉瓦庫爾的塞納河日落，冬日景象"
+                    }
+                },
+                {
+                    "id": "portrait-d-ambroise-vollard",
+                    "title": "Portrait d'Ambroise Vollard",
+                    "artist": "Paul Cézanne",
+                    "year": "1899",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_25399-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/portrait-d-ambroise-vollard",
+                    "width": 3540,
+                    "height": 4361,
+                    "title_translations": {
+                        "en": "Portrait of Ambroise Vollard",
+                        "zh-CN": "安布鲁瓦兹·沃拉尔肖像",
+                        "zh-TW": "安布魯瓦茲·沃拉爾肖像"
+                    }
+                },
+                {
+                    "id": "les-demoiselles-des-bords-de-la-seine-3-9t-3-9",
+                    "title": "Les demoiselles des bords de la Seine (été)",
+                    "artist": "Gustave Courbet",
+                    "year": "1857",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/meero_ppp00377_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/les-demoiselles-des-bords-de-la-seine-%C3%A9t%C3%A9",
+                    "width": 4230,
+                    "height": 3563,
+                    "title_translations": {
+                        "en": "Young Ladies on the Banks of the Seine (Summer)",
+                        "zh-CN": "塞纳河畔的少女们（夏）",
+                        "zh-TW": "塞納河畔的少女們（夏）"
+                    }
+                },
+                {
+                    "id": "pierre-joseph-proudhon-et-ses-enfants-en-1853",
+                    "title": "Pierre-Joseph Proudhon et ses enfants en 1853",
+                    "artist": "Gustave Courbet",
+                    "year": "1865",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/26986-20.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/pierre-joseph-proudhon-et-ses-enfants-en-1853",
+                    "width": 4647,
+                    "height": 3543,
+                    "title_translations": {
+                        "en": "Pierre-Joseph Proudhon and His Children in 1853",
+                        "zh-CN": "皮埃尔-约瑟夫·蒲鲁东和他的孩子们（1853 年）",
+                        "zh-TW": "皮耶-約瑟夫·蒲魯東和他的孩子們（1853 年）"
+                    }
+                },
+                {
+                    "id": "la-sieste-pendant-la-saison-des-foins",
+                    "title": "La Sieste pendant la saison des foins",
+                    "artist": "Gustave Courbet",
+                    "year": "1867–1868",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/meero_ppp00035_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/la-sieste-pendant-la-saison-des-foins",
+                    "width": 4085,
+                    "height": 3165,
+                    "title_translations": {
+                        "en": "The Siesta in Haymaking Season",
+                        "zh-CN": "割草季节的午睡",
+                        "zh-TW": "割草季節的午睡"
+                    }
+                },
+                {
+                    "id": "l-eglise-de-moret-le-soir",
+                    "title": "L'Eglise de Moret (le soir)",
+                    "artist": "Alfred Sisley",
+                    "year": "1894",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_70009-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/l-eglise-de-moret-le-soir",
+                    "width": 3661,
+                    "height": 4522,
+                    "title_translations": {
+                        "en": "The Church at Moret (Evening)",
+                        "zh-CN": "莫雷的教堂（傍晚）",
+                        "zh-TW": "莫雷的教堂（傍晚）"
+                    }
+                },
+                {
+                    "id": "les-scieurs-de-long",
+                    "title": "Les Scieurs de long",
+                    "artist": "Alfred Sisley",
+                    "year": "1876",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_78076-23.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/les-scieurs-de-long",
+                    "width": 6687,
+                    "height": 5187,
+                    "title_translations": {
+                        "en": "The Sawyers",
+                        "zh-CN": "锯木工",
+                        "zh-TW": "鋸木工"
+                    }
+                },
+                {
+                    "id": "personnages-dans-un-interieur-la-musique",
+                    "title": "Personnages dans un intérieur. La musique",
+                    "artist": "Edouard Vuillard",
+                    "year": "1896",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_25525-14.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/personnages-dans-un-interieur-la-musique",
+                    "width": 3400,
+                    "height": 4751,
+                    "title_translations": {
+                        "en": "Figures in an Interior: Music",
+                        "zh-CN": "室内人物：音乐",
+                        "zh-TW": "室內人物：音樂"
+                    }
+                },
+                {
+                    "id": "personnages-dans-un-interieur-le-choix-des-livres",
+                    "title": "Personnages dans un intérieur. Le choix des livres",
+                    "artist": "Edouard Vuillard",
+                    "year": "1896",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_25525-15.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/personnages-dans-un-interieur-le-choix-des-livres",
+                    "width": 2432,
+                    "height": 6700,
+                    "title_translations": {
+                        "en": "Figures in an Interior: Choosing Books",
+                        "zh-CN": "室内人物：挑选书籍",
+                        "zh-TW": "室內人物：挑選書籍"
+                    }
+                },
+                {
+                    "id": "personnages-dans-un-interieur-le-travail",
+                    "title": "Personnages dans un intérieur. Le travail",
+                    "artist": "Edouard Vuillard",
+                    "year": "1896",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_26321-12.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/personnages-dans-un-interieur-le-travail",
+                    "width": 2604,
+                    "height": 7091,
+                    "title_translations": {
+                        "en": "Figures in an Interior: Work",
+                        "zh-CN": "室内人物：工作",
+                        "zh-TW": "室內人物：工作"
+                    }
+                },
+                {
+                    "id": "sur-le-boulevard-0",
+                    "title": "Sur le boulevard",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1880",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_36757-7.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/sur-le-boulevard-0",
+                    "width": 3504,
+                    "height": 4565,
+                    "title_translations": {
+                        "en": "On the Boulevard",
+                        "zh-CN": "在大道上",
+                        "zh-TW": "在大道上"
+                    }
+                },
+                {
+                    "id": "la-mort-de-gericault",
+                    "title": "La Mort de Géricault",
+                    "artist": "Ary Scheffer",
+                    "year": "c. 1824",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MVR/lpdp_25300-5.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-de-la-vie-romantique/oeuvres/la-mort-de-gericault",
+                    "width": 4267,
+                    "height": 3519,
+                    "title_translations": {
+                        "en": "The Death of Géricault",
+                        "zh-CN": "籍里柯之死",
+                        "zh-TW": "傑利柯之死"
+                    }
+                },
+                {
+                    "id": "la-priere-du-matin",
+                    "title": "La Prière du matin",
+                    "artist": "Jean-Baptiste Greuze",
+                    "year": "1775–1800",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/COG/25930-6.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-cognacq-jay/oeuvres/la-priere-du-matin",
+                    "width": 2382,
+                    "height": 3000,
+                    "title_translations": {
+                        "en": "The Morning Prayer",
+                        "zh-CN": "晨祷",
+                        "zh-TW": "晨禱"
+                    }
+                },
+                {
+                    "id": "portrait-de-madame-de-bonnieres",
+                    "title": "Portrait de Madame de Bonnières",
+                    "artist": "Auguste Renoir",
+                    "year": "1889",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_25800-10.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/portrait-de-madame-de-bonnieres",
+                    "width": 2282,
+                    "height": 2987,
+                    "title_translations": {
+                        "en": "Portrait of Madame de Bonnières",
+                        "zh-CN": "博尼埃尔夫人肖像",
+                        "zh-TW": "博尼埃爾夫人肖像"
+                    }
+                },
+                {
+                    "id": "l-amour-en-sentinelle",
+                    "title": "L'Amour en sentinelle",
+                    "artist": "Jean-Honoré Fragonard",
+                    "year": "c. 1780",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/COG/lpdp_25921-20.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-cognacq-jay/oeuvres/l-amour-en-sentinelle",
+                    "width": 4196,
+                    "height": 5064,
+                    "title_translations": {
+                        "en": "Love the Sentinel",
+                        "zh-CN": "站岗的爱神",
+                        "zh-TW": "站崗的愛神"
+                    }
+                },
+                {
+                    "id": "parisienne-sur-la-place-de-la-concorde",
+                    "title": "Parisienne sur la place de la Concorde",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1885",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_37880-5.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/parisienne-sur-la-place-de-la-concorde",
+                    "width": 3486,
+                    "height": 4590,
+                    "title_translations": {
+                        "en": "Parisian Woman on the Place de la Concorde",
+                        "zh-CN": "协和广场上的巴黎女子",
+                        "zh-TW": "協和廣場上的巴黎女子"
+                    }
+                }
+            ]
+        },
+        {
+            "key": "pm_impressionism",
+            "name": "Impressionists & Post-Impressionists",
+            "name_translations": {
+                "de": "Impressionismus & Postimpressionismus",
+                "es": "Impresionismo y posimpresionismo",
+                "fr": "Impressionnisme et post-impressionnisme",
+                "it": "Impressionismo e postimpressionismo",
+                "ja": "印象派と後期印象派",
+                "pt": "Impressionismo e pós-impressionismo",
+                "ru": "Импрессионизм и постимпрессионизм",
+                "uk": "Імпресіонізм і постімпресіонізм",
+                "zh-CN": "印象派与后印象派",
+                "zh-TW": "印象派與後印象派"
+            },
+            "type": "curated",
+            "items": [
+                {
+                    "id": "lisiere-de-la-foret-de-fontainebleau",
+                    "title": "Lisière de la forêt de Fontainebleau",
+                    "artist": "Alfred Sisley",
+                    "year": "1865",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/meero_ppp00693_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/lisiere-de-la-foret-de-fontainebleau",
+                    "width": 5232,
+                    "height": 3317,
+                    "title_translations": {
+                        "en": "Edge of the Forest of Fontainebleau",
+                        "zh-CN": "枫丹白露森林边缘",
+                        "zh-TW": "楓丹白露森林邊緣"
+                    }
+                },
+                {
+                    "id": "le-remorqueur-le-loing-a-saint-mammes",
+                    "title": "Le Remorqueur, le Loing à Saint-Mammès",
+                    "artist": "Alfred Sisley",
+                    "year": "c. 1883",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/26981-5.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/le-remorqueur-le-loing-a-saint-mammes",
+                    "width": 3733,
+                    "height": 2752,
+                    "title_translations": {
+                        "en": "The Tugboat, the Loing at Saint-Mammès",
+                        "zh-CN": "拖船，圣马梅的卢万河",
+                        "zh-TW": "拖船，聖馬梅的盧萬河"
+                    }
+                },
+                {
+                    "id": "le-pont-royal-et-le-pavillon-de-flore",
+                    "title": "Le Pont Royal et le Pavillon de Flore",
+                    "artist": "Camille Pissarro",
+                    "year": "1903",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_50680-3.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/le-pont-royal-et-le-pavillon-de-flore",
+                    "width": 4541,
+                    "height": 3775,
+                    "title_translations": {
+                        "en": "The Pont Royal and the Pavillon de Flore",
+                        "zh-CN": "皇家桥与花神阁",
+                        "zh-TW": "皇家橋與花神閣"
+                    }
+                },
+                {
+                    "id": "le-village-de-knocke",
+                    "title": "Le Village de Knocke",
+                    "artist": "Camille Pissarro",
+                    "year": "1894",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_26981-4.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/le-village-de-knocke",
+                    "width": 3150,
+                    "height": 2631,
+                    "title_translations": {
+                        "en": "The Village of Knokke",
+                        "zh-CN": "克诺克村",
+                        "zh-TW": "克諾克村"
+                    }
+                },
+                {
+                    "id": "rochers-et-branches-a-bibemus",
+                    "title": "Rochers et branches à Bibémus",
+                    "artist": "Paul Cézanne",
+                    "year": "1895–1904",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_72167-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/rochers-et-branches-a-bibemus",
+                    "width": 3780,
+                    "height": 4615,
+                    "title_translations": {
+                        "en": "Rocks and Branches at Bibémus",
+                        "zh-CN": "比贝米斯的岩石与树枝",
+                        "zh-TW": "比貝米斯的岩石與樹枝"
+                    }
+                },
+                {
+                    "id": "les-quatre-saisons-l-hiver",
+                    "title": "Les Quatre Saisons - L'hiver",
+                    "artist": "Paul Cézanne",
+                    "year": "c. 1860",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_24769-9.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/les-quatre-saisons-l-hiver",
+                    "width": 3334,
+                    "height": 10000,
+                    "title_translations": {
+                        "en": "The Four Seasons: Winter",
+                        "zh-CN": "四季：冬",
+                        "zh-TW": "四季：冬"
+                    }
+                },
+                {
+                    "id": "les-quatre-saisons-l-automne",
+                    "title": "Les Quatre Saisons - L'automne",
+                    "artist": "Paul Cézanne",
+                    "year": "c. 1860",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_24769-10.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/les-quatre-saisons-l-automne",
+                    "width": 2375,
+                    "height": 6888,
+                    "title_translations": {
+                        "en": "The Four Seasons: Autumn",
+                        "zh-CN": "四季：秋",
+                        "zh-TW": "四季：秋"
+                    }
+                },
+                {
+                    "id": "les-quatre-saisons-l-ete",
+                    "title": "Les Quatre Saisons - L'été",
+                    "artist": "Paul Cézanne",
+                    "year": "c. 1860",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_24769-11.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/les-quatre-saisons-l-ete",
+                    "width": 3499,
+                    "height": 10000,
+                    "title_translations": {
+                        "en": "The Four Seasons: Summer",
+                        "zh-CN": "四季：夏",
+                        "zh-TW": "四季：夏"
+                    }
+                },
+                {
+                    "id": "les-quatre-saisons-le-printemps",
+                    "title": "Les Quatre Saisons - Le printemps",
+                    "artist": "Paul Cézanne",
+                    "year": "c. 1860",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_24769-12.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/les-quatre-saisons-le-printemps",
+                    "width": 3121,
+                    "height": 10000,
+                    "title_translations": {
+                        "en": "The Four Seasons: Spring",
+                        "zh-CN": "四季：春",
+                        "zh-TW": "四季：春"
+                    }
+                },
+                {
+                    "id": "peche-et-raisins",
+                    "title": "Pêche et raisins",
+                    "artist": "Auguste Renoir",
+                    "year": "c. 1914",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_84245-13.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/peche-et-raisins",
+                    "width": 7909,
+                    "height": 4425,
+                    "title_translations": {
+                        "en": "Peach and Grapes",
+                        "zh-CN": "桃子与葡萄",
+                        "zh-TW": "桃子與葡萄"
+                    }
+                },
+                {
+                    "id": "jeune-femme-a-la-rose",
+                    "title": "Jeune femme à la rose",
+                    "artist": "Auguste Renoir",
+                    "year": "1918–1919",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_26392-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/jeune-femme-a-la-rose",
+                    "width": 3791,
+                    "height": 4706,
+                    "title_translations": {
+                        "en": "Young Woman with a Rose",
+                        "zh-CN": "手持玫瑰的年轻女子",
+                        "zh-TW": "手持玫瑰的年輕女子"
+                    }
+                },
+                {
+                    "id": "femme-lisant-dans-un-paysage",
+                    "title": "Femme lisant dans un paysage",
+                    "artist": "Auguste Renoir",
+                    "year": "c. 1917",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_42938-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/femme-lisant-dans-un-paysage",
+                    "width": 3737,
+                    "height": 4146,
+                    "title_translations": {
+                        "en": "Woman Reading in a Landscape",
+                        "zh-CN": "风景中阅读的女子",
+                        "zh-TW": "風景中閱讀的女子"
+                    }
+                },
+                {
+                    "id": "bouquet-de-narcisses-et-de-roses",
+                    "title": "Bouquet de narcisses et de roses",
+                    "artist": "Auguste Renoir",
+                    "year": "c. 1914",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_42938-2bis.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/bouquet-de-narcisses-et-de-roses",
+                    "width": 3000,
+                    "height": 3521,
+                    "title_translations": {
+                        "en": "Bouquet of Daffodils and Roses",
+                        "zh-CN": "水仙与玫瑰花束",
+                        "zh-TW": "水仙與玫瑰花束"
+                    }
+                },
+                {
+                    "id": "vieil-homme-au-baton",
+                    "title": "Vieil homme au bâton",
+                    "artist": "Paul Gauguin",
+                    "year": "1888",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_25238-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/vieil-homme-au-baton",
+                    "width": 1989,
+                    "height": 3007,
+                    "title_translations": {
+                        "en": "Old Man with a Stick",
+                        "zh-CN": "拄杖老人",
+                        "zh-TW": "拄杖老人"
+                    }
+                },
+                {
+                    "id": "coup-de-vent-devant-frascati-le-havre",
+                    "title": "Coup de vent devant Frascati, Le Havre",
+                    "artist": "Eugène Boudin",
+                    "year": "1896",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_74299-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/coup-de-vent-devant-frascati-le-havre",
+                    "width": 5708,
+                    "height": 3501,
+                    "title_translations": {
+                        "en": "Gale in Front of Frascati, Le Havre",
+                        "zh-CN": "勒阿弗尔，弗拉斯卡蒂前的大风",
+                        "zh-TW": "勒阿弗爾，弗拉斯卡蒂前的大風"
+                    }
+                },
+                {
+                    "id": "bateaux-echoues-a-maree-basse",
+                    "title": "Bateaux échoués à marée basse",
+                    "artist": "Eugène Boudin",
+                    "year": "c. 1895",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_74045-3.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/bateaux-echoues-a-maree-basse",
+                    "width": 7041,
+                    "height": 3160,
+                    "title_translations": {
+                        "en": "Boats Aground at Low Tide",
+                        "zh-CN": "退潮时搁浅的船",
+                        "zh-TW": "退潮時擱淺的船"
+                    }
+                },
+                {
+                    "id": "le-jardin",
+                    "title": "Le jardin",
+                    "artist": "Pierre Bonnard",
+                    "year": "c. 1936",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MAM/3y05886.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-d-art-moderne/oeuvres/le-jardin",
+                    "width": 476,
+                    "height": 600,
+                    "title_translations": {
+                        "en": "The Garden",
+                        "zh-CN": "花园",
+                        "zh-TW": "花園"
+                    }
+                },
+                {
+                    "id": "le-dejeuner-0",
+                    "title": "Le déjeuner",
+                    "artist": "Pierre Bonnard",
+                    "year": "c. 1932",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MAM/3y05884.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-d-art-moderne/oeuvres/le-dejeuner-0",
+                    "width": 600,
+                    "height": 480,
+                    "title_translations": {
+                        "en": "The Luncheon",
+                        "zh-CN": "午餐",
+                        "zh-TW": "午餐"
+                    }
+                },
+                {
+                    "id": "une-rue-a-delft-le-soir",
+                    "title": "Une rue à Delft, le soir",
+                    "artist": "Johan Barthold Jongkind",
+                    "year": "1868",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_26980-12.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/une-rue-a-delft-le-soir",
+                    "width": 2787,
+                    "height": 2115,
+                    "title_translations": {
+                        "en": "A Street in Delft, Evening",
+                        "zh-CN": "代尔夫特的街道，傍晚",
+                        "zh-TW": "台夫特的街道，傍晚"
+                    }
+                },
+                {
+                    "id": "clair-de-lune-a-overschie-environs-de-rotterdam",
+                    "title": "Clair de lune à Overschie (environs de Rotterdam)",
+                    "artist": "Johan Barthold Jongkind",
+                    "year": "1855",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_74345-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/clair-de-lune-a-overschie-environs-de-rotterdam",
+                    "width": 4831,
+                    "height": 3661,
+                    "title_translations": {
+                        "en": "Moonlight at Overschie (near Rotterdam)",
+                        "zh-CN": "奥弗斯希的月光（鹿特丹附近）",
+                        "zh-TW": "奧弗斯希的月光（鹿特丹附近）"
+                    }
+                }
+            ]
+        },
+        {
+            "key": "pm_french_masters",
+            "name": "French Romantics & Realists",
+            "name_translations": {
+                "de": "Französische Romantiker & Realisten",
+                "es": "Románticos y realistas franceses",
+                "fr": "Romantiques et réalistes français",
+                "it": "Romantici e realisti francesi",
+                "ja": "フランスのロマン派と写実主義",
+                "pt": "Românticos e realistas franceses",
+                "ru": "Французские романтики и реалисты",
+                "uk": "Французькі романтики та реалісти",
+                "zh-CN": "法国浪漫主义与现实主义",
+                "zh-TW": "法國浪漫主義與寫實主義"
+            },
+            "type": "curated",
+            "items": [
+                {
+                    "id": "portrait-de-monsieur-corbinaud",
+                    "title": "Portrait de Monsieur Corbinaud",
+                    "artist": "Gustave Courbet",
+                    "year": "1863",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_25759-2.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/portrait-de-monsieur-corbinaud",
+                    "width": 3450,
+                    "height": 4646,
+                    "title_translations": {
+                        "en": "Portrait of Monsieur Corbinaud",
+                        "zh-CN": "科尔比诺先生肖像",
+                        "zh-TW": "科爾比諾先生肖像"
+                    }
+                },
+                {
+                    "id": "grappe-de-raisins",
+                    "title": "Grappe de raisins",
+                    "artist": "Gustave Courbet",
+                    "year": "1871",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_88075-6.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/grappe-de-raisins",
+                    "width": 4272,
+                    "height": 5287,
+                    "title_translations": {
+                        "en": "Bunch of Grapes",
+                        "zh-CN": "一串葡萄",
+                        "zh-TW": "一串葡萄"
+                    }
+                },
+                {
+                    "id": "rochers-a-ornans",
+                    "title": "Rochers à Ornans",
+                    "artist": "Gustave Courbet",
+                    "year": "c. 1869",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_25759-9.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/rochers-a-ornans",
+                    "width": 4500,
+                    "height": 3507,
+                    "title_translations": {
+                        "en": "Rocks at Ornans",
+                        "zh-CN": "奥尔南的岩石",
+                        "zh-TW": "奧爾南的岩石"
+                    }
+                },
+                {
+                    "id": "pompiers-courant-a-un-incendie",
+                    "title": "Pompiers courant à un incendie",
+                    "artist": "Gustave Courbet",
+                    "year": "1850–1851",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/cglv_ppp00737_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/pompiers-courant-a-un-incendie",
+                    "width": 3000,
+                    "height": 2001,
+                    "title_translations": {
+                        "en": "Firemen Rushing to a Fire",
+                        "zh-CN": "奔赴火场的消防员",
+                        "zh-TW": "奔赴火場的消防員"
+                    }
+                },
+                {
+                    "id": "l-ane",
+                    "title": "L'Âne",
+                    "artist": "Gustave Courbet",
+                    "year": "1862–1863",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_88075-7.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/l-ane",
+                    "width": 5799,
+                    "height": 3862,
+                    "title_translations": {
+                        "en": "The Donkey",
+                        "zh-CN": "驴",
+                        "zh-TW": "驢"
+                    }
+                },
+                {
+                    "id": "le-chevreuil",
+                    "title": "Le Chevreuil",
+                    "artist": "Gustave Courbet",
+                    "year": "1876",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_25759-4.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/le-chevreuil",
+                    "width": 3450,
+                    "height": 4603,
+                    "title_translations": {
+                        "en": "The Roe Deer",
+                        "zh-CN": "狍",
+                        "zh-TW": "狍"
+                    }
+                },
+                {
+                    "id": "les-amants-dans-la-campagne-sentiments-du-jeune-age",
+                    "title": "Les Amants dans la campagne. Sentiments du jeune âge",
+                    "artist": "Gustave Courbet",
+                    "year": "c. 1844",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/meero_ppp00733_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/les-amants-dans-la-campagne-sentiments-du-jeune-age",
+                    "width": 3206,
+                    "height": 3994,
+                    "title_translations": {
+                        "en": "Lovers in the Countryside: Feelings of Youth",
+                        "zh-CN": "乡间情侣：青春的情感",
+                        "zh-TW": "鄉間情侶：青春的情感"
+                    }
+                },
+                {
+                    "id": "portrait-de-jules-valles-1832-1885-ecrivain",
+                    "title": "Portrait de Jules Vallès (1832-1885), écrivain",
+                    "artist": "Gustave Courbet",
+                    "year": "c. 1861",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_25745-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/portrait-de-jules-valles-1832-1885-ecrivain",
+                    "width": 3570,
+                    "height": 4428,
+                    "title_translations": {
+                        "en": "Portrait of Jules Vallès (1832–1885), Writer",
+                        "zh-CN": "作家儒勒·瓦莱斯（1832–1885）肖像",
+                        "zh-TW": "作家儒勒·瓦萊斯（1832–1885）肖像"
+                    }
+                },
+                {
+                    "id": "henri-iv-jouant-avec-ses-enfants-au-moment-ou-l-ambassadeur-d-espagne-est-admis",
+                    "title": "Henri IV jouant avec ses enfants au moment où l'ambassadeur d'Espagne est admis en sa présence",
+                    "artist": "Jean-Auguste-Dominique Ingres",
+                    "year": "1817",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/meero_pp-pdut01164_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/henri-iv-jouant-avec-ses-enfants-au-moment-ou-l-ambassadeur-d-espagne-est-admis",
+                    "width": 4349,
+                    "height": 3808,
+                    "title_translations": {
+                        "en": "Henri IV Playing with His Children as the Spanish Ambassador Is Admitted",
+                        "zh-CN": "亨利四世与孩子们玩耍时，西班牙大使被引见",
+                        "zh-TW": "亨利四世與孩子們玩耍時，西班牙大使被引見"
+                    }
+                },
+                {
+                    "id": "francois-ier-re-3-7oit-les-derniers-soupirs-de-leonard-de-vinci",
+                    "title": "François Ier reçoit les derniers soupirs de Léonard de Vinci",
+                    "artist": "Jean-Auguste-Dominique Ingres",
+                    "year": "1818",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/meero_pp-pdut01165_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/francois-ier-re%C3%A7oit-les-derniers-soupirs-de-leonard-de-vinci",
+                    "width": 4347,
+                    "height": 3835,
+                    "title_translations": {
+                        "en": "Francis I Receiving the Last Breath of Leonardo da Vinci",
+                        "zh-CN": "达·芬奇之死",
+                        "zh-TW": "達文西之死"
+                    }
+                },
+                {
+                    "id": "la-campagne-au-lever-du-jour",
+                    "title": "La campagne au lever du jour",
+                    "artist": "Théodore Rousseau",
+                    "year": "1859",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/meero_pp-pdut01198_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/la-campagne-au-lever-du-jour",
+                    "width": 4791,
+                    "height": 2625,
+                    "title_translations": {
+                        "en": "Countryside at Daybreak",
+                        "zh-CN": "黎明的田野",
+                        "zh-TW": "黎明的田野"
+                    }
+                },
+                {
+                    "id": "l-adoration-des-mages-1",
+                    "title": "L'Adoration des Mages",
+                    "artist": "Théodore Chassériau",
+                    "year": "1856",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/meero_pp-pdut01808_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/l-adoration-des-mages-1",
+                    "width": 3902,
+                    "height": 4363,
+                    "title_translations": {
+                        "en": "The Adoration of the Magi",
+                        "zh-CN": "三王来朝",
+                        "zh-TW": "三王來朝"
+                    }
+                },
+                {
+                    "id": "la-vallee-des-larmes",
+                    "title": "La Vallée des larmes",
+                    "artist": "Gustave Doré",
+                    "year": "1883",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_143990-14.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/la-vallee-des-larmes",
+                    "width": 6924,
+                    "height": 4859,
+                    "title_translations": {
+                        "en": "The Valley of Tears",
+                        "zh-CN": "泪之谷",
+                        "zh-TW": "淚之谷"
+                    }
+                },
+                {
+                    "id": "paysage-de-montagne",
+                    "title": "Paysage de montagne",
+                    "artist": "Gustave Doré",
+                    "year": "1881",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_80731-9.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/paysage-de-montagne",
+                    "width": 5789,
+                    "height": 3780,
+                    "title_translations": {
+                        "en": "Mountain Landscape",
+                        "zh-CN": "山景",
+                        "zh-TW": "山景"
+                    }
+                },
+                {
+                    "id": "la-famille-du-marin",
+                    "title": "La famille du marin",
+                    "artist": "Ary Scheffer",
+                    "year": "1826",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MVR/lpdp_25534-17.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-de-la-vie-romantique/oeuvres/la-famille-du-marin",
+                    "width": 4231,
+                    "height": 5361,
+                    "title_translations": {
+                        "en": "The Sailor's Family",
+                        "zh-CN": "水手一家",
+                        "zh-TW": "水手一家"
+                    }
+                },
+                {
+                    "id": "marguerite-tenant-son-enfant-mort",
+                    "title": "Marguerite tenant son enfant mort",
+                    "artist": "Ary Scheffer",
+                    "year": "c. 1846",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MVR/lpdp_25299-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-de-la-vie-romantique/oeuvres/marguerite-tenant-son-enfant-mort",
+                    "width": 3150,
+                    "height": 5025,
+                    "title_translations": {
+                        "en": "Marguerite Holding Her Dead Child",
+                        "zh-CN": "抱着死去孩子的玛格丽特",
+                        "zh-TW": "抱著死去孩子的瑪格麗特"
+                    }
+                },
+                {
+                    "id": "lenore-les-morts-vont-vite",
+                    "title": "Lénore, les morts vont vite",
+                    "artist": "Ary Scheffer",
+                    "year": "c. 1830",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MVR/lpdp_34848-12.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-de-la-vie-romantique/oeuvres/lenore-les-morts-vont-vite",
+                    "width": 5413,
+                    "height": 3076,
+                    "title_translations": {
+                        "en": "Lenore, the Dead Travel Fast",
+                        "zh-CN": "莱诺蕾，亡者疾行",
+                        "zh-TW": "萊諾蕾，亡者疾行"
+                    }
+                },
+                {
+                    "id": "les-orphelins",
+                    "title": "Les orphelins",
+                    "artist": "Ary Scheffer",
+                    "year": "1823",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MVR/lpdp_25534-5.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-de-la-vie-romantique/oeuvres/les-orphelins",
+                    "width": 3752,
+                    "height": 4511,
+                    "title_translations": {
+                        "en": "The Orphans",
+                        "zh-CN": "孤儿们",
+                        "zh-TW": "孤兒們"
+                    }
+                },
+                {
+                    "id": "arion",
+                    "title": "Arion",
+                    "artist": "Gustave Moreau",
+                    "year": "1891",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_26313-20.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/arion",
+                    "width": 2432,
+                    "height": 2965,
+                    "title_translations": {
+                        "en": "Arion",
+                        "zh-CN": "阿里翁",
+                        "zh-TW": "阿里翁"
+                    }
+                },
+                {
+                    "id": "les-rois-mages",
+                    "title": "Les rois mages",
+                    "artist": "Ary Scheffer",
+                    "year": "1841–1844",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MVR/meero_mvr2017.5.1_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-de-la-vie-romantique/oeuvres/les-rois-mages",
+                    "width": 2258,
+                    "height": 3000,
+                    "title_translations": {
+                        "en": "The Magi",
+                        "zh-CN": "三王",
+                        "zh-TW": "三王"
+                    }
+                }
+            ]
+        },
+        {
+            "key": "pm_paris",
+            "name": "Paris Through the Ages",
+            "name_translations": {
+                "de": "Paris im Wandel der Zeit",
+                "es": "París a través de los siglos",
+                "fr": "Paris au fil des siècles",
+                "it": "Parigi attraverso i secoli",
+                "ja": "時代を巡るパリ",
+                "pt": "Paris através dos séculos",
+                "ru": "Париж сквозь века",
+                "uk": "Париж крізь віки",
+                "zh-CN": "穿越时代的巴黎",
+                "zh-TW": "穿越時代的巴黎"
+            },
+            "type": "curated",
+            "items": [
+                {
+                    "id": "la-victoria",
+                    "title": "La Victoria",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1880",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_41156-4.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/la-victoria",
+                    "width": 5143,
+                    "height": 3374,
+                    "title_translations": {
+                        "en": "The Victoria Carriage",
+                        "zh-CN": "维多利亚马车",
+                        "zh-TW": "維多利亞馬車"
+                    }
+                },
+                {
+                    "id": "les-belles-de-nuit",
+                    "title": "Les belles de nuit",
+                    "artist": "Jean Béraud",
+                    "year": "1905",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_36757-5.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/les-belles-de-nuit",
+                    "width": 3729,
+                    "height": 4361,
+                    "title_translations": {
+                        "en": "Women of the Night",
+                        "zh-CN": "夜之女子",
+                        "zh-TW": "夜之女子"
+                    }
+                },
+                {
+                    "id": "sortie-des-ouvrieres-de-la-maison-paquin",
+                    "title": "Sortie des ouvrières de la maison Paquin",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1900",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_27028-14.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/sortie-des-ouvrieres-de-la-maison-paquin",
+                    "width": 4572,
+                    "height": 3500,
+                    "title_translations": {
+                        "en": "Seamstresses Leaving the House of Paquin",
+                        "zh-CN": "离开帕坎时装店的女工",
+                        "zh-TW": "離開帕坎時裝店的女工"
+                    }
+                },
+                {
+                    "id": "la-colonne-morris",
+                    "title": "La colonne Morris",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1885",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_36489-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/la-colonne-morris",
+                    "width": 3325,
+                    "height": 4900,
+                    "title_translations": {
+                        "en": "The Morris Column",
+                        "zh-CN": "莫里斯广告柱",
+                        "zh-TW": "莫里斯廣告柱"
+                    }
+                },
+                {
+                    "id": "la-promenade-aux-champs-elysees",
+                    "title": "La promenade aux Champs-Elysées",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/carp1664_1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/la-promenade-aux-champs-elysees",
+                    "width": 2500,
+                    "height": 1714,
+                    "title_translations": {
+                        "en": "Promenade on the Champs-Élysées",
+                        "zh-CN": "香榭丽舍大街上的漫步",
+                        "zh-TW": "香榭麗舍大道上的漫步"
+                    }
+                },
+                {
+                    "id": "la-sortie-du-salon-au-palais-de-l-industrie",
+                    "title": "La sortie du Salon, au Palais de l'Industrie",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_36757-4.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/la-sortie-du-salon-au-palais-de-l-industrie",
+                    "width": 4900,
+                    "height": 3373,
+                    "title_translations": {
+                        "en": "Leaving the Salon at the Palais de l'Industrie",
+                        "zh-CN": "离开工业宫沙龙展",
+                        "zh-TW": "離開工業宮沙龍展"
+                    }
+                },
+                {
+                    "id": "la-sortie-du-conservatoire-de-musique",
+                    "title": "La sortie du conservatoire de musique",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1899",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_41156-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/la-sortie-du-conservatoire-de-musique",
+                    "width": 4488,
+                    "height": 3697,
+                    "title_translations": {
+                        "en": "Leaving the Conservatoire de Musique",
+                        "zh-CN": "音乐学院放学时分",
+                        "zh-TW": "音樂學院放學時分"
+                    }
+                },
+                {
+                    "id": "les-berges-de-la-seine",
+                    "title": "Les berges de la Seine",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1880",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_27120-11.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/les-berges-de-la-seine",
+                    "width": 4000,
+                    "height": 3366,
+                    "title_translations": {
+                        "en": "The Banks of the Seine",
+                        "zh-CN": "塞纳河岸",
+                        "zh-TW": "塞納河岸"
+                    }
+                },
+                {
+                    "id": "les-funerailles-de-victor-hugo-place-de-l-etoile-le-1er-juin-1885",
+                    "title": "Les funérailles de Victor Hugo, place de l'Étoile, le 1er juin 1885",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1885",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_41156-3.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/les-funerailles-de-victor-hugo-place-de-l-etoile-le-1er-juin-1885",
+                    "width": 5565,
+                    "height": 5028,
+                    "title_translations": {
+                        "en": "The Funeral of Victor Hugo, Place de l'Étoile, 1 June 1885",
+                        "zh-CN": "雨果的葬礼，星形广场，1885 年 6 月 1 日",
+                        "zh-TW": "雨果的葬禮，星形廣場，1885 年 6 月 1 日"
+                    }
+                },
+                {
+                    "id": "entree-de-l-exposition-universelle-de-1889",
+                    "title": "Entrée de l'exposition universelle de 1889",
+                    "artist": "Jean Béraud",
+                    "year": "1889",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/meero_carp1654_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/entree-de-l-exposition-universelle-de-1889",
+                    "width": 4954,
+                    "height": 3828,
+                    "title_translations": {
+                        "en": "Entrance to the 1889 Exposition Universelle",
+                        "zh-CN": "1889 年世界博览会入口",
+                        "zh-TW": "1889 年世界博覽會入口"
+                    }
+                },
+                {
+                    "id": "le-boulevard-montmartre-devant-le-theatre-des-varietes-l-apres-midi",
+                    "title": "Le boulevard Montmartre, devant le théâtre des Variétés, l'après-midi",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1885",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_41156-5.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/le-boulevard-montmartre-devant-le-theatre-des-varietes-l-apres-midi",
+                    "width": 4516,
+                    "height": 3780,
+                    "title_translations": {
+                        "en": "Boulevard Montmartre in Front of the Théâtre des Variétés, Afternoon",
+                        "zh-CN": "午后的蒙马特大道，综艺剧院前",
+                        "zh-TW": "午後的蒙馬特大道，綜藝劇院前"
+                    }
+                },
+                {
+                    "id": "parisienne-au-bois",
+                    "title": "Parisienne au Bois",
+                    "artist": "Auguste-François-Marie Gorguet",
+                    "year": "c. 1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_76528-6.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/parisienne-au-bois",
+                    "width": 3997,
+                    "height": 6286,
+                    "title_translations": {
+                        "en": "Parisian Woman in the Bois",
+                        "zh-CN": "布洛涅森林里的巴黎女子",
+                        "zh-TW": "布洛涅森林裡的巴黎女子"
+                    }
+                },
+                {
+                    "id": "la-sortie-du-lycee-condorcet",
+                    "title": "La sortie du lycée Condorcet",
+                    "artist": "Jean Béraud",
+                    "year": "c. 1903",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_27028-15.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/la-sortie-du-lycee-condorcet",
+                    "width": 4533,
+                    "height": 3499,
+                    "title_translations": {
+                        "en": "Leaving the Lycée Condorcet",
+                        "zh-CN": "孔多塞中学放学",
+                        "zh-TW": "孔多塞中學放學"
+                    }
+                },
+                {
+                    "id": "la-baignoire-au-theatre-des-varietes",
+                    "title": "La Baignoire, au théâtre des Variétés",
+                    "artist": "Jean Béraud",
+                    "year": "1883",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_36757-2.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/la-baignoire-au-theatre-des-varietes",
+                    "width": 3725,
+                    "height": 4442,
+                    "title_translations": {
+                        "en": "The Box at the Théâtre des Variétés",
+                        "zh-CN": "综艺剧院的包厢",
+                        "zh-TW": "綜藝劇院的包廂"
+                    }
+                },
+                {
+                    "id": "courses-a-longchamp-l-arrivee-au-poteau",
+                    "title": "Courses à Longchamp ; l'arrivée au poteau",
+                    "artist": "Jean Béraud",
+                    "year": "1886",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_27120-9.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/courses-a-longchamp-l-arrivee-au-poteau",
+                    "width": 4902,
+                    "height": 3393,
+                    "title_translations": {
+                        "en": "Races at Longchamp: The Finish",
+                        "zh-CN": "隆尚赛马：冲线",
+                        "zh-TW": "隆尚賽馬：衝線"
+                    }
+                },
+                {
+                    "id": "les-coulisses-de-l-opera-de-paris",
+                    "title": "Les coulisses de l'Opéra de Paris",
+                    "artist": "Jean Béraud",
+                    "year": "1889",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_34717-20.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/les-coulisses-de-l-opera-de-paris",
+                    "width": 4850,
+                    "height": 3299,
+                    "title_translations": {
+                        "en": "Backstage at the Paris Opéra",
+                        "zh-CN": "巴黎歌剧院后台",
+                        "zh-TW": "巴黎歌劇院後台"
+                    }
+                },
+                {
+                    "id": "le-puits-artesien-de-grenelle-place-de-breteuil",
+                    "title": "Le puits artésien de Grenelle (place de Breteuil)",
+                    "artist": "Stanislas Lépine",
+                    "year": "c. 1880",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_76086-25.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/le-puits-artesien-de-grenelle-place-de-breteuil",
+                    "width": 3390,
+                    "height": 5214,
+                    "title_translations": {
+                        "en": "The Artesian Well of Grenelle (Place de Breteuil)",
+                        "zh-CN": "格勒内勒自流井（布勒特伊广场）",
+                        "zh-TW": "格勒內勒自流井（布勒特伊廣場）"
+                    }
+                },
+                {
+                    "id": "l-ile-de-la-cite-et-l-ile-saint-louis-vues-du-pont-d-austerlitz",
+                    "title": "L'île de la Cité et l'île Saint-Louis, vues du pont d'Austerlitz",
+                    "artist": "Stanislas Lépine",
+                    "year": "c. 1880",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/carp1935_1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/l-ile-de-la-cite-et-l-ile-saint-louis-vues-du-pont-d-austerlitz",
+                    "width": 2500,
+                    "height": 1562,
+                    "title_translations": {
+                        "en": "The Île de la Cité and the Île Saint-Louis, Seen from the Pont d'Austerlitz",
+                        "zh-CN": "从奥斯特里茨桥看西岱岛与圣路易岛",
+                        "zh-TW": "從奧斯特里茨橋看西堤島與聖路易島"
+                    }
+                },
+                {
+                    "id": "la-bastille-dans-les-premiers-jours-de-sa-demolition",
+                    "title": "La Bastille, dans les premiers jours de sa démolition",
+                    "artist": "Hubert Robert",
+                    "year": "1789",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_157115-23.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/la-bastille-dans-les-premiers-jours-de-sa-demolition",
+                    "width": 3000,
+                    "height": 1990,
+                    "title_translations": {
+                        "en": "The Bastille in the First Days of Its Demolition",
+                        "zh-CN": "拆除初期的巴士底狱",
+                        "zh-TW": "拆除初期的巴士底獄"
+                    }
+                },
+                {
+                    "id": "le-decintrement-du-pont-de-neuilly-le-22-septembre-1772",
+                    "title": "Le décintrement du pont de Neuilly, le 22 septembre 1772",
+                    "artist": "Hubert Robert",
+                    "year": "1772–1775",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_27176-2.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/le-decintrement-du-pont-de-neuilly-le-22-septembre-1772",
+                    "width": 6078,
+                    "height": 2886,
+                    "title_translations": {
+                        "en": "The Removal of the Centering of the Pont de Neuilly, 22 September 1772",
+                        "zh-CN": "1772 年 9 月 22 日讷伊桥拆除拱架",
+                        "zh-TW": "1772 年 9 月 22 日訥伊橋拆除拱架"
+                    }
+                }
+            ]
+        },
+        {
+            "key": "pm_ziem",
+            "name": "Félix Ziem: Venice & the Orient",
+            "name_translations": {
+                "de": "Félix Ziem: Venedig & der Orient",
+                "es": "Félix Ziem: Venecia y Oriente",
+                "fr": "Félix Ziem : Venise et l'Orient",
+                "it": "Félix Ziem: Venezia e l'Oriente",
+                "ja": "フェリックス・ジエム：ヴェネツィアと東方",
+                "pt": "Félix Ziem: Veneza e o Oriente",
+                "ru": "Феликс Зием: Венеция и Восток",
+                "uk": "Фелікс Зьєм: Венеція і Схід",
+                "zh-CN": "费利克斯·齐姆：威尼斯与东方",
+                "zh-TW": "費利克斯·齊姆：威尼斯與東方"
+            },
+            "type": "curated",
+            "items": [
+                {
+                    "id": "pin-parasol-a-l-embouchure-du-bosphore",
+                    "title": "Pin parasol à l'embouchure du Bosphore",
+                    "artist": "Félix Ziem",
+                    "year": "1870–1900",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_52018-19.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/pin-parasol-a-l-embouchure-du-bosphore",
+                    "width": 3000,
+                    "height": 2440,
+                    "title_translations": {
+                        "en": "Umbrella Pine at the Mouth of the Bosphorus",
+                        "zh-CN": "博斯普鲁斯海峡口的伞松",
+                        "zh-TW": "博斯普魯斯海峽口的傘松"
+                    }
+                },
+                {
+                    "id": "venise-procession-de-la-saint-georges",
+                    "title": "Venise, procession de la Saint-Georges",
+                    "artist": "Félix Ziem",
+                    "year": "c. 1870",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_24489-12.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/venise-procession-de-la-saint-georges",
+                    "width": 4698,
+                    "height": 3667,
+                    "title_translations": {
+                        "en": "Venice, Procession of Saint George",
+                        "zh-CN": "威尼斯，圣乔治游行",
+                        "zh-TW": "威尼斯，聖喬治遊行"
+                    }
+                },
+                {
+                    "id": "le-caique",
+                    "title": "Le Caïque",
+                    "artist": "Félix Ziem",
+                    "year": "1880–1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_52015-11.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/le-caique",
+                    "width": 3000,
+                    "height": 1867,
+                    "title_translations": {
+                        "en": "The Caïque",
+                        "zh-CN": "卡伊克小船",
+                        "zh-TW": "卡伊克小船"
+                    }
+                },
+                {
+                    "id": "venise-le-grand-canal-au-soleil-levant",
+                    "title": "Venise, le Grand Canal au soleil levant",
+                    "artist": "Félix Ziem",
+                    "year": "1880–1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_24447-8.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/venise-le-grand-canal-au-soleil-levant",
+                    "width": 4709,
+                    "height": 3400,
+                    "title_translations": {
+                        "en": "Venice, the Grand Canal at Sunrise",
+                        "zh-CN": "威尼斯，日出时的大运河",
+                        "zh-TW": "威尼斯，日出時的大運河"
+                    }
+                },
+                {
+                    "id": "le-quai-saint-jean-a-marseille",
+                    "title": "Le Quai Saint-Jean à Marseille",
+                    "artist": "Félix Ziem",
+                    "year": "1890–1895",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_50135-5.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/le-quai-saint-jean-a-marseille",
+                    "width": 3372,
+                    "height": 4133,
+                    "title_translations": {
+                        "en": "The Quai Saint-Jean in Marseille",
+                        "zh-CN": "马赛的圣让码头",
+                        "zh-TW": "馬賽的聖讓碼頭"
+                    }
+                },
+                {
+                    "id": "le-rhone-entre-arles-et-avignon",
+                    "title": "Le Rhône entre Arles et Avignon",
+                    "artist": "Félix Ziem",
+                    "year": "1860–1865",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_55539-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/le-rhone-entre-arles-et-avignon",
+                    "width": 5516,
+                    "height": 3285,
+                    "title_translations": {
+                        "en": "The Rhône between Arles and Avignon",
+                        "zh-CN": "阿尔勒与阿维尼翁之间的罗讷河",
+                        "zh-TW": "亞爾與亞維儂之間的隆河"
+                    }
+                },
+                {
+                    "id": "devant-martigues-la-voile-jaune",
+                    "title": "Devant Martigues, la voile jaune",
+                    "artist": "Félix Ziem",
+                    "year": "c. 1875",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_75329-5.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/devant-martigues-la-voile-jaune",
+                    "width": 5513,
+                    "height": 3301,
+                    "title_translations": {
+                        "en": "Off Martigues, the Yellow Sail",
+                        "zh-CN": "马蒂格附近海面，黄色的帆",
+                        "zh-TW": "馬蒂格附近海面，黃色的帆"
+                    }
+                },
+                {
+                    "id": "les-eaux-douces-d-asie-environs-de-constantinople",
+                    "title": "Les Eaux douces d'Asie, environs de Constantinople",
+                    "artist": "Félix Ziem",
+                    "year": "1880–1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/cglv_ppp00276_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/les-eaux-douces-d-asie-environs-de-constantinople",
+                    "width": 3000,
+                    "height": 1904,
+                    "title_translations": {
+                        "en": "The Sweet Waters of Asia, near Constantinople",
+                        "zh-CN": "亚洲甜水，君士坦丁堡附近",
+                        "zh-TW": "亞洲甜水，君士坦丁堡附近"
+                    }
+                },
+                {
+                    "id": "les-sloops-de-peche",
+                    "title": "Les Sloops de pêche",
+                    "artist": "Félix Ziem",
+                    "year": "c. 1852",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_75329-23.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/les-sloops-de-peche",
+                    "width": 5773,
+                    "height": 3412,
+                    "title_translations": {
+                        "en": "The Fishing Sloops",
+                        "zh-CN": "单桅渔船",
+                        "zh-TW": "單桅漁船"
+                    }
+                },
+                {
+                    "id": "l-embouchure-du-bosphore",
+                    "title": "L'Embouchure du Bosphore",
+                    "artist": "Félix Ziem",
+                    "year": "1880–1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/cglv_ppp00198_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/l-embouchure-du-bosphore",
+                    "width": 3000,
+                    "height": 2189,
+                    "title_translations": {
+                        "en": "The Mouth of the Bosphorus",
+                        "zh-CN": "博斯普鲁斯海峡口",
+                        "zh-TW": "博斯普魯斯海峽口"
+                    }
+                },
+                {
+                    "id": "venise-et-le-campanile-au-clair-de-lune",
+                    "title": "Venise et le Campanile au clair de lune",
+                    "artist": "Félix Ziem",
+                    "year": "1870–1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_24447-4.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/venise-et-le-campanile-au-clair-de-lune",
+                    "width": 4808,
+                    "height": 3300,
+                    "title_translations": {
+                        "en": "Venice and the Campanile by Moonlight",
+                        "zh-CN": "月光下的威尼斯与钟楼",
+                        "zh-TW": "月光下的威尼斯與鐘樓"
+                    }
+                },
+                {
+                    "id": "constantinople-sainte-sophie-au-soleil-levant",
+                    "title": "Constantinople, Sainte-Sophie au soleil levant",
+                    "artist": "Félix Ziem",
+                    "year": "1870–1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_26981-6.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/constantinople-sainte-sophie-au-soleil-levant",
+                    "width": 4904,
+                    "height": 3764,
+                    "title_translations": {
+                        "en": "Constantinople, Hagia Sophia at Sunrise",
+                        "zh-CN": "君士坦丁堡，日出时的圣索菲亚大教堂",
+                        "zh-TW": "君士坦丁堡，日出時的聖索菲亞大教堂"
+                    }
+                },
+                {
+                    "id": "beyrouth-retour-de-fantasia",
+                    "title": "Beyrouth, retour de fantasia",
+                    "artist": "Félix Ziem",
+                    "year": "1885–1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_38065-3.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/beyrouth-retour-de-fantasia",
+                    "width": 4650,
+                    "height": 3660,
+                    "title_translations": {
+                        "en": "Beirut, Return from a Fantasia",
+                        "zh-CN": "贝鲁特，骑术表演归来",
+                        "zh-TW": "貝魯特，騎術表演歸來"
+                    }
+                },
+                {
+                    "id": "marche-a-fez",
+                    "title": "Marché à Fez",
+                    "artist": "Félix Ziem",
+                    "year": "1887",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/cglv_ppp00204_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/marche-a-fez",
+                    "width": 3000,
+                    "height": 1844,
+                    "title_translations": {
+                        "en": "Market in Fez",
+                        "zh-CN": "非斯的集市",
+                        "zh-TW": "非斯的市集"
+                    }
+                },
+                {
+                    "id": "caravane-en-route-vers-la-mecque",
+                    "title": "Caravane en route vers La Mecque",
+                    "artist": "Félix Ziem",
+                    "year": "1880–1885",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_38065-9.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/caravane-en-route-vers-la-mecque",
+                    "width": 5100,
+                    "height": 3168,
+                    "title_translations": {
+                        "en": "Caravan on the Way to Mecca",
+                        "zh-CN": "前往麦加的商队",
+                        "zh-TW": "前往麥加的商隊"
+                    }
+                },
+                {
+                    "id": "fusine-environs-de-venise",
+                    "title": "Fusine, environs de Venise",
+                    "artist": "Félix Ziem",
+                    "year": "1870–1890",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/cglv_ppp00206_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/fusine-environs-de-venise",
+                    "width": 3000,
+                    "height": 2208,
+                    "title_translations": {
+                        "en": "Fusina, near Venice",
+                        "zh-CN": "威尼斯附近的福西纳",
+                        "zh-TW": "威尼斯附近的福西納"
+                    }
+                },
+                {
+                    "id": "chevaux-sauvages-en-camargue",
+                    "title": "Chevaux sauvages en Camargue",
+                    "artist": "Félix Ziem",
+                    "year": "1890–1895",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_36768-2.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/chevaux-sauvages-en-camargue",
+                    "width": 5232,
+                    "height": 3172,
+                    "title_translations": {
+                        "en": "Wild Horses in the Camargue",
+                        "zh-CN": "卡马格的野马",
+                        "zh-TW": "卡馬格的野馬"
+                    }
+                },
+                {
+                    "id": "venise",
+                    "title": "Venise",
+                    "artist": "Félix Ziem",
+                    "year": "n.d.",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_52020-13.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/venise",
+                    "width": 5032,
+                    "height": 3134,
+                    "title_translations": {
+                        "en": "Venice",
+                        "zh-CN": "威尼斯",
+                        "zh-TW": "威尼斯"
+                    }
+                }
+            ]
+        },
+        {
+            "key": "pm_eighteenth",
+            "name": "18th-Century France",
+            "name_translations": {
+                "de": "Frankreich im 18. Jahrhundert",
+                "es": "Francia en el siglo XVIII",
+                "fr": "La France du XVIIIe siècle",
+                "it": "La Francia del Settecento",
+                "ja": "18世紀のフランス",
+                "pt": "França do século XVIII",
+                "ru": "Франция XVIII века",
+                "uk": "Франція XVIII століття",
+                "zh-CN": "18 世纪的法国",
+                "zh-TW": "18 世紀的法國"
+            },
+            "type": "curated",
+            "items": [
+                {
+                    "id": "paysage-au-chien",
+                    "title": "Paysage au chien",
+                    "artist": "Jean-Baptiste Huet",
+                    "year": "1765–1770",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/meero_carp2105_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/paysage-au-chien",
+                    "width": 3902,
+                    "height": 5719,
+                    "title_translations": {
+                        "en": "Landscape with a Dog",
+                        "zh-CN": "有狗的风景",
+                        "zh-TW": "有狗的風景"
+                    }
+                },
+                {
+                    "id": "paysage-aux-echassiers",
+                    "title": "Paysage aux échassiers",
+                    "artist": "Jean-Baptiste Huet",
+                    "year": "1765–1770",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/meero_carp2106_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/paysage-aux-echassiers",
+                    "width": 4813,
+                    "height": 3902,
+                    "title_translations": {
+                        "en": "Landscape with Waders",
+                        "zh-CN": "有涉禽的风景",
+                        "zh-TW": "有涉禽的風景"
+                    }
+                },
+                {
+                    "id": "paysage-aux-cygnes",
+                    "title": "Paysage aux cygnes",
+                    "artist": "Jean-Baptiste Huet",
+                    "year": "1765–1770",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/meero_carp2107_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/paysage-aux-cygnes",
+                    "width": 4294,
+                    "height": 3950,
+                    "title_translations": {
+                        "en": "Landscape with Swans",
+                        "zh-CN": "有天鹅的风景",
+                        "zh-TW": "有天鵝的風景"
+                    }
+                },
+                {
+                    "id": "paysage-rustique",
+                    "title": "Paysage rustique",
+                    "artist": "Jean-Baptiste Huet",
+                    "year": "1765–1770",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/meero_carp2108_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/paysage-rustique",
+                    "width": 3945,
+                    "height": 4437,
+                    "title_translations": {
+                        "en": "Rustic Landscape",
+                        "zh-CN": "田园风景",
+                        "zh-TW": "田園風景"
+                    }
+                },
+                {
+                    "id": "deux-colombes-se-becquetant-dans-un-paysage",
+                    "title": "Deux colombes se becquetant dans un paysage",
+                    "artist": "Jean-Baptiste Huet",
+                    "year": "1765–1770",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/meero_carp2110_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/deux-colombes-se-becquetant-dans-un-paysage",
+                    "width": 1830,
+                    "height": 5932,
+                    "title_translations": {
+                        "en": "Two Doves Billing in a Landscape",
+                        "zh-CN": "风景中互啄的两只鸽子",
+                        "zh-TW": "風景中互啄的兩隻鴿子"
+                    }
+                },
+                {
+                    "id": "perrette-et-le-pot-au-la-3-t",
+                    "title": "Perrette et le pot au lait",
+                    "artist": "Jean-Honoré Fragonard",
+                    "year": "c. 1770",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/COG/25919-4.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-cognacq-jay/oeuvres/perrette-et-le-pot-au-la%C3%AEt",
+                    "width": 3000,
+                    "height": 2546,
+                    "title_translations": {
+                        "en": "Perrette and the Milk Pot",
+                        "zh-CN": "佩蕾特与牛奶罐",
+                        "zh-TW": "佩蕾特與牛奶罐"
+                    }
+                },
+                {
+                    "id": "tete-de-jeune-femme",
+                    "title": "Tête de jeune femme",
+                    "artist": "Jean-Baptiste Greuze",
+                    "year": "c. 1775",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/COG/25931-3.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-cognacq-jay/oeuvres/tete-de-jeune-femme",
+                    "width": 2457,
+                    "height": 3000,
+                    "title_translations": {
+                        "en": "Head of a Young Woman",
+                        "zh-CN": "年轻女子的头像",
+                        "zh-TW": "年輕女子的頭像"
+                    }
+                },
+                {
+                    "id": "la-liseuse-0",
+                    "title": "La Liseuse",
+                    "artist": "French School",
+                    "year": "n.d.",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/COG/25918-20.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-cognacq-jay/oeuvres/la-liseuse-0",
+                    "width": 2368,
+                    "height": 3000,
+                    "title_translations": {
+                        "en": "The Reader",
+                        "zh-CN": "读书的女子",
+                        "zh-TW": "讀書的女子"
+                    }
+                },
+                {
+                    "id": "portrait-de-jeune-fille-2",
+                    "title": "Portrait de jeune fille",
+                    "artist": "Jeanne-Philiberte Ledoux",
+                    "year": "c. 1790–1795",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/COG/25930-17.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-cognacq-jay/oeuvres/portrait-de-jeune-fille-2",
+                    "width": 2476,
+                    "height": 3000,
+                    "title_translations": {
+                        "en": "Portrait of a Young Girl",
+                        "zh-CN": "少女肖像",
+                        "zh-TW": "少女肖像"
+                    }
+                },
+                {
+                    "id": "jeune-fille-au-chat",
+                    "title": "Jeune fille au chat",
+                    "artist": "Anonymous",
+                    "year": "n.d.",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_70009-23.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/jeune-fille-au-chat",
+                    "width": 3661,
+                    "height": 4496,
+                    "title_translations": {
+                        "en": "Girl with a Cat",
+                        "zh-CN": "抱猫的少女",
+                        "zh-TW": "抱貓的少女"
+                    }
+                },
+                {
+                    "id": "jeune-berger-qui-tente-le-sort-pour-savoir-s-il-est-aime-de-sa-bergere",
+                    "title": "Jeune Berger qui tente le sort pour savoir s'il est aimé de sa bergère",
+                    "artist": "Jean-Baptiste Greuze",
+                    "year": "1760–1761",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/cglv_pp-pdut01192_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/jeune-berger-qui-tente-le-sort-pour-savoir-s-il-est-aime-de-sa-bergere",
+                    "width": 2420,
+                    "height": 3000,
+                    "title_translations": {
+                        "en": "The Young Shepherd Consulting Fate to Learn Whether His Shepherdess Loves Him",
+                        "zh-CN": "年轻牧羊人占卜牧羊女是否爱他",
+                        "zh-TW": "年輕牧羊人占卜牧羊女是否愛他"
+                    }
+                },
+                {
+                    "id": "petit-garcon-au-gilet-rouge",
+                    "title": "Petit Garçon au gilet rouge",
+                    "artist": "Jean-Baptiste Greuze",
+                    "year": "c. 1775",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/COG/cglv_cogj44_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-cognacq-jay/oeuvres/petit-garcon-au-gilet-rouge",
+                    "width": 6427,
+                    "height": 8333,
+                    "title_translations": {
+                        "en": "Little Boy in a Red Waistcoat",
+                        "zh-CN": "穿红背心的小男孩",
+                        "zh-TW": "穿紅背心的小男孩"
+                    }
+                },
+                {
+                    "id": "portrait-de-marie-leszczynska-reine-de-france",
+                    "title": "Portrait de Marie Leszczynska, reine de France",
+                    "artist": "Jean-Marc Nattier",
+                    "year": "1750–1800",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/COG/35786-18.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-cognacq-jay/oeuvres/portrait-de-marie-leszczynska-reine-de-france",
+                    "width": 2387,
+                    "height": 3000,
+                    "title_translations": {
+                        "en": "Portrait of Marie Leszczyńska, Queen of France",
+                        "zh-CN": "法国王后玛丽·莱什琴斯卡肖像",
+                        "zh-TW": "法國王后瑪麗·萊什琴斯卡肖像"
+                    }
+                },
+                {
+                    "id": "monsieur-sarasin",
+                    "title": "Monsieur Sarasin",
+                    "artist": "Jean-Marc Nattier",
+                    "year": "1734",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_35765-14.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/monsieur-sarasin",
+                    "width": 3600,
+                    "height": 4490,
+                    "title_translations": {
+                        "en": "Monsieur Sarasin",
+                        "zh-CN": "萨拉赞先生",
+                        "zh-TW": "薩拉贊先生"
+                    }
+                },
+                {
+                    "id": "portrait-de-marie-adelaide-de-france-fille-de-louis-xv-dite-madame",
+                    "title": "Portrait de Marie-Adélaïde de France, fille de Louis XV, dite Madame Adélaïde",
+                    "artist": "Jean-Marc Nattier",
+                    "year": "c. 1750",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/COG/25928-4.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-cognacq-jay/oeuvres/portrait-de-marie-adelaide-de-france-fille-de-louis-xv-dite-madame",
+                    "width": 2451,
+                    "height": 3000,
+                    "title_translations": {
+                        "en": "Portrait of Marie-Adélaïde of France, Daughter of Louis XV, Known as Madame Adélaïde",
+                        "zh-CN": "法兰西的玛丽-阿德莱德（路易十五之女，人称阿德莱德夫人）肖像",
+                        "zh-TW": "法蘭西的瑪麗-阿德萊德（路易十五之女，人稱阿德萊德夫人）肖像"
+                    }
+                },
+                {
+                    "id": "philippe-v-1683-1746-roi-d-espagne",
+                    "title": "Philippe V (1683-1746), roi d'Espagne",
+                    "artist": "Hyacinthe Rigaud",
+                    "year": "c. 1704",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_35472-13.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/philippe-v-1683-1746-roi-d-espagne",
+                    "width": 2383,
+                    "height": 3000,
+                    "title_translations": {
+                        "en": "Philip V (1683–1746), King of Spain",
+                        "zh-CN": "西班牙国王腓力五世（1683–1746）",
+                        "zh-TW": "西班牙國王腓力五世（1683–1746）"
+                    }
+                },
+                {
+                    "id": "caprice-architectural-un-palais-inspire-du-louvre-et-le-pont-neuf-s",
+                    "title": "Caprice architectural : un palais inspiré du Louvre et le Pont-Neuf s'encadrant dans l'arche d'un pont",
+                    "artist": "Pierre-Antoine Demachy",
+                    "year": "c. 1775",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/CAR/lpdp_41898-9.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-carnavalet/oeuvres/caprice-architectural-un-palais-inspire-du-louvre-et-le-pont-neuf-s",
+                    "width": 5408,
+                    "height": 4371,
+                    "title_translations": {
+                        "en": "Architectural Capriccio: A Palace Inspired by the Louvre and the Pont-Neuf Framed in the Arch of a Bridge",
+                        "zh-CN": "建筑幻想画：受卢浮宫启发的宫殿与嵌在桥拱中的新桥",
+                        "zh-TW": "建築幻想畫：受羅浮宮啟發的宮殿與嵌在橋拱中的新橋"
+                    }
+                },
+                {
+                    "id": "ruines-romaines-le-forum-avec-le-colisee-et-l-obelisque",
+                    "title": "Ruines romaines, le Forum avec le Colisée et l'Obélisque",
+                    "artist": "Hubert Robert",
+                    "year": "c. 1765",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_42462-2.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/ruines-romaines-le-forum-avec-le-colisee-et-l-obelisque",
+                    "width": 3800,
+                    "height": 4673,
+                    "title_translations": {
+                        "en": "Roman Ruins, the Forum with the Colosseum and the Obelisk",
+                        "zh-CN": "罗马废墟：广场、斗兽场与方尖碑",
+                        "zh-TW": "羅馬廢墟：廣場、競技場與方尖碑"
+                    }
+                }
+            ]
+        },
+        {
+            "key": "pm_artistic_nudes",
+            "name": "Artistic Nudes",
+            "name_translations": {
+                "de": "Künstlerische Akte",
+                "es": "Desnudos Artísticos",
+                "fr": "Nus Artistiques",
+                "it": "Nudi Artistici",
+                "ja": "芸術的なヌード",
+                "pt": "Nus Artísticos",
+                "ru": "Художественные Ню",
+                "uk": "Художні ню",
+                "zh-CN": "艺术裸体",
+                "zh-TW": "藝術裸體"
+            },
+            "type": "curated",
+            "items": [
+                {
+                    "id": "trois-baigneuses-0",
+                    "title": "Trois baigneuses",
+                    "artist": "Gustave Courbet",
+                    "year": "1865–1869",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_81181-1.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/trois-baigneuses-0",
+                    "width": 3543,
+                    "height": 5098,
+                    "title_translations": {
+                        "en": "Three Bathers",
+                        "zh-CN": "三位浴女",
+                        "zh-TW": "三位浴女"
+                    }
+                },
+                {
+                    "id": "le-sommeil",
+                    "title": "Le Sommeil",
+                    "artist": "Gustave Courbet",
+                    "year": "1866",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/meero_ppp03130_001.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/le-sommeil",
+                    "width": 5206,
+                    "height": 3515,
+                    "title_translations": {
+                        "en": "Sleep",
+                        "zh-CN": "睡眠",
+                        "zh-TW": "睡眠"
+                    }
+                },
+                {
+                    "id": "nu-dans-le-bain",
+                    "title": "Nu dans le bain",
+                    "artist": "Pierre Bonnard",
+                    "year": "1936",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MAM/3y05885.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-d-art-moderne/oeuvres/nu-dans-le-bain",
+                    "width": 600,
+                    "height": 378,
+                    "title_translations": {
+                        "en": "Nude in the Bath",
+                        "zh-CN": "浴中裸女",
+                        "zh-TW": "浴中裸女"
+                    }
+                },
+                {
+                    "id": "nu-de-face",
+                    "title": "Nu de face",
+                    "artist": "Pierre Bonnard",
+                    "year": "c. 1905",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_144620-20.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/nu-de-face",
+                    "width": 4248,
+                    "height": 5503,
+                    "title_translations": {
+                        "en": "Nude, Front View",
+                        "zh-CN": "裸女（正面）",
+                        "zh-TW": "裸女（正面）"
+                    }
+                },
+                {
+                    "id": "nu-de-dos",
+                    "title": "Nu de dos",
+                    "artist": "Pierre Bonnard",
+                    "year": "c. 1905",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_144620-21.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/nu-de-dos",
+                    "width": 4377,
+                    "height": 5671,
+                    "title_translations": {
+                        "en": "Nude, Back View",
+                        "zh-CN": "裸女（背面）",
+                        "zh-TW": "裸女（背面）"
+                    }
+                },
+                {
+                    "id": "femme-a-sa-toilette-0",
+                    "title": "Femme à sa toilette",
+                    "artist": "Pierre Bonnard",
+                    "year": "c. 1934",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/MAM/3y05887.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/musee-d-art-moderne/oeuvres/femme-a-sa-toilette-0",
+                    "width": 282,
+                    "height": 600,
+                    "title_translations": {
+                        "en": "Woman at Her Toilette",
+                        "zh-CN": "梳妆的女子",
+                        "zh-TW": "梳妝的女子"
+                    }
+                },
+                {
+                    "id": "femme-nue-assise",
+                    "title": "Femme nue assise",
+                    "artist": "Félix Ziem",
+                    "year": "n.d.",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_55240-6.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/femme-nue-assise",
+                    "width": 4896,
+                    "height": 3744,
+                    "title_translations": {
+                        "en": "Seated Nude Woman",
+                        "zh-CN": "坐着的裸女",
+                        "zh-TW": "坐著的裸女"
+                    }
+                },
+                {
+                    "id": "femme-nue-assise-vue-de-dos",
+                    "title": "Femme nue assise, vue de dos",
+                    "artist": "Félix Ziem",
+                    "year": "1845–1848",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_55240-5.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/femme-nue-assise-vue-de-dos",
+                    "width": 3780,
+                    "height": 4274,
+                    "title_translations": {
+                        "en": "Seated Nude Woman, Seen from Behind",
+                        "zh-CN": "坐着的裸女（背面）",
+                        "zh-TW": "坐著的裸女（背面）"
+                    }
+                },
+                {
+                    "id": "venus-medicis",
+                    "title": "Vénus Médicis",
+                    "artist": "Hubert Robert",
+                    "year": "c. 1790",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_37423-3.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/venus-medicis",
+                    "width": 2717,
+                    "height": 5803,
+                    "title_translations": {
+                        "en": "The Medici Venus",
+                        "zh-CN": "美第奇维纳斯",
+                        "zh-TW": "梅迪奇維納斯"
+                    }
+                },
+                {
+                    "id": "hercule-farnese",
+                    "title": "Hercule Farnèse",
+                    "artist": "Hubert Robert",
+                    "year": "c. 1790",
+                    "image_url": "https://www.parismuseescollections.paris.fr/sites/default/files/atoms/images/PPA/lpdp_37423-4.jpg",
+                    "view_url": "https://www.parismuseescollections.paris.fr/fr/petit-palais/oeuvres/hercule-farnese",
+                    "width": 2717,
+                    "height": 5869,
+                    "title_translations": {
+                        "en": "The Farnese Hercules",
+                        "zh-CN": "法尔内塞的赫拉克勒斯",
+                        "zh-TW": "法爾內塞的赫拉克勒斯"
+                    }
+                }
+            ]
+        }
+    ]
+}

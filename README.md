@@ -14,7 +14,7 @@
 
 Turns your Windows wallpaper into museum paintings, to enjoy any time and choose as you like.
 
-- **Lives in the tray, changes on a schedule.** Works come from the open-access collections of The Metropolitan Museum of Art, the Art Institute of Chicago, the Cleveland Museum of Art, the Rijksmuseum, the National Palace Museum, Statens Museum for Kunst and the J. Paul Getty Museum. The first line of the tray menu names the work, the artist and the museum.
+- **Lives in the tray, changes on a schedule.** Works come from the open-access collections of The Metropolitan Museum of Art, the Art Institute of Chicago, the Cleveland Museum of Art, the Rijksmuseum, the National Palace Museum, Statens Museum for Kunst, the J. Paul Getty Museum, the National Gallery of Art, the Yale University Art Collections and Paris Musées. The first line of the tray menu names the work, the artist and the museum.
 - **Shown whole, never cropped.** Full artwork fits the entire painting on your screen. Nothing is cropped, and nothing is drawn over the picture.
 - **Or use your own pictures.** Pictures from the wallpaper site wallhaven, the free photo library Pexels or Wikipedia's media library Wikimedia Commons, or a folder on your PC.
 
@@ -24,7 +24,7 @@ Unofficial fork of [Spice](https://github.com/dixieflatline76/Spice) by Karl Kwo
 
 ## What it does
 
-Paintpane cycles wallpapers from open-access museum collections (The Metropolitan Museum of Art, the Art Institute of Chicago, the Cleveland Museum of Art, the Rijksmuseum, the National Palace Museum, Statens Museum for Kunst, the J. Paul Getty Museum), Wikimedia Commons, wallhaven, Pexels, local folders and your favorites. A new installation starts with only the museum collections and Favorites turned on; the other sources are off until you turn them on in Settings › Sources. It runs in the Windows system tray and supports global hotkeys. It handles each monitor independently. All of that comes from Spice; see [What's different from Spice](#whats-different-from-spice) for what Paintpane adds.
+Paintpane cycles wallpapers from open-access museum collections (The Metropolitan Museum of Art, the Art Institute of Chicago, the Cleveland Museum of Art, the Rijksmuseum, the National Palace Museum, Statens Museum for Kunst, the J. Paul Getty Museum, the National Gallery of Art, the Yale University Art Collections, Paris Musées), Wikimedia Commons, wallhaven, Pexels, local folders and your favorites. A new installation starts with only the museum collections and Favorites turned on; the other sources are off until you turn them on in Settings › Sources. It runs in the Windows system tray and supports global hotkeys. It handles each monitor independently. All of that comes from Spice; see [What's different from Spice](#whats-different-from-spice) for what Paintpane adds.
 
 ## Download
 
@@ -37,6 +37,7 @@ Get `paintpane.exe` from the [latest release](https://github.com/begineri/Paintp
 ## What's different from Spice
 
 - **Paintings shown whole** by default, with or without a museum frame. Spice's cropping stays as **Smart crop**, and **Tune image** adjusts a single picture.
+- **Three more museums:** the National Gallery of Art, the Yale University Art Collections and Paris Musées.
 - **NSFW images are hidden by default.**
 - **The Windows lock screen gets a painting too.**
 - **Redesigned and quieter.** New settings window and tray menu, starts with Windows, no notifications, less disk and memory use.

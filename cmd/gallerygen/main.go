@@ -23,9 +23,12 @@ import (
 	_ "github.com/dixieflatline76/Spice/v2/pkg/wallpaper/providers/cleveland"
 	_ "github.com/dixieflatline76/Spice/v2/pkg/wallpaper/providers/getty"
 	_ "github.com/dixieflatline76/Spice/v2/pkg/wallpaper/providers/metmuseum"
+	_ "github.com/dixieflatline76/Spice/v2/pkg/wallpaper/providers/nga"
 	_ "github.com/dixieflatline76/Spice/v2/pkg/wallpaper/providers/npm"
+	_ "github.com/dixieflatline76/Spice/v2/pkg/wallpaper/providers/parismusees"
 	_ "github.com/dixieflatline76/Spice/v2/pkg/wallpaper/providers/rijksmuseum"
 	_ "github.com/dixieflatline76/Spice/v2/pkg/wallpaper/providers/smk"
+	_ "github.com/dixieflatline76/Spice/v2/pkg/wallpaper/providers/yale"
 )
 
 func calculateHash(entry curation.CollectionEntry) string {

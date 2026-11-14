@@ -64,6 +64,24 @@
       "provider": "StatensMuseumForKunst"
     },
     {
+      "desc": "⭐ Best of NGA",
+      "url": "nga_masterpieces",
+      "active": true,
+      "provider": "NationalGalleryOfArt"
+    },
+    {
+      "desc": "⭐ Best of Yale",
+      "url": "yale_masterpieces",
+      "active": true,
+      "provider": "YaleUniversityArtCollections"
+    },
+    {
+      "desc": "⭐ Best of Paris Musées",
+      "url": "pm_masterpieces",
+      "active": true,
+      "provider": "ParisMusees"
+    },
+    {
       "desc": "Wikimedia Featured Astronomy",
       "url": "page:Commons:Featured_pictures/Astronomy",
       "active": false,

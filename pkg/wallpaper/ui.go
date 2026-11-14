@@ -337,8 +337,14 @@ func (wp *Plugin) nowShowingLines(img provider.Image) (string, string) {
 }
 
 // nowShowingParts returns the title and the cleaned artist name; the artist is
-// empty when the title already contains it.
+// empty when the title already contains it. A provider with titles in several
+// languages gives the title in the current interface language.
 func (wp *Plugin) nowShowingParts(img provider.Image) (title, artist string) {
+	if tl, ok := wp.providers[img.Provider].(provider.TitleLocalizer); ok {
+		if t, ok := tl.LocalizedTitle(img); ok && t != "" {
+			img.Title = t
+		}
+	}
 	return titleAndArtist(img)
 }
 

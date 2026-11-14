@@ -27,9 +27,11 @@ func NewMigrationChain() *MigrationChain {
 			PruneStaleFavoritesStep,
 			EnsureManagedFavoritesStep,
 			RenameMetBestOfStep,
+			AddFirstNewMuseumsStep,
 			UpdateCollisionsStep,
 			FixSmartFitFlexibilityStep,
 			FixFacePriorityStep,
+			FixCommonsFavoriteLinksStep,
 		},
 	}
 }
@@ -304,4 +306,54 @@ func EnsureManagedFavoritesStep(cfg *Config) (bool, error) {
 		}
 	}
 	return changed, nil
+}
+
+// firstNewMuseumsMigration is the AppliedMigrations name of AddFirstNewMuseumsStep.
+const firstNewMuseumsMigration = "add_nga_yale_paris_musees"
+
+// firstNewMuseumQueries are the highlights collections of the museums added after v1.0 of the
+// museum list: the National Gallery of Art, Yale and Paris Musées. They are also in
+// asset/text/default_config.json, which is what new users start from.
+var firstNewMuseumQueries = []ImageQuery{
+	{Description: "⭐ Best of NGA", URL: "nga_masterpieces", Provider: "NationalGalleryOfArt"},
+	{Description: "⭐ Best of Yale", URL: "yale_masterpieces", Provider: "YaleUniversityArtCollections"},
+	{Description: "⭐ Best of Paris Musées", URL: "pm_masterpieces", Provider: "ParisMusees"},
+}
+
+func (c *Config) migrationApplied(name string) bool {
+	for _, n := range c.AppliedMigrations {
+		if n == name {
+			return true
+		}
+	}
+	return false
+}
+
+// AddFirstNewMuseumsStep turns on the highlights of the three museums added after the first
+// release for people who already have settings, as new users get them from the default config.
+// It runs once: it records itself in AppliedMigrations, so a user who later turns a museum off or
+// removes it does not get it back. A museum the user already has any query for, on or off, is left
+// as it is.
+func AddFirstNewMuseumsStep(cfg *Config) (bool, error) {
+	if cfg.migrationApplied(firstNewMuseumsMigration) {
+		return false, nil
+	}
+	for _, want := range firstNewMuseumQueries {
+		exists := false
+		for _, q := range cfg.Queries {
+			if q.Provider == want.Provider {
+				exists = true
+				break
+			}
+		}
+		if exists {
+			continue
+		}
+		log.Printf("Migration: Turning on %s (%s)", want.Description, want.Provider)
+		want.ID = GenerateQueryID(want.Provider + ":" + want.URL)
+		want.Active = true
+		cfg.Queries = append(cfg.Queries, want)
+	}
+	cfg.AppliedMigrations = append(cfg.AppliedMigrations, firstNewMuseumsMigration)
+	return true, nil
 }

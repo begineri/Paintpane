@@ -54,6 +54,9 @@ type Config struct {
 	AvoidSet          map[string]bool `json:"avoid_set"` // Set of image URLs to avoid
 	avoidMap          sync.Map        // Thread-safe map for InAvoidSet checks
 	NudeMarks         map[string]bool `json:"nude_marks,omitempty"` // Image IDs manually marked as nude
+	// AppliedMigrations names the one-time migrations that already ran, so a step that adds
+	// something (not just repairs it) does not add it again after the user removed or turned it off.
+	AppliedMigrations []string `json:"applied_migrations,omitempty"`
 	userid            string
 	mu                sync.RWMutex // Mutex for thread-safe access
 
@@ -1272,6 +1275,7 @@ func (c *Config) save() {
 		VirtualPaperMatting: c.VirtualPaperMatting,
 		VirtualFrameSize:    c.VirtualFrameSize,
 		ArtworkDisplayMode:  c.ArtworkDisplayMode,
+		AppliedMigrations:   append([]string(nil), c.AppliedMigrations...),
 	}
 
 	// Sync avoidMap to AvoidSet for JSON marshaling

@@ -269,6 +269,10 @@ type Thumbnail struct {
 	Title       string
 	Artist      string
 	Year        string
+	// TitleTranslations is optional: the title in other interface languages, keyed by the app's
+	// language code ("zh", "zh-Hant", "fr", ...), only where it differs from Title. The
+	// preview page shows Title and switches to these in those languages.
+	TitleTranslations map[string]string
 }
 
 // ThumbnailProvider defines the interface for providers that can resolve a batch of artwork IDs into thumbnail image URLs.
@@ -374,6 +378,16 @@ type ScaledDownloadProvider interface {
 	// full size is unknown, or the image is no larger than fit allows; the full image is then
 	// downloaded and shrunk after download if needed.
 	ScaledDownloadURL(ctx context.Context, img Image, fit func(w, h int) (int, int)) (string, bool)
+}
+
+// TitleLocalizer is an optional interface for providers whose works have titles in several
+// languages (Paris Musées: French, English, Chinese). An image keeps the title it was listed with,
+// in the interface language of that moment; the tray asks for the title again when it shows the
+// image, so it follows a later change of language.
+type TitleLocalizer interface {
+	// LocalizedTitle returns img's title in the current interface language, or false when the
+	// provider does not know the work.
+	LocalizedTitle(img Image) (string, bool)
 }
 
 // HeaderProvider is an optional interface for providers that need custom headers for image downloads.

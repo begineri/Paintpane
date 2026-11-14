@@ -23,9 +23,12 @@ func TestIsNudeID_CoversEveryNudeCollection(t *testing.T) {
 		{"Getty", "getty_nudes"},
 		{"Getty", "getty_photography"},
 		{"MetMuseum", "metmuseum_artistic_nudes"},
+		{"NationalGalleryOfArt", "nga_artistic_nudes"},
+		{"ParisMusees", "pm_artistic_nudes"},
 		{"Rijksmuseum", "rijks_nudes_photography"},
 		{"Rijksmuseum", "rijks_nudes_mixed"},
 		{"StatensMuseumForKunst", "smk_artistic_nudes"},
+		{"YaleUniversityArtCollections", "yale_artistic_nudes"},
 	}
 	for _, c := range expected {
 		entry := m.GetEntry(c.providerID, c.key)

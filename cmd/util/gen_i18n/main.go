@@ -39,6 +39,11 @@ var allowIdenticalToEnglish = map[string]bool{
 
 	// SMK Proper Nouns
 	"Statens Museum for Kunst": true,
+	"National Gallery of Art":  true,
+	"Paris Musées":             true,
+	"Paris, France":            true,
+	"New Haven, CT, USA":       true,
+	"Washington, DC, USA":      true,
 	"Copenhagen, Denmark":      true,
 
 	// International loanwords / identical across many languages

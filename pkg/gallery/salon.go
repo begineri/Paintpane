@@ -13,6 +13,10 @@ type GalleryItem struct {
 	Artist  string
 	Year    string
 
+	// TitleTranslations is the title in other interface languages (app language code → title);
+	// the page switches the label to it in those languages. Optional.
+	TitleTranslations map[string]string
+
 	// Original pixel dimensions
 	Width  float64
 	Height float64

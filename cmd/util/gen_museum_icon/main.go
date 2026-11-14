@@ -2,7 +2,7 @@
 // square in one colour with the museum's initial in white. It exists because official
 // museum logos may not be used without permission (docs/museum-logos.md).
 //
-//	go run ./cmd/util/gen_museum_icon -letter N -color 2F5D8A -out pkg/wallpaper/providers/nga/nga.png
+//	go run ./cmd/util/gen_museum_icon -letter N -color 5E5280 -out pkg/wallpaper/providers/nga/nga.png
 //
 // The style is a placeholder until the UI prototype session confirms the final icon design.
 package main

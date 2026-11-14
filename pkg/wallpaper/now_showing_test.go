@@ -104,3 +104,29 @@ func TestNowShowingLabelArtistRule(t *testing.T) {
 	assert.Equal(t, "Mount Starr King, Yosemite", title)
 	assert.Equal(t, "Albert Bierstadt", artist, "the app-drawn menu shows the cleaned name on its own line")
 }
+
+type localizedTitles struct {
+	provider.ImageProvider
+	titles map[string]string
+}
+
+func (l localizedTitles) LocalizedTitle(img provider.Image) (string, bool) {
+	t, ok := l.titles[img.ID]
+	return t, ok
+}
+
+// An image listed while the interface was in Chinese shows its English title once the language
+// is English: the tray asks a TitleLocalizer for the title instead of using the stored one.
+func TestNowShowingAsksForTheTitleInTheCurrentLanguage(t *testing.T) {
+	wp := &Plugin{providers: map[string]provider.ImageProvider{
+		"ParisMusees": localizedTitles{titles: map[string]string{"ParisMusees_sur-le-boulevard": "On the Boulevard"}},
+	}}
+	img := provider.Image{ID: "ParisMusees_sur-le-boulevard", Provider: "ParisMusees", Title: "林荫大道上", Artist: "Jean Béraud"}
+	assert.Equal(t, "On the Boulevard — Jean Béraud", wp.nowShowingLabel(img))
+	title, artist := wp.nowShowingLines(img)
+	assert.Equal(t, "On the Boulevard", title)
+	assert.Equal(t, "Jean Béraud", artist)
+
+	unknown := provider.Image{ID: "ParisMusees_gone", Provider: "ParisMusees", Title: "Le Pont", Artist: "X"}
+	assert.Equal(t, "Le Pont — X", wp.nowShowingLabel(unknown), "a work the provider does not know keeps its stored title")
+}

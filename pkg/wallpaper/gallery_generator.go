@@ -94,6 +94,7 @@ func GenerateGalleryForProvider(ctx context.Context, prov provider.ImageProvider
 			items[index].ID = thumb.ID
 			items[index].ViewURL = thumb.ViewURL
 			items[index].Title = thumb.Title
+			items[index].TitleTranslations = thumb.TitleTranslations
 			items[index].Artist = thumb.Artist
 			items[index].Year = thumb.Year
 

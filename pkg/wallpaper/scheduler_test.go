@@ -79,8 +79,10 @@ func TestCheckAndRunRefresh_OTAIntegration(t *testing.T) {
 		fm:    NewFileManager(tempDir),
 	}
 
-	// Enable OTA in config
+	// Enable OTA in config. GetConfig is shared by the whole test binary: put it back.
+	otaWas := wp.cfg.GetMuseumCollectionOTA()
 	wp.cfg.SetMuseumCollectionOTA(true)
+	t.Cleanup(func() { wp.cfg.SetMuseumCollectionOTA(otaWas) })
 
 	// Set up mock remote server for Curation Manager
 	remoteJSON := `{
@@ -94,12 +96,23 @@ func TestCheckAndRunRefresh_OTAIntegration(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	cm := curation.GetManager()
+	// A curation manager of this test's own. SyncAll replaces every provider's collection with
+	// the mock's empty one; on the shared manager that was left for the tests after this one, so
+	// a second run (-count=2) found Getty's nudes gone (TestIsImageHidden) and testprov already at
+	// v9.9.9, with no cache file written.
+	curation.GetManager()
+	sharedManager := curation.GlobalManager
+	cm := curation.NewManager()
+	curation.GlobalManager = cm
 	cm.RemoteBaseURL = ts.URL + "/"
 	cm.CacheDir = filepath.Join(tempDir, "curation_cache")
 
 	// Create a dummy provider so SyncAll triggers an update
 	curation.ProviderIDToFilename["testprov"] = "testprov.json"
+	t.Cleanup(func() {
+		curation.GlobalManager = sharedManager
+		delete(curation.ProviderIDToFilename, "testprov")
+	})
 
 	// Fast forward time to trigger a new day refresh
 	now := time.Now()
@@ -109,10 +122,8 @@ func TestCheckAndRunRefresh_OTAIntegration(t *testing.T) {
 
 	assert.Equal(t, now.Day(), newRefreshDay, "Expected refresh day to update")
 
-	// Wait briefly to allow background SyncAll and generation workers to run
-	time.Sleep(500 * time.Millisecond)
-
-	// Verify OTA was actually triggered by checking if the cache file was written
+	// Verify OTA was actually triggered by checking if the cache file was written. SyncAll runs
+	// inside checkAndRunRefresh, so the file is there once it returns.
 	cachePath := filepath.Join(cm.CacheDir, "testprov.json")
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		t.Errorf("Expected OTA curation cache file to be written at %s", cachePath)

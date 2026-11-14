@@ -15,6 +15,23 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// holdAutoApply keeps a change pending for the rest of the test. A change applies itself
+// applyDelay (800 ms) after the last edit, on a timer goroutine; a test that checks the state
+// between an edit and Apply would otherwise see the change already applied whenever the test
+// goroutine is held up that long (a busy machine, -race, go test -p). In the headless driver the
+// timer also runs applyPending on its own goroutine, a data race with the test. Tests that want
+// the change applied tap Apply, or call FlushPending or CommitSetting.
+func holdAutoApply(t *testing.T, sm setting.SettingsManager) {
+	t.Helper()
+	m := sm.(*SettingsManager)
+	m.applyDelay = time.Hour
+	t.Cleanup(func() {
+		if m.applyTimer != nil {
+			m.applyTimer.Stop()
+		}
+	})
+}
+
 func TestCommitSetting(t *testing.T) {
 	// Initialize test app and window
 	app := test.NewApp()
@@ -22,6 +39,7 @@ func TestCommitSetting(t *testing.T) {
 	testWin := app.NewWindow("Test")
 
 	sm := NewSettingsManager(testWin)
+	holdAutoApply(t, sm)
 
 	// 1. Create a setting via schema
 	initialVal := "Original Baseline"
@@ -161,6 +179,7 @@ func TestVisibleIfStateTransitions(t *testing.T) {
 	app := test.NewApp()
 	testWin := app.NewWindow("Test Visibility")
 	sm := NewSettingsManager(testWin)
+	holdAutoApply(t, sm)
 
 	baseline := "ValidKey"
 	p := schema.PanelSchema{
@@ -221,6 +240,7 @@ func TestApplyTriggersRefresh(t *testing.T) {
 	app := test.NewApp()
 	testWin := app.NewWindow("Test Apply Refresh")
 	sm := NewSettingsManager(testWin)
+	holdAutoApply(t, sm)
 
 	refreshCount := 0
 	sm.RegisterRefreshFunc(func() {

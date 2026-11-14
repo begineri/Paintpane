@@ -78,8 +78,9 @@ func TestShrinkEmbeddedImages(t *testing.T) {
 }
 
 // The pages built into the program carry small thumbnails (the evaluation of 2026-11-08 chose to
-// keep them built in and make them small, about 20 MB instead of 104 MB). A page regenerated with
-// cmd/gallerygen uses EncodeThumbnail, so it passes too; an old page does not.
+// keep them built in and make them small, about 20 MB instead of 104 MB for seven museums). A page
+// regenerated with cmd/gallerygen uses EncodeThumbnail, so it passes too; an old page does not.
+// NGA, Yale and Paris Musées (P8) brought ten museums and about 32 MB.
 func TestEmbeddedGalleriesAreSmall(t *testing.T) {
 	var total int64
 	images := 0
@@ -104,5 +105,5 @@ func TestEmbeddedGalleriesAreSmall(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Greater(t, images, 300, "the pages carry their thumbnails")
-	assert.Less(t, total, int64(25_000_000), "all pages together are about 20 MB")
+	assert.Less(t, total, int64(36_000_000), "all pages together are about 32 MB")
 }

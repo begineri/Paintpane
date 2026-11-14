@@ -35,6 +35,15 @@ type PreResolvedItem struct {
 	Year        string `json:"year,omitempty"`
 	ImageURL    string `json:"image_url"`
 	ViewURL     string `json:"view_url,omitempty"`
+
+	// Width and Height are the pixel size of the full image as the museum reports it.
+	// Providers that request a scaled copy (IIIF) work out the scaled size from them.
+	Width  int `json:"width,omitempty"`
+	Height int `json:"height,omitempty"`
+
+	// TitleTranslations holds the title in other languages keyed like name_translations
+	// ("en", "zh-CN", "zh-TW", ...) for museums whose own titles are in one language only.
+	TitleTranslations map[string]string `json:"title_translations,omitempty"`
 }
 
 // CollectionEntry defines a single browsable collection.
