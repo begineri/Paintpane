@@ -4,37 +4,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"image"
 	"image/color"
 	"os"
 	"path/filepath"
 	"strings"
 )
-
-// icon returns the app icon drawn for one size. 16-32 px are hand-placed
-// grids; larger sizes rasterise the shape scene at their own block size and
-// detail tier.
-func icon(size int) *image.NRGBA {
-	if size <= 32 {
-		return smallIcon(size)
-	}
-	type tier struct{ block, gold, inner, detail int }
-	t := map[int]tier{
-		48:  {1, 3, 1, detMid},
-		64:  {1, 3, 1, detMid},
-		96:  {2, 3, 1, detMid}, // the 48 px drawing at 200 % DPI
-		118: {2, 4, 1, detHigh},
-		128: {2, 4, 1, detHigh},
-		256: {4, 4, 1, detHigh}, // the 128 px drawing at 200 % DPI
-	}[size]
-	if t.block == 0 {
-		panic("no tier for size")
-	}
-	img := image.NewNRGBA(image.Rect(0, 0, size, size))
-	in := drawFrame(img, img.Bounds(), t.block, t.gold, t.inner, size >= 64)
-	paintScene(img, in, t.block, t.detail)
-	return img
-}
 
 // framedPainting draws a landscape frame + painting at block size b with its
 // outer top-left at (x, y) and size w x h (all in pixels, multiples of b).
@@ -66,16 +42,18 @@ func splash(scale, shapes int, title bool) *image.NRGBA {
 	return img
 }
 
-// wizardImage is the 240 x 458 Inno Setup side panel.
+// wizardImage is the 240 x 458 Inno Setup side panel: the large icon above
+// the name, centred on cream.
 func wizardImage() *image.NRGBA {
-	const b = 4
-	img := image.NewNRGBA(image.Rect(0, 0, 240, 458))
-	fill(img, img.Bounds(), cNavy)
-	fill(img, image.Rect(0, 100*b, 240, 458), cNavyLight) // wainscot
-	fill(img, image.Rect(0, 99*b, 240, 100*b), cGoldShade)
-	framedPainting(img, 4*b, 24*b, 52*b, 40*b, b, -1)
-	tw := textWidth("Paintpane")
-	drawText(img, "Paintpane", (60-tw)/2*b, 72*b, b, cCream, cOutline)
+	const w, h = 240, 458
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	fill(img, img.Bounds(), cCream)
+	ic := b2x256.scaled(1, 2).render() // 128 px canvas, 112 px tile
+	const scale, gap = 3, 20
+	tw, th := textWidth("Paintpane")*scale, 7*scale
+	top := (h - (112 + gap + th)) / 2 // centre the tile and the text as a group
+	over(img, ic, (w-128)/2, top-8)
+	drawText(img, "Paintpane", (w-tw)/2, top+112+gap, scale, cInk, color.NRGBA{})
 	return img
 }
 
@@ -103,23 +81,31 @@ func main() {
 	flag.Parse()
 	out := func(p string) string { return filepath.Join(*root, filepath.FromSlash(p)) }
 
-	sizes := []int{16, 24, 32, 48, 64, 96, 128, 256}
+	sizes := []int{16, 20, 24, 32, 40, 48, 64, 96, 256}
 	var icons []*image.NRGBA
 	for _, s := range sizes {
 		icons = append(icons, icon(s))
 	}
+	big := icon(256)
 	writeICO(out("assets-src/installer/Paintpane.ico"), icons)
-	writePNG(out("asset/icons/tray.png"), icon(118))
-	writePNG(out("asset/images/splash.png"), splash(1, -1, true))
+	writePNG(out("asset/icons/tray.png"), trayIcon())
+	writePNG(out("asset/icons/app.png"), big)
+	writePNG(out("site/assets/icon-256.png"), big)
+	writePNG(out("site/assets/favicon-32.png"), icon(32))
+	writePNG(out("docs/mockups/intro-page/icon-256.png"), big)
+	// The about animation still shows the old framed Bedroom (owner's call,
+	// 2026-11-15); it is regenerated unchanged.
 	frames, delays := aboutFrames()
 	writeGIF(out("asset/images/about_splash.gif"), frames, delays)
 	writeBMP(out("assets-src/installer/Paintpane.bmp"), wizardImage())
 
 	if *preview != "" {
-		writePNG(*preview, previewSheet(append(icons[:3:3], icon(48), icon(64), icon(118))))
-		writePNG(strings.TrimSuffix(*preview, ".png")+"-wizard.png", wizardImage())
-		f, d := aboutFrames()
-		writePNG(strings.TrimSuffix(*preview, ".png")+"-about-mid.png", f[len(d)/2])
+		base := strings.TrimSuffix(*preview, ".png")
+		writePNG(*preview, previewSheet(append(icons[:6:6], trayIcon())))
+		for _, s := range []int{16, 20, 24} {
+			writePNG(fmt.Sprintf("%s-%d.png", base, s), icon(s)) // 1x, to check against final/*.svg
+		}
+		writePNG(base+"-wizard.png", wizardImage())
 	}
 	os.Stdout.WriteString("icons written\n")
 }
@@ -156,14 +142,5 @@ func previewSheet(icons []*image.NRGBA) *image.NRGBA {
 }
 
 func blit(dst, src *image.NRGBA, x0, y0, z int) {
-	b := src.Bounds()
-	for y := 0; y < b.Dy(); y++ {
-		for x := 0; x < b.Dx(); x++ {
-			c := src.NRGBAAt(x, y)
-			if c.A == 0 {
-				continue
-			}
-			fill(dst, image.Rect(x0+x*z, y0+y*z, x0+(x+1)*z, y0+(y+1)*z), c)
-		}
-	}
+	over(dst, nearest(src, z), x0, y0)
 }

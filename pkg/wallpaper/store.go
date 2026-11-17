@@ -313,9 +313,7 @@ func (s *ImageStore) removeFromBucketsLocked(id string, derivativePaths map[stri
 func (s *ImageStore) scheduleSaveLocked() {
 	if !s.asyncSave {
 		// Sync mode: snapshot while locked and save immediately.
-		snapshot := make([]provider.Image, len(s.images))
-		copy(snapshot, s.images)
-		s.saveCacheInternal(snapshot)
+		s.saveCacheInternal(s.snapshotForSaveLocked())
 		return
 	}
 
@@ -663,20 +661,26 @@ func (s *ImageStore) LoadCache() error {
 		}
 		return err
 	}
-	defer file.Close()
-
-	if err := json.NewDecoder(file).Decode(&s.images); err != nil {
+	err = json.NewDecoder(file).Decode(&s.images)
+	// Closed before any save below: Windows cannot rename the new file over an open one.
+	file.Close()
+	if err != nil {
 		return err
 	}
 
+	// Paths in the file are relative to the cache root (P22); files up to v1.1 hold absolute ones.
+	migrationOccurred := s.resolveCachePathsLocked()
+
 	// Namespacing Migration: Upgrade legacy IDs to namespaced format
-	migrationOccurred := s.migrateLegacyIDsLocked()
+	if s.migrateLegacyIDsLocked() {
+		migrationOccurred = true
+	}
 	if s.fixCommonsViewURLsLocked() {
 		migrationOccurred = true
 	}
 
 	if migrationOccurred {
-		log.Printf("Migration: Namespacing upgrade complete. Saving updated cache.")
+		log.Printf("Migration: Cache upgrade complete. Saving updated cache.")
 		// No lock needed as we're inside LoadCache which holds mu.Lock()
 		s.scheduleSaveLocked()
 	}
@@ -703,32 +707,7 @@ func (s *ImageStore) LoadCache() error {
 
 func (s *ImageStore) SaveCache() {
 	s.mu.RLock()
-	snapshot := make([]provider.Image, len(s.images))
-	for i, img := range s.images {
-		// Deep copy the struct to avoid shared map references during JSON encoding
-		snapshot[i] = img
-		if img.ProcessingFlags != nil {
-			flags := make(map[string]bool)
-			for k, v := range img.ProcessingFlags {
-				flags[k] = v
-			}
-			snapshot[i].ProcessingFlags = flags
-		}
-		if img.DerivativePaths != nil {
-			paths := make(map[string]string)
-			for k, v := range img.DerivativePaths {
-				paths[k] = v
-			}
-			snapshot[i].DerivativePaths = paths
-		}
-		if img.Tuning != nil {
-			tuning := make(map[string]provider.TuningOptions)
-			for k, v := range img.Tuning {
-				tuning[k] = v
-			}
-			snapshot[i].Tuning = tuning
-		}
-	}
+	snapshot := s.snapshotForSaveLocked()
 	s.mu.RUnlock()
 
 	s.saveCacheInternal(snapshot)
@@ -743,6 +722,7 @@ func (s *ImageStore) saveCacheInternal(images []provider.Image) {
 		return
 	}
 
+	// Write a temporary file and rename it over the cache, so a crash never leaves half a file.
 	tmp := s.cachePath + ".tmp"
 	file, err := os.Create(tmp)
 	if err != nil {
@@ -754,10 +734,18 @@ func (s *ImageStore) saveCacheInternal(images []provider.Image) {
 	encoder.SetIndent("", "  ")
 	if err := encoder.Encode(images); err != nil {
 		file.Close()
+		_ = os.Remove(tmp)
 		log.Printf("Store: Failed to encode cache: %v", err)
 		return
 	}
-	file.Close()
+	if err := file.Sync(); err != nil {
+		log.Printf("Store: Failed to flush cache: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		_ = os.Remove(tmp)
+		log.Printf("Store: Failed to write cache: %v", err)
+		return
+	}
 
 	if err := os.Rename(tmp, s.cachePath); err != nil {
 		log.Printf("Store: Failed to rename cache: %v", err)

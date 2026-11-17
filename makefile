@@ -51,7 +51,7 @@ build-darwin-amd64:
 	@echo "Cleaning previous Paintpane.app bundle..."
 	rm -rf Paintpane.app
 	@echo "Packaging Paintpane.app..."
-	fyne package --os darwin --executable ./bin/paintpane-darwin-amd64 --icon asset/icons/tray.png --name Paintpane --app-id io.github.begineri.paintpane
+	fyne package --os darwin --executable ./bin/paintpane-darwin-amd64 --icon asset/icons/app.png --name Paintpane --app-id io.github.begineri.paintpane
 
 	@echo "Modifying Info.plist to set LSUIElement=true..."
 	plutil -insert LSUIElement -bool true Paintpane.app/Contents/Info.plist
@@ -66,7 +66,7 @@ build-darwin-arm64:
 	@echo "Cleaning previous Paintpane.app bundle..."
 	rm -rf Paintpane.app
 	@echo "Packaging Paintpane.app..."
-	fyne package --os darwin --executable ./bin/paintpane-darwin-arm64 --icon asset/icons/tray.png --name Paintpane --app-id io.github.begineri.paintpane
+	fyne package --os darwin --executable ./bin/paintpane-darwin-arm64 --icon asset/icons/app.png --name Paintpane --app-id io.github.begineri.paintpane
 
 	@echo "Modifying Info.plist to set LSUIElement=true..."
 	plutil -insert LSUIElement -bool true Paintpane.app/Contents/Info.plist
@@ -103,7 +103,7 @@ build-darwin-amd64-dev:
 	GOOS=darwin GOARCH=amd64 go build -o bin/paintpane-darwin-amd64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
 
 	@echo "Packaging Paintpane.app..."
-	fyne package --os darwin --executable ./bin/paintpane-darwin-amd64 --icon asset/icons/tray.png --name Paintpane --app-id io.github.begineri.paintpane
+	fyne package --os darwin --executable ./bin/paintpane-darwin-amd64 --icon asset/icons/app.png --name Paintpane --app-id io.github.begineri.paintpane
 
 	@echo "Modifying Info.plist to set LSUIElement=true..."
 	plutil -insert LSUIElement -bool true Paintpane.app/Contents/Info.plist
@@ -116,7 +116,7 @@ build-darwin-arm64-dev:
 	GOOS=darwin GOARCH=arm64 go build -o bin/paintpane-darwin-arm64 -ldflags "$(LDFLAGS_COMMON)" ./cmd/spice
 
 	@echo "Packaging Paintpane.app..."
-	fyne package --os darwin --executable ./bin/paintpane-darwin-arm64 --icon asset/icons/tray.png --name Paintpane --app-id io.github.begineri.paintpane
+	fyne package --os darwin --executable ./bin/paintpane-darwin-arm64 --icon asset/icons/app.png --name Paintpane --app-id io.github.begineri.paintpane
 
 	@echo "Modifying Info.plist to set LSUIElement=true..."
 	plutil -insert LSUIElement -bool true Paintpane.app/Contents/Info.plist

@@ -176,6 +176,10 @@ func getInstance() *SpiceApp {
 			applyTheme(saInstance.App, parseThemeMode(saInstance.appConfig.GetTheme()), saInstance.appConfig.GetAccent())
 			fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: theme applied")
 
+			// Before any window exists: Fyne gives the app icon only to windows
+			// created after SetIcon, and the first-run licence window comes next.
+			saInstance.setWindowIcon()
+
 			saInstance.verifyEULA()
 			fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: EULA verified")
 
@@ -285,6 +289,17 @@ func (sa *SpiceApp) quit() {
 	sa.Quit()
 }
 
+// setWindowIcon gives every window (title bar, taskbar button, Alt+Tab) the
+// large drawing, app.png; the tray keeps tray.png.
+func (sa *SpiceApp) setWindowIcon() {
+	appIcon, err := sa.assetMgr.GetIcon("app.png")
+	if err != nil {
+		utilLog.Printf("ERROR: Failed to load app icon: %v", err)
+		return
+	}
+	sa.SetIcon(appIcon)
+}
+
 // setTrayMenu shows items (plus the footer) in the tray: in the app-drawn
 // menu on Windows, and in the native menu, which other platforms show and the
 // debug API reads.
@@ -303,11 +318,12 @@ func (sa *SpiceApp) setTrayMenu(items []schema.MenuItemSchema) {
 	native = append(native, fyne.NewMenuItemSeparator(), settingsItem, fyne.NewMenuItemSeparator(), quitItem)
 	sa.trayMenu = fyne.NewMenu("", native...)
 
+	// The tray gets the 16 px drawing enlarged 4x (tray.png), which Windows
+	// reduces cleanly. Windows get app.png, set in setWindowIcon.
 	trayIcon, err := sa.assetMgr.GetIcon("tray.png")
 	if err != nil {
 		utilLog.Printf("ERROR: Failed to load tray icon: %v", err)
 	}
-	sa.SetIcon(trayIcon)
 
 	utilLog.Debug("Calling desk.SetSystemTrayMenu...")
 	desk.SetSystemTrayMenu(sa.trayMenu)

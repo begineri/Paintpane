@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"image"
+	_ "image/gif" // Register GIF decoder (about_splash.gif)
 	_ "image/png" // Register PNG decoder
 
 	"fyne.io/fyne/v2"
