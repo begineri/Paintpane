@@ -25,6 +25,12 @@ modification of Spice by begineri.
 License included in [pkg/wallpaper/internal/progjpeg/LICENSE](pkg/wallpaper/internal/progjpeg/LICENSE).
 That notice also applies to the binaries built from this repository.
 
+`third_party/fyne` is a copy of the **Fyne** GUI toolkit (https://fyne.io) v2.7.4 with a few
+changes for Paintpane, each listed in [third_party/fyne/PAINTPANE.md](third_party/fyne/PAINTPANE.md).
+Copyright (C) 2018 Fyne.io developers, licensed under the BSD 3-Clause License included in
+[third_party/fyne/LICENSE](third_party/fyne/LICENSE). That notice also applies to the binaries
+built from this repository.
+
 ## Fonts
 
 Paintpane bundles a subset of **Noto Sans SC** (Regular and Bold), Copyright © 2014-2021 Adobe

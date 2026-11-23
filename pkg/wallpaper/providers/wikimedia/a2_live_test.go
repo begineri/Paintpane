@@ -3,21 +3,19 @@ package wikimedia
 import (
 	"context"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/dixieflatline76/Spice/v2/internal/nettest"
 	"github.com/dixieflatline76/Spice/v2/pkg/wallpaper"
 )
 
-// A2 phase 5: credits of real Commons files. Needs the network, so it only runs with A2_LIVE=1.
+// A2 phase 5: credits of real Commons files. Needs the network, so it only runs with A2_LIVE=1 or PAINTPANE_NETWORK_TESTS=1.
 func TestA2_LiveCreditsAreReadable(t *testing.T) {
-	if os.Getenv("A2_LIVE") == "" {
-		t.Skip("set A2_LIVE=1 to read real Commons data")
-	}
+	nettest.RequireNetwork(t, "A2_LIVE")
 	p := NewProvider(&wallpaper.Config{}, &http.Client{Timeout: 60 * time.Second})
 	queries := []string{
 		"category:Featured_pictures_on_Wikimedia_Commons",

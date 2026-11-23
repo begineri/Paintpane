@@ -229,8 +229,8 @@ func (m *MockImageStore) Clear() {
 	m.Called()
 }
 
-func (m *MockImageStore) Sync(limit int, targetFlags map[string]bool, activeQueryIDs map[string]bool) {
-	m.Called(limit, targetFlags, activeQueryIDs)
+func (m *MockImageStore) Sync(limit int, targetFlags map[string]bool, activeQueryIDs map[string]bool, keep map[string]bool) {
+	m.Called(limit, targetFlags, activeQueryIDs, keep)
 }
 
 func (m *MockImageStore) GetKnownIDs() map[string]bool {

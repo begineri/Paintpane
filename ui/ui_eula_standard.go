@@ -22,12 +22,16 @@ func (sa *SpiceApp) verifyEULA() {
 		// Don't create any windows — proceed directly to background mode.
 		// The app will run headless with tray menu and hotkeys.
 		sa.os.TransformToBackground()
+		if util.HasAcceptedEULA(sa.Preferences()) {
+			licenceAccepted() // accepted in an earlier run; without one, no first wallpaper at start
+		}
 		return
 	}
 
 	// Check if the EULA has been accepted
 	if util.HasAcceptedEULA(sa.Preferences()) {
 		sa.os.TransformToBackground() // EULA already accepted: run in the background
+		licenceAccepted()
 	} else {
 		sa.displayEULAAcceptance() // Show the EULA if it hasn't been accepted
 	}
@@ -58,9 +62,10 @@ func (sa *SpiceApp) displayEULAAcceptance() {
 			sa.Quit()
 		},
 		func() {
-			sa.acceptEULA()
+			acceptedBefore := sa.acceptEULA()
 			eulaWindow.Close()
 			sa.os.TransformToBackground() // Run in the background once the EULA is accepted
+			sa.offerStoreImport(acceptedBefore)
 		}))
 	eulaWindow.Show()
 	styleTitleBar(eulaWindow)
@@ -68,9 +73,12 @@ func (sa *SpiceApp) displayEULAAcceptance() {
 
 // acceptEULA records the acceptance. On a first run (no acceptance of any version recorded before)
 // it also registers the program to start with Windows, once (S3-6, registerAutostartOnFirstRun).
-func (sa *SpiceApp) acceptEULA() {
+// It reports whether an earlier acceptance was recorded (not a first run).
+func (sa *SpiceApp) acceptEULA() bool {
 	prefs := sa.Preferences()
 	acceptedBefore := util.HasEverAcceptedEULA(prefs) // read before this acceptance is recorded
 	util.MarkEULAAccepted(prefs)
 	registerAutostartOnFirstRun(prefs, acceptedBefore)
+	licenceAccepted() // a fresh install's first wallpaper waited for this
+	return acceptedBefore
 }

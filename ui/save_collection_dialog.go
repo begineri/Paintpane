@@ -53,7 +53,7 @@ func (sm *SettingsManager) showSaveCollectionDialog(defaultName string, save fun
 	nameEntry.SetText(defaultName)
 
 	popup := newDialogPopup(parent, addQueryDialogWidth, vstack(8,
-		newDialogTitle(i18n.T("Save collection")),
+		newDialogTitle(i18n.T("Save collection"), addQueryDialogWidth),
 		vstack(4, newStyledText(i18n.T("Name"), 12, false, theme.ColorNamePlaceHolder), nameEntry),
 		noInset(problem),
 		container.NewBorder(nil, nil, widget.NewLabel(i18n.T("Active")), hug(active)),

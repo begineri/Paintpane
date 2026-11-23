@@ -54,6 +54,8 @@ go build -tags release -o bin/paintpane.exe -ldflags "-s -w -H=windowsgui -X mai
 
 The Go module path is still `github.com/dixieflatline76/Spice/v2`, kept on purpose so the code stays easy to compare with Spice.
 
+The Fyne GUI toolkit is built from a patched copy in [`third_party/fyne`](third_party/fyne/) (Fyne 2.7.4; `go.mod` points to it with a `replace`). Its [PAINTPANE.md](third_party/fyne/PAINTPANE.md) lists every change.
+
 The website is plain HTML and CSS in [`site/`](site/); open `site/index.html` in a browser to preview it.
 
 ## Contributing
@@ -67,3 +69,5 @@ Paintpane is built on [Spice](https://github.com/dixieflatline76/Spice), created
 ## License
 
 Paintpane is distributed under the same [PolyForm Noncommercial License 1.0.0](LICENSE) as Spice, with Karl Kwong's copyright notice kept. **Noncommercial use only**: you may use, study, modify and share it, but not for commercial advantage or monetary compensation. See [NOTICE.md](NOTICE.md).
+
+Third-party code in this repository keeps its own licence: the patched Fyne in [`third_party/fyne`](third_party/fyne/) and the JPEG decoder in [`pkg/wallpaper/internal/progjpeg`](pkg/wallpaper/internal/progjpeg/) are under the BSD 3-Clause License (see NOTICE.md).

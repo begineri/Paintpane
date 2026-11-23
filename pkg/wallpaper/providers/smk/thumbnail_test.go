@@ -2,17 +2,18 @@ package smk
 
 import (
 	"context"
-	"net/http"
-	"os"
 	"testing"
+
+	"github.com/dixieflatline76/Spice/v2/internal/nettest"
 )
 
 func TestFetchThumbnails_TDD(t *testing.T) {
-	if os.Getenv("SPICE_LIVE_TESTS") == "" {
-		t.Skip("Skipping live network test in CI. Run with SPICE_LIVE_TESTS=1 to execute.")
-	}
-
-	p := NewProvider(nil, http.DefaultClient)
+	// The search result is replayed from testdata (recorded from api.smk.dk on 2026-11-18, cut
+	// down to the fields FetchThumbnails reads), so the test runs offline and in CI.
+	client := nettest.Replay(t, map[string]string{
+		"api.smk.dk/api/v1/art/?object_number=KMS3418": "testdata/object-KMS3418.json",
+	})
+	p := NewProvider(nil, client)
 
 	// Valid ID from SMK
 	ids := []string{"KMS3418"}

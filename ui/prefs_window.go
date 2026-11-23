@@ -202,6 +202,8 @@ func (sa *SpiceApp) generalPanel(sm *SettingsManager, openShortcuts func()) *sch
 							selectedLang := langOptions[i]
 							sa.appConfig.SetLanguage(selectedLang)
 							i18n.SetLanguage(selectedLang)
+							// Chinese and Japanese draw quotes and … full width, other languages narrow.
+							applyTheme(sa.App, parseThemeMode(sa.appConfig.GetTheme()), sa.appConfig.GetAccent())
 
 							if srv := api.GetServer(); srv != nil {
 								if err := srv.BroadcastLanguage(i18n.GetLanguage()); err != nil {
@@ -229,6 +231,16 @@ func (sa *SpiceApp) generalPanel(sm *SettingsManager, openShortcuts func()) *sch
 						InitialValue: autostartOn(),
 						ApplyFunc:    sa.setAutostart,
 						VisibleIf:    autostartAvailable,
+					},
+					// Microsoft Store edition (docs/ui_refresh.md §12 v51, S3-6S): Windows starts it
+					// through the package's StartupTask, so this row says where to turn that on or off.
+					schema.ButtonItem{
+						Name:       "storeStartup",
+						Label:      i18n.T("Start with Windows"),
+						Help:       i18n.T("Turn it on or off in Windows Settings › Apps › Startup."),
+						ButtonText: i18n.T("Open Settings"),
+						OnPressed:  func() { openStartupSettings(sa) },
+						VisibleIf:  storeStartupRowVisible,
 					},
 					schema.ButtonItem{
 						Name:       "manageMacStartup",

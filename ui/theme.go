@@ -140,12 +140,14 @@ type paintpaneTheme struct {
 	forced  bool
 	variant fyne.ThemeVariant
 	accent  accentDef
+	narrow  string // characters drawn in the Latin font (narrowPunctuation), by UI language
 }
 
 // newPaintpaneTheme returns the theme for a mode with the default accent; use
 // withAccent to choose another.
 func newPaintpaneTheme(mode themeMode) *paintpaneTheme {
-	t := &paintpaneTheme{base: theme.DefaultTheme(), mode: mode, accent: parseAccent(accentDefault)}
+	t := &paintpaneTheme{base: theme.DefaultTheme(), mode: mode, accent: parseAccent(accentDefault),
+		narrow: narrowPunctuation(i18n.EffectiveLanguage())}
 	switch mode {
 	case themeModeLight:
 		t.forced, t.variant = true, theme.VariantLight
@@ -182,7 +184,8 @@ func (t *paintpaneTheme) Color(name fyne.ThemeColorName, variant fyne.ThemeVaria
 // a subset of Noto Sans SC built by assets-src/fonts/subset.py (SIL OFL 1.1,
 // see NOTICE.md). Chinese and Latin share one design and Chinese gets a real
 // bold. Characters outside the subset fall back to Fyne's font, then to a
-// system font.
+// system font. A few punctuation marks are left out on purpose so that they
+// come from Fyne's font, narrow (font_narrow.go).
 var (
 	//go:embed fonts/NotoSansSC-Regular.subset.otf
 	notoSansSCRegular []byte
@@ -198,9 +201,9 @@ func (t *paintpaneTheme) Font(style fyne.TextStyle) fyne.Resource {
 	case style.Monospace, style.Symbol, style.Italic:
 		return t.base.Font(style) // Noto Sans SC has no monospace or italic
 	case style.Bold:
-		return fontBold
+		return textFontsFor(t.narrow).bold
 	default:
-		return fontRegular
+		return textFontsFor(t.narrow).regular
 	}
 }
 
@@ -213,12 +216,13 @@ func (t *paintpaneTheme) Size(name fyne.ThemeSizeName) float32 {
 	return t.base.Size(name)
 }
 
-// applyTheme installs the theme for the given mode and accent key on the running app. Installing
-// a theme makes Fyne drop its font and text caches and redraw every window, so a call that would
-// not change the look does nothing: the settings page applies a choice when it is made and again
-// when its pending changes are saved.
+// applyTheme installs the theme for the given mode and accent key, and the UI language's fonts,
+// on the running app. Installing a theme makes Fyne drop its font and text caches and redraw every
+// window, so a call that would not change the look does nothing: the settings page applies a
+// choice when it is made and again when its pending changes are saved.
 func applyTheme(app fyne.App, mode themeMode, accent string) {
-	if cur, ok := app.Settings().Theme().(*paintpaneTheme); ok && cur.mode == mode && cur.accent.key == parseAccent(accent).key {
+	if cur, ok := app.Settings().Theme().(*paintpaneTheme); ok && cur.mode == mode && cur.accent.key == parseAccent(accent).key &&
+		cur.narrow == narrowPunctuation(i18n.EffectiveLanguage()) {
 		return
 	}
 	app.Settings().SetTheme(newPaintpaneTheme(mode).withAccent(accent))

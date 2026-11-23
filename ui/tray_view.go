@@ -870,12 +870,15 @@ func (r *trayMenuRenderer) build() {
 				add(r.glyph("chevronRight", p.ph, ax, cy-trayIconSize/2, trayIconSize))
 				end = ax - trayRowGap - trayCurGap
 				if it.Detail != "" {
-					// The label is cut before the choice, unless the choice
-					// would take more than half the room.
+					// The choice takes the room the whole label leaves. When both do not
+					// fit, the label is cut before the choice, unless the choice would take
+					// more than half the room.
 					cw := trayTextW(it.Detail, trayNoteSize, false)
 					cx := end - cw
-					if mid := tx + (end-tx)/2; cx < mid {
-						cx, cw = mid, end-mid
+					labelEnd := tx + trayTextW(it.Label, trayTextSize, it.Emphasis) + trayRowGap + trayCurGap
+					if mid := tx + (end-tx)/2; cx < mid && cx < labelEnd {
+						cx = fyne.Min(mid, labelEnd)
+						cw = end - cx
 					}
 					add(r.text(it.Detail, trayNoteSize, false, p.ph, cx, cy, cw, fyne.TextAlignLeading))
 					end = cx - trayRowGap - trayCurGap

@@ -784,7 +784,11 @@ const (
 	ImageActionRepoint                    // Display mode changed: Forget derivative paths (Keep all files)
 )
 
-func (s *ImageStore) Sync(limit int, targetFlags map[string]bool, activeQueryIDs map[string]bool) {
+// Sync reconciles the store with the configuration: it drops images of inactive queries, blocked
+// images and images whose master is gone, resets derivatives whose processing flags no longer match,
+// then evicts the oldest images over limit. Images in keep (the wallpapers and lock screen on show)
+// are never evicted for the limit, as in PruneToLimit, so the store may stay over it by those few.
+func (s *ImageStore) Sync(limit int, targetFlags map[string]bool, activeQueryIDs map[string]bool, keep map[string]bool) {
 	if s.fm == nil {
 		return
 	}
@@ -844,15 +848,20 @@ func (s *ImageStore) Sync(limit int, targetFlags map[string]bool, activeQueryIDs
 		}
 	}
 
-	// 3. Prune Limit
-	if len(finalImages) > limit {
-		excess := len(finalImages) - limit
-		toPrune := finalImages[:excess]
-		finalImages = finalImages[excess:]
-		for _, img := range toPrune {
-			idsToDelete = append(idsToDelete, img.ID)
-			delete(s.idSet, img.ID)
+	// 3. Prune Limit: evict the oldest, but never an image on show (see PruneToLimit).
+	if excess := len(finalImages) - limit; excess > 0 {
+		kept := make([]provider.Image, 0, limit+len(keep))
+		pruned := 0
+		for _, img := range finalImages {
+			if pruned < excess && !keep[img.ID] {
+				idsToDelete = append(idsToDelete, img.ID)
+				delete(s.idSet, img.ID)
+				pruned++
+				continue
+			}
+			kept = append(kept, img)
 		}
+		finalImages = kept
 	}
 
 	// 4. Update State

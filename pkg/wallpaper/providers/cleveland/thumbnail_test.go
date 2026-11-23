@@ -2,12 +2,18 @@ package cleveland
 
 import (
 	"context"
-	"net/http"
 	"testing"
+
+	"github.com/dixieflatline76/Spice/v2/internal/nettest"
 )
 
 func TestFetchThumbnails_TDD(t *testing.T) {
-	p := NewProvider(nil, http.DefaultClient)
+	// The artwork record is replayed from testdata (recorded from openaccess-api.clevelandart.org
+	// on 2026-11-18, cut down to the fields apiArtwork reads), so the test never touches the real API.
+	client := nettest.Replay(t, map[string]string{
+		"openaccess-api.clevelandart.org/api/artworks/141639": "testdata/artwork-141639.json",
+	})
+	p := NewProvider(nil, client)
 
 	// Valid ID from CMA
 	ids := []string{"141639"}

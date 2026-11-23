@@ -37,7 +37,7 @@ var _ provider.Syncer = (*mockSyncerProvider)(nil)
 var _ provider.RemoteConfigSyncer = (*mockSyncerProvider)(nil)
 
 // newTestPlugin creates a minimal Plugin suitable for scheduler tests.
-// Network calls will fail fast (10ms timeout), which is what we want.
+// Network calls fail at once (noNetworkTransport), which is what we want.
 func newTestPlugin(t *testing.T) *Plugin {
 	tempDir := t.TempDir()
 
@@ -46,7 +46,7 @@ func newTestPlugin(t *testing.T) *Plugin {
 		fetchingInProgress: util.NewSafeBool(),
 		queryPages:         make(map[string]*util.SafeCounter),
 		providers:          make(map[string]provider.ImageProvider),
-		httpClient:         &http.Client{Timeout: 10 * time.Millisecond},
+		httpClient:         &http.Client{Transport: noNetworkTransport{}},
 		store:              NewImageStore(),
 		fm:                 NewFileManager(tempDir),
 	}
@@ -99,7 +99,7 @@ func TestScheduler_NightlyRefreshGated(t *testing.T) {
 	t1 := time.Date(2026, 5, 1, 0, 1, 0, 0, time.UTC)
 	lastDay := wp.checkAndRunRefresh(t1, 30, false) // Day 30 → 1
 
-	// Network check will fail (10ms timeout), so maintenance won't fully execute.
+	// The network check fails (noNetworkTransport), so maintenance won't fully execute.
 	// But we can verify the day tracking is correct:
 	// If network fails, lastDay stays at 30 (it returns early).
 	// This is expected behavior — the scheduler retries on the next tick.

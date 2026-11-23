@@ -2,6 +2,7 @@ package ui
 
 import (
 	"image/color"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/canvas"
@@ -51,7 +52,7 @@ func showConfirmDialog(parent fyne.Window, spec confirmSpec, result func(bool)) 
 		}
 	}
 
-	title := newDialogTitle(spec.Title)
+	title := newDialogTitle(spec.Title, dialogWidth)
 
 	kind := buttonNeutral
 	if spec.Danger {
@@ -71,11 +72,22 @@ func showConfirmDialog(parent fyne.Window, spec confirmSpec, result func(bool)) 
 	popup = newDialogPopup(parent, dialogWidth, vstack(8, parts...))
 }
 
-// newDialogTitle is the bold, left-aligned title of a dialog.
-func newDialogTitle(text string) fyne.CanvasObject {
-	title := newStyledText(text, dialogTitle, true, theme.ColorNameForeground)
-	title.lineHeight = 24
-	return title
+// newDialogTitle is the bold, left-aligned title of a dialog dialogW wide. A title too long for one
+// line, such as "Delete “<a long collection name>”?", wraps like the text under it (wrapText).
+func newDialogTitle(text string, dialogW float32) fyne.CanvasObject {
+	wrapped := wrapText(text, dialogW-2*dialogPadding, func(s string) float32 {
+		return fyne.MeasureText(s, dialogTitle, fyne.TextStyle{Bold: true}).Width
+	})
+	var lines []fyne.CanvasObject
+	for _, line := range strings.Split(wrapped, "\n") {
+		title := newStyledText(line, dialogTitle, true, theme.ColorNameForeground)
+		title.lineHeight = 24
+		lines = append(lines, title)
+	}
+	if len(lines) == 1 {
+		return lines[0]
+	}
+	return vstack(0, lines...)
 }
 
 // newDialogText is the muted, wrapped sentence under the title of a dialog dialogW wide. It

@@ -25,7 +25,7 @@ func init() {
 
 func paintpaneMetadata() fyne.AppMetadata {
 	return fyne.AppMetadata{
-		ID:         config.AppName, // the ID the app is created with (app.NewWithID)
+		ID:         config.DataID, // the ID the app is created with (app.NewWithID)
 		Name:       config.AppName,
 		Migrations: map[string]bool{"fyneDo": true},
 	}

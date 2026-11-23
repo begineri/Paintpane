@@ -263,11 +263,7 @@ func (b *PrefsPanelBuilder) BuildAdvancedPage() *schema.PanelSchema {
 						// and the dialog says how much will be deleted.
 						HelpAsync: func(set func(string)) {
 							setCacheHelp = set
-							go func() {
-								u := b.plugin.CacheUsage()
-								usage.set(u)
-								set(u.Summary())
-							}()
+							go usage.measure(b.plugin.CacheUsage, set)
 						},
 						ConfirmMessageFunc: func() string {
 							u, ok := usage.get()
@@ -278,10 +274,8 @@ func (b *PrefsPanelBuilder) BuildAdvancedPage() *schema.PanelSchema {
 						},
 						OnPressed: func() {
 							b.plugin.ClearCache()
-							usage.set(CacheUsage{})
-							if setCacheHelp != nil {
-								setCacheHelp(CacheUsage{}.Summary())
-							}
+							// Also drops a count still running from when the page opened (R4).
+							usage.cleared(setCacheHelp)
 						},
 					},
 					// S4-5: the count, View (the thumbnails, S4-B) and Reset.

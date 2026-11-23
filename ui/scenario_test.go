@@ -263,7 +263,7 @@ func TestScenarioSwitchPagesAndApplyImmediately(t *testing.T) {
 func TestScenarioGeneralHasNoNotificationsSwitch(t *testing.T) {
 	s := newScenario(t)
 	s.sa.prefsNav.Select(pageGeneral)
-	assert.True(t, s.shows("Check for new versions"), "the General page is shown")
+	require.Equal(t, pageGeneral, s.sa.prefsNav.Current(), "the General page is shown")
 	assert.False(t, s.shows("System notifications"))
 	assert.NotContains(t, s.sa.prefsSM.allWidgets, "enableNotifications")
 }

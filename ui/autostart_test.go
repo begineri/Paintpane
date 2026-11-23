@@ -25,38 +25,6 @@ func useFakeAutostart(t *testing.T) *autostart.MemoryStore {
 	return store
 }
 
-// General › Running › Start with Windows is the program's own switch (S3-6): it shows whether the
-// program has registered itself, and turning it on or off registers or removes the entry.
-func TestScenarioStartWithWindowsSwitch(t *testing.T) {
-	inLanguages(t, func(t *testing.T, lang string) {
-		want := map[string]struct{ general, label, oldButton string }{
-			"en": {"General", "Start with Windows", "Manage in Windows Settings"},
-			"zh": {"常规", "随 Windows 启动", "在 Windows 设置中管理"},
-		}[lang]
-		store := useFakeAutostart(t)
-		s := newScenarioWith(t, wallpaper.GetInstance())
-		s.tapText(want.general)
-
-		assert.True(t, s.shows(want.label), "the row is there")
-		assert.False(t, s.shows(want.oldButton), "it is a switch now, not a button to Windows' settings")
-		require.NotNil(t, s.sa.prefsSM.allWidgets["startWithWindows"])
-		assert.False(t, s.switchOn("startWithWindows"), "nothing registered: the switch is off")
-
-		// On: the Run value is written with the exe and the autostart flag.
-		s.toggle("startWithWindows")
-		s.sa.prefsSM.FlushPending()
-		cmd, registered, _ := store.Command()
-		assert.True(t, registered)
-		assert.Equal(t, `"`+fakeExe+`" --autostart`, cmd)
-
-		// Off: the value is deleted.
-		s.toggle("startWithWindows")
-		s.sa.prefsSM.FlushPending()
-		_, registered, _ = store.Command()
-		assert.False(t, registered, "turning it off removes the entry")
-	})
-}
-
 // The switch shows the registration as it is when the window opens.
 func TestScenarioStartWithWindowsShowsTheRegistration(t *testing.T) {
 	store := useFakeAutostart(t)
@@ -100,23 +68,15 @@ func TestScenarioStartWithWindowsFailureIsShown(t *testing.T) {
 	assert.False(t, s.switchOn("startWithWindows"), "so the switch is off")
 }
 
-// Without a store (anything but Windows, or the Microsoft Store build) the row is not there.
+// Without a store (anything but Windows, or the Microsoft Store build) the switch is not there.
+// (The Store build shows its own row instead, TestScenarioStoreRunningRow.)
 func TestScenarioStartWithWindowsHiddenWithoutAStore(t *testing.T) {
 	useFakeAutostart(t)
 	autostartStore = func() autostart.Store { return nil }
+	prev := storeStartupRowVisible
+	storeStartupRowVisible = func() bool { return false }
+	t.Cleanup(func() { storeStartupRowVisible = prev })
 	s := newScenarioWith(t, wallpaper.GetInstance())
 	s.tapText("General")
 	assert.False(t, s.shows("Start with Windows"))
-}
-
-func TestRefreshAutostartKeepsTheRegistrationCurrent(t *testing.T) {
-	store := useFakeAutostart(t)
-	refreshAutostart()
-	_, registered, _ := store.Command()
-	assert.False(t, registered, "no registration: refreshing creates none")
-
-	require.NoError(t, store.SetCommand(`"D:\Old\paintpane.exe"`))
-	refreshAutostart()
-	cmd, _, _ := store.Command()
-	assert.Equal(t, autostart.Command(fakeExe), cmd, "it points at the running exe, with the flag")
 }

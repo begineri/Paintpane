@@ -126,6 +126,7 @@ func (sa *SpiceApp) ShowTuneImagePopup(monitorID int, previewPath string, _ prov
 		if onClose != nil {
 			onClose()
 		}
+		releaseClosingWindow(w)
 	})
 
 	w.Show()

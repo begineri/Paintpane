@@ -37,35 +37,29 @@ func TestStripAccessionNumber(t *testing.T) {
 // A record without a title or an artist leaves that name empty instead of
 // "Unknown Title" / "Unknown Artist", which the tray would show.
 func TestObjectNames(t *testing.T) {
-	full := map[string]interface{}{
-		"_label": "Irises (90.PA.20)",
-		"produced_by": map[string]interface{}{
-			"carried_out_by": []interface{}{
-				map[string]interface{}{"_label": " Vincent van Gogh "},
-				map[string]interface{}{"_label": "Someone Else"},
-			},
-		},
+	by := func(names ...string) oneOrMany[linkedArtProduction] {
+		var refs oneOrMany[linkedArtRef]
+		for _, n := range names {
+			refs = append(refs, linkedArtRef{Label: n})
+		}
+		return oneOrMany[linkedArtProduction]{{CarriedOutBy: refs}}
 	}
-	title, artist := objectNames(full)
+	title, artist := objectNames(linkedArtObject{Label: "Irises (90.PA.20)", ProducedBy: by(" Vincent van Gogh ", "Someone Else")})
 	assert.Equal(t, "Irises", title)
 	assert.Equal(t, "Vincent van Gogh", artist)
 	assert.Equal(t, "Vincent van Gogh - Irises", attribution(artist, title))
 
-	title, artist = objectNames(map[string]interface{}{"_label": "Irises (90.PA.20)"})
+	title, artist = objectNames(linkedArtObject{Label: "Irises (90.PA.20)"})
 	assert.Equal(t, "Irises", title)
 	assert.Empty(t, artist)
 	assert.Equal(t, "Irises", attribution(artist, title))
 
-	title, artist = objectNames(map[string]interface{}{
-		"produced_by": map[string]interface{}{
-			"carried_out_by": []interface{}{map[string]interface{}{"_label": "Vincent van Gogh"}},
-		},
-	})
+	title, artist = objectNames(linkedArtObject{ProducedBy: by("Vincent van Gogh")})
 	assert.Empty(t, title)
 	assert.Equal(t, "Vincent van Gogh", artist)
 	assert.Equal(t, "Vincent van Gogh", attribution(artist, title))
 
-	title, artist = objectNames(map[string]interface{}{"produced_by": map[string]interface{}{"carried_out_by": []interface{}{}}})
+	title, artist = objectNames(linkedArtObject{ProducedBy: by()})
 	assert.Empty(t, title)
 	assert.Empty(t, artist)
 	assert.Empty(t, attribution(artist, title))

@@ -78,3 +78,6 @@ func releaseLock() {
 		_ = os.Remove(lockFile.Name()) //remove lock file
 	}
 }
+
+// instanceRunning is only used by the Microsoft Store edition (Windows).
+func instanceRunning() bool { return false }

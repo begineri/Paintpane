@@ -26,7 +26,7 @@ func TestStrictSync_LegacySafety(t *testing.T) {
 	store.Add(img1)
 
 	// Run Sync with nil active map
-	store.Sync(100, nil, nil)
+	store.Sync(100, nil, nil, nil)
 
 	// Verify: Image should still exist
 	assert.Equal(t, 1, store.Count())
@@ -60,7 +60,7 @@ func TestStrictSync_UncheckAll(t *testing.T) {
 
 	// Run Sync with EMPTY map (Active = None)
 	activeIDs := make(map[string]bool)
-	store.Sync(100, nil, activeIDs)
+	store.Sync(100, nil, activeIDs, nil)
 
 	// Verify: img1 gone, img2 gone (Untagged/Orphan now pruned)
 	assert.Equal(t, 0, store.Count())
@@ -110,7 +110,7 @@ func TestStrictSync_MixedState(t *testing.T) {
 	// Active Set: Only qA
 	activeIDs := map[string]bool{"qA": true}
 
-	store.Sync(100, nil, activeIDs)
+	store.Sync(100, nil, activeIDs, nil)
 
 	// Verification
 	known := store.GetKnownIDs()

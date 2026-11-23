@@ -39,6 +39,10 @@ const (
 	// CmdNextLockScreen gives the lock screen another image and leaves the desktop alone (T15).
 	CmdNextLockScreen
 
+	// CmdFirstWallpaper gives a display that Paintpane has never set a wallpaper on its first image,
+	// as soon as one is ready (see showFirstWallpaper).
+	CmdFirstWallpaper
+
 	// Legacy Anchor commands
 	CmdAnchorAuto Command = 200
 	CmdAnchorTL   Command = 201
@@ -76,7 +80,7 @@ type StoreInterface interface {
 	SetOutcomeFlag(id, key string, value bool) bool
 
 	// Administrative and Batch Operations
-	Sync(limit int, targetFlags map[string]bool, activeQueryIDs map[string]bool)
+	Sync(limit int, targetFlags map[string]bool, activeQueryIDs map[string]bool, keep map[string]bool)
 	GetKnownIDs() map[string]bool
 	SetFileManager(fm *FileManager, cacheFile string)
 	SetAsyncSave(enabled bool)
@@ -265,7 +269,26 @@ func (mc *MonitorController) handleCommand(cmd Command) {
 		mc.enforceNudeFilter()
 	case CmdNextLockScreen:
 		mc.nextLockScreen()
+	case CmdFirstWallpaper:
+		mc.showFirstWallpaper()
 	}
+}
+
+// showFirstWallpaper shows the first image on a display that has no wallpaper from Paintpane: a
+// fresh install, or a display never used before. Without it the desktop kept its old picture until
+// the first scheduled change, up to an hour after the first images were ready (store-feasibility
+// 11.3 #2). With no image ready yet, next() leaves the display waiting for images, and the first
+// one that arrives is shown (Run). A display that has a wallpaper from last time keeps it, even when
+// that image is gone: the desktop still shows it, and the next scheduled change replaces it.
+func (mc *MonitorController) showFirstWallpaper() {
+	if mc.State.CurrentImage.ID != "" || mc.State.CurrentID != "" {
+		return
+	}
+	if mc.cfg != nil && mc.cfg.LastShownImage(mc.monitorKey()) != "" {
+		return
+	}
+	log.Printf("[Monitor %d] No wallpaper from Paintpane yet; showing the first image that is ready.", mc.ID)
+	mc.next(false)
 }
 
 func (mc *MonitorController) isHidden(img provider.Image) bool {

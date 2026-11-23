@@ -5,7 +5,6 @@ go 1.25.0
 require fyne.io/fyne/v2 v2.7.4
 
 require (
-	github.com/cayleygraph/quad v1.3.0 // indirect
 	github.com/clipperhouse/uax29/v2 v2.2.0 // indirect
 	github.com/danieljoos/wincred v1.2.3 // indirect
 	github.com/fyne-io/oksvg v0.2.0 // indirect
@@ -16,12 +15,11 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/mattn/go-runewidth v0.0.27 // indirect
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646 // indirect
-	github.com/pquerna/cachecontrol v0.2.0 // indirect
 	github.com/stretchr/objx v0.5.3 // indirect
 )
 
 require (
-	fyne.io/systray v1.12.2 // indirect
+	fyne.io/systray v1.12.2
 	github.com/BurntSushi/toml v1.6.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/disintegration/imaging v1.6.2
@@ -33,7 +31,7 @@ require (
 	github.com/go-gl/gl v0.0.0-20260331235117-4566fea9a276 // indirect
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20260802143932-8fa725040a18 // indirect
 	github.com/go-text/render v0.2.1 // indirect
-	github.com/go-text/typesetting v0.3.4 // indirect
+	github.com/go-text/typesetting v0.3.4
 	github.com/godbus/dbus/v5 v5.2.2 // indirect
 	github.com/jeandeaual/go-locale v0.0.0-20250612000132-0ef82f21eade
 	github.com/jsummers/gobmp v0.0.0-20230614200233-a9de23ed2e25 // indirect
@@ -57,7 +55,6 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/harry1453/go-common-file-dialog v1.2.1-0.20250428222125-566edcc205d7
-	github.com/piprate/json-gold v0.8.0
 	github.com/zalando/go-keyring v0.2.8
 	golang.design/x/hotkey v0.4.1
 	golang.org/x/image v0.36.0
@@ -65,3 +62,6 @@ require (
 	golang.org/x/time v0.15.0
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1
 )
+
+// Fyne 2.7.4 with Paintpane's patches (event loop, systray window without OpenGL); see third_party/fyne/PAINTPANE.md.
+replace fyne.io/fyne/v2 => ./third_party/fyne

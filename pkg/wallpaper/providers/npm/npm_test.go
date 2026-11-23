@@ -2,12 +2,11 @@ package npm
 
 import (
 	"context"
-	"net/http"
 	"testing"
 )
 
 func TestNPMProvider_fetchImageByCID(t *testing.T) {
-	p := NewProvider(nil, http.DefaultClient)
+	p := NewProvider(nil, replayClient(t))
 
 	// CID 2383 is the Octagonal inkstick
 	img, err := p.fetchImageByCID(context.Background(), 2383)

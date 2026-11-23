@@ -39,8 +39,21 @@ jobs:
       - name: Run tests
         run: go test ./...
 
+      # The Microsoft Store build (MSIX) hides Start with Windows and the
+      # update check and keeps its own data folders; check it compiles and its tests pass too.
+      - name: Vet (Store build)
+        run: go vet -tags "release msstore" ./...
+        env:
+          CGO_ENABLED: 1
+
+      - name: Run tests (Store build)
+        run: go test -tags "release msstore" ./...
+
       - name: Check i18n integrity
         run: make check-i18n
 
       - name: Dry Run Build (No Secrets)
         run: make build-win-amd64
+
+      - name: Dry Run Build (Store, no packing)
+        run: go build -tags "release msstore" -o bin/paintpane-store.exe -ldflags "-H=windowsgui" ./cmd/spice

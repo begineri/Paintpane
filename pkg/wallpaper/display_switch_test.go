@@ -346,7 +346,7 @@ func TestSync_RepointKeepsFilesAndForgetsPaths(t *testing.T) {
 		DerivativePaths: map[string]string{"800x500": path},
 	}))
 
-	store.Sync(100, map[string]bool{flagDisplayFramed: true}, nil)
+	store.Sync(100, map[string]bool{flagDisplayFramed: true}, nil, nil)
 	require.True(t, fm.WaitForDerivativeDeletes(context.Background()))
 	require.True(t, fm.WaitTimeout(derivativeCleanupWait))
 
@@ -436,11 +436,11 @@ func TestIsStaleDisplayMode(t *testing.T) {
 
 	assert.False(t, store.isStaleDisplayMode(full), "nothing to compare with before the first Sync")
 
-	store.Sync(100, map[string]bool{flagDisplayFull: true, flagDisplayFramed: false}, nil)
+	store.Sync(100, map[string]bool{flagDisplayFull: true, flagDisplayFramed: false}, nil, nil)
 	assert.False(t, store.isStaleDisplayMode(full))
 	assert.True(t, store.isStaleDisplayMode(smart))
 
-	store.Sync(100, map[string]bool{flagDisplayFull: false, flagDisplayFramed: false, "SmartFit": true}, nil)
+	store.Sync(100, map[string]bool{flagDisplayFull: false, flagDisplayFramed: false, "SmartFit": true}, nil, nil)
 	assert.True(t, store.isStaleDisplayMode(full))
 	assert.False(t, store.isStaleDisplayMode(smart))
 }

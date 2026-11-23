@@ -49,6 +49,7 @@ current_coverage_report.txt
 
 # build artifacts
 build/
+!third_party/fyne/internal/build/
 report_output/
 *.obj
 

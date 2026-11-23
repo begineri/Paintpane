@@ -260,9 +260,10 @@ func (appDebugTarget) State() any {
 		}
 	})
 	return map[string]any{
-		"version":   config.AppVersion,
-		"wallpaper": wallpaper.GetInstance().DebugState(),
-		"prefs":     prefs,
+		"version":    config.AppVersion,
+		"wallpaper":  wallpaper.GetInstance().DebugState(),
+		"prefs":      prefs,
+		"background": devBackground(),
 	}
 }
 

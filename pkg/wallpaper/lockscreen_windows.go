@@ -40,7 +40,11 @@ $null = $setTask.Wait(-1)
 // SetLockScreen sets the Windows lock screen image. It uses a hidden PowerShell process
 // so that a WinRT failure cannot take down the application.
 func (w *windowsOS) SetLockScreen(imagePath string) error {
-	absPath, err := filepath.Abs(resolveMSIXPicturePath(imagePath))
+	return withMSIXPicture(imagePath, msixLockScreenRole, setLockScreenFile)
+}
+
+func setLockScreenFile(imagePath string) error {
+	absPath, err := filepath.Abs(imagePath)
 	if err != nil {
 		return err
 	}

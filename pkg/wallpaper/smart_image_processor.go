@@ -23,6 +23,9 @@ type SmartImageProcessor struct {
 	resampler imaging.ResampleFilter //moved to struct level
 	pigo      *pigo.Pigo
 	config    *Config
+	// faceLongEdge overrides faceDetectLongEdge: 0 uses it, a negative value looks for faces in
+	// the full-size image (tests compare the two).
+	faceLongEdge int
 	// Diagnostics. Pipeline workers call FitImage concurrently, so these need a lock; with several
 	// images in flight, "last" is whichever update landed most recently.
 	statsMu   sync.Mutex
@@ -499,14 +502,45 @@ func checkContext(ctx context.Context) error {
 	}
 }
 
+// faceDetectLongEdge is the long edge, in pixels, of the reduced copy faces are looked for in
+// (owner, 2026-11-08, docs/lightweight-eval.md question 6). On a 4K-capped original the full-size
+// search took 2-5 s and up to 126 MB of extra heap; at 1280 it takes about 43% of the time and at
+// most 33 MB. The minimum face size is a share of the short edge, so the same faces are found except
+// tiny ones (under about 3% of the short edge), which were as often false positives (laces, fairy
+// lights) as real faces. On the 49 golden and tuning images 43 agree on whether there is a face and
+// 7 crops change, 2 of them for the better; 1600 and 1920 agreed less (TestEvalFaceDownscale).
+const faceDetectLongEdge = 1280
+
+// detectLongEdge is the long edge findBestFace reduces images to, or 0 for none.
+func (c *SmartImageProcessor) detectLongEdge() int {
+	switch {
+	case c.faceLongEdge < 0:
+		return 0
+	case c.faceLongEdge > 0:
+		return c.faceLongEdge
+	}
+	return faceDetectLongEdge
+}
+
 func (c *SmartImageProcessor) findBestFace(img image.Image) (image.Rectangle, error) {
 	bounds := img.Bounds()
-	width := bounds.Dx()
-	height := bounds.Dy()
 
-	// pigo needs grayscale image data.
-	// We convert to NRGBA first to ensure consistent pixel access across different image formats (YCbCr, etc.)
-	nrgba := imaging.Clone(img)
+	// pigo needs grayscale image data. Reduce large images first (the box is mapped back to img's
+	// pixels below); either way we get NRGBA, for consistent pixel access across formats (YCbCr, etc.)
+	var nrgba *image.NRGBA
+	if edge := c.detectLongEdge(); edge > 0 && max(bounds.Dx(), bounds.Dy()) > edge {
+		w, h := edge, 0
+		if bounds.Dy() > bounds.Dx() {
+			w, h = 0, edge
+		}
+		nrgba = imaging.Resize(img, w, h, imaging.Linear)
+	} else {
+		nrgba = imaging.Clone(img)
+	}
+	width := nrgba.Bounds().Dx()
+	height := nrgba.Bounds().Dy()
+	sx := float64(bounds.Dx()) / float64(width)
+	sy := float64(bounds.Dy()) / float64(height)
 	pixels := pigo.RgbToGrayscale(nrgba)
 
 	// Determine dynamic MaxSize based on image dimensions
@@ -575,6 +609,11 @@ func (c *SmartImageProcessor) findBestFace(img image.Image) (image.Rectangle, er
 	if !found {
 		return image.Rectangle{}, fmt.Errorf("no face found")
 	}
+
+	// Back to the pixels of img.
+	bestDet.Col = int(math.Round(float64(bestDet.Col) * sx))
+	bestDet.Row = int(math.Round(float64(bestDet.Row) * sy))
+	bestDet.Scale = int(math.Round(float64(bestDet.Scale) * sx))
 
 	// Determine boost parameters
 	// Strength 0 (Standard) -> 1.5

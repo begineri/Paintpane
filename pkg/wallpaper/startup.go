@@ -98,6 +98,9 @@ func (wp *Plugin) fetchedDryToday() bool {
 	return wp.cfg != nil && wp.cfg.String(dryFetchDayPrefKey) == today()
 }
 
+// startupTimer is time.After; tests replace it to end the start-up wait without waiting.
+var startupTimer = time.After
+
 // afterStartupDelay runs fn now when delay is zero, otherwise after delay (and not at all if the
 // plugin is deactivated meanwhile).
 func (wp *Plugin) afterStartupDelay(delay time.Duration, fn func()) {
@@ -108,7 +111,7 @@ func (wp *Plugin) afterStartupDelay(delay time.Duration, fn func()) {
 	ctx := wp.ctx
 	go func() {
 		select {
-		case <-time.After(delay):
+		case <-startupTimer(delay):
 			fn()
 		case <-ctx.Done():
 		}

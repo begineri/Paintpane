@@ -36,6 +36,19 @@ func (c *Config) LastShownImage(displayKey string) string {
 	return c.lastShownLocked()[displayKey]
 }
 
+// LastShownImageIDs returns the IDs of the images last set as wallpaper, on any display.
+func (c *Config) LastShownImageIDs() map[string]bool {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	ids := map[string]bool{}
+	for _, id := range c.lastShownLocked() {
+		if id != "" {
+			ids[id] = true
+		}
+	}
+	return ids
+}
+
 // SetLastShownImage records the image just set as the wallpaper of the display with this key.
 func (c *Config) SetLastShownImage(displayKey, imageID string) {
 	if displayKey == "" || imageID == "" {

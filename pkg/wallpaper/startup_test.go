@@ -182,6 +182,7 @@ func TestE2E_StartKeepsLastWallpaper(t *testing.T) {
 
 	app := newE2EApp(t, t.TempDir(), prefs, e2eMonitor(0, 800, 500))
 	app.seed(t, map[string][2]int{"a": {800, 500}, "b": {500, 800}, "c": {900, 900}})
+	app.wp.cfg.SetLastShownImage("display-0", "a") // the wallpaper set last time
 	app.wp.Activate()
 	defer app.stop()
 

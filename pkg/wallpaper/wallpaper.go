@@ -125,6 +125,11 @@ type Plugin struct {
 	// Timer Interrupt
 	resetTimerCh chan struct{}
 	tickerCancel context.CancelFunc
+
+	// The first wallpaper of a display waits for the licence (first_wallpaper.go).
+	licenceMu         sync.Mutex
+	licenceAccepted   bool // the person accepted the licence (LicenceAccepted)
+	firstWallpaperDue bool // this start is ready to give displays their first wallpaper
 }
 
 var (
@@ -505,8 +510,14 @@ func (wp *Plugin) Activate() {
 	// page with a cursor get it back here (page_cursors.go).
 	wp.restorePageCursors()
 	// Sync collections and fetch, unless the library is already full (C1); after an autostart,
-	// not before the delay is over (D2).
-	wp.afterStartupDelay(delay, wp.startupFetch)
+	// not before the delay is over (D2). Then a display that has never had a wallpaper from
+	// Paintpane (a fresh install) gets its first image as soon as one is ready and the licence is
+	// accepted, instead of at the first scheduled change. It comes after the fetch has started, so
+	// it does not start one of its own, and after an autostart it waits with the fetch.
+	wp.afterStartupDelay(delay, func() {
+		wp.startupFetch()
+		wp.firstWallpapersDue()
+	})
 	wp.ChangeWallpaperFrequency(wp.cfg.GetWallpaperChangeFrequency(), false)
 
 	// Start monitor watcher
@@ -539,6 +550,9 @@ func (wp *Plugin) Deactivate() {
 		wp.cancel()
 		wp.cancel = nil
 	}
+	wp.licenceMu.Lock()
+	wp.firstWallpaperDue = false // the next Activate decides again
+	wp.licenceMu.Unlock()
 	wp.interrupt.Set(true)
 	wp.downloadMutex.Unlock()
 
@@ -709,7 +723,10 @@ func (wp *Plugin) resetTimer() {
 }
 
 func (wp *Plugin) ChangeWallpaperFrequency(newFreq Frequency, silent bool) {
-	if wp.ticker != nil && wp.cfg.GetWallpaperChangeFrequency() == newFreq {
+	wp.downloadMutex.Lock()
+	running := wp.ticker != nil
+	wp.downloadMutex.Unlock()
+	if running && wp.cfg.GetWallpaperChangeFrequency() == newFreq {
 		// Frequency hasn't changed, do not reset the ticker!
 		// This prevents SyncMonitors from indefinitely delaying rotations.
 		return
@@ -732,7 +749,8 @@ func (wp *Plugin) ChangeWallpaperFrequency(newFreq Frequency, silent bool) {
 		// The Plugin drives the frequency via Ticker -> SetNextWallpaper.
 		duration := newFreq.Duration()
 		if duration > 0 {
-			wp.ticker = time.NewTicker(duration)
+			ticker := time.NewTicker(duration)
+			wp.ticker = ticker
 
 			var loopCtx context.Context
 			if wp.ctx != nil {
@@ -741,37 +759,40 @@ func (wp *Plugin) ChangeWallpaperFrequency(newFreq Frequency, silent bool) {
 				loopCtx, wp.tickerCancel = context.WithCancel(context.Background())
 			}
 
-			// Start ticker loop
-			go func() {
-				// We need to capture the current ticker to stop correctly
-				currentTicker := wp.ticker
-				for {
-					select {
-					case <-currentTicker.C:
-						if wp.ticker != currentTicker {
-							return
-						}
-						wp.SetNextWallpaper(-1, false)
-					case <-wp.resetTimerCh:
-						if wp.ticker != currentTicker {
-							return
-						}
-						// Drain any concurrently delivered tick to avoid immediate double-fire
-						select {
-						case <-currentTicker.C:
-						default:
-						}
-						currentTicker.Reset(duration)
-					case <-loopCtx.Done():
-						return
-					}
-				}
-			}()
+			go wp.runRotationTicker(loopCtx, ticker, duration)
 		}
 	}
 
 	if wp.manager != nil {
 		wp.manager.RebuildTrayMenu()
+	}
+}
+
+// runRotationTicker changes the wallpaper on every tick until ctx ends. ChangeWallpaperFrequency
+// cancels ctx, under downloadMutex, before it replaces the ticker, so the loop ends by ctx alone and
+// never reads wp.ticker, which it could not read without that lock. A tick or reset that was already
+// pending when ctx ended is dropped, as the old ticker's would be.
+func (wp *Plugin) runRotationTicker(ctx context.Context, ticker *time.Ticker, duration time.Duration) {
+	for {
+		select {
+		case <-ticker.C:
+			if ctx.Err() != nil {
+				return
+			}
+			wp.SetNextWallpaper(-1, false)
+		case <-wp.resetTimerCh:
+			if ctx.Err() != nil {
+				return
+			}
+			// Drain any concurrently delivered tick to avoid immediate double-fire
+			select {
+			case <-ticker.C:
+			default:
+			}
+			ticker.Reset(duration)
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -1147,19 +1168,44 @@ func (wp *Plugin) SyncMonitors(force bool) {
 
 // syncMonitorsLocked is removed as it is now integrated into SyncMonitors with Policy.
 
+// monitorFullCheckEvery is how many unchanged watcher ticks (90 seconds each) may pass before the
+// watcher checks the monitors fully anyway.
+const monitorFullCheckEvery = 10
+
 func (wp *Plugin) startMonitorWatcher() {
 	ticker := time.NewTicker(90 * time.Second)
 	defer ticker.Stop()
 
+	var w monitorWatch
 	for {
 		select {
 		case <-wp.ctx.Done():
 			log.Debug("[Sync] Stopping monitor watcher (Context Cancelled)")
 			return
 		case <-ticker.C:
-			wp.SyncMonitors(false)
+			if w.due(displayLayoutKey()) {
+				wp.SyncMonitors(false)
+			}
 		}
 	}
+}
+
+// monitorWatch decides whether a watcher tick needs the full monitor check (SyncMonitors, which
+// asks the shell through COM): only when the display layout changed since the last full check,
+// when it cannot be read, or every monitorFullCheckEvery ticks.
+type monitorWatch struct {
+	lastKey string
+	skipped int
+}
+
+func (w *monitorWatch) due(key string) bool {
+	if key != "" && key == w.lastKey && w.skipped < monitorFullCheckEvery-1 {
+		w.skipped++
+		return false
+	}
+	w.lastKey = key
+	w.skipped = 0
+	return true
 }
 
 func (wp *Plugin) updateTrayMenuUI(img provider.Image, monitorID int) {
@@ -1288,8 +1334,14 @@ func (wp *Plugin) targetProcessingFlags() map[string]bool {
 
 // syncStoreWithConfig reconciles the image store with the current configuration.
 // It handles query activation, cache sizing, and derivative invalidation for processing modes.
+// Images on show are never evicted for the cache limit. That includes each display's wallpaper
+// from last time: at start this runs before restoreLastShownImages, while the desktop still shows them.
 func (wp *Plugin) syncStoreWithConfig() {
-	wp.store.Sync(int(wp.cfg.GetCacheSize().Size()), wp.targetProcessingFlags(), wp.cfg.GetActiveQueryIDs())
+	keep := wp.imagesOnShow()
+	for id := range wp.cfg.LastShownImageIDs() {
+		keep[id] = true
+	}
+	wp.store.Sync(int(wp.cfg.GetCacheSize().Size()), wp.targetProcessingFlags(), wp.cfg.GetActiveQueryIDs(), keep)
 }
 
 // SetArtworkDisplayMode applies a new artwork display mode and rebuilds wallpapers to match.

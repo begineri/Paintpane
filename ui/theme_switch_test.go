@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/dixieflatline76/Spice/v2/config"
 	"github.com/dixieflatline76/Spice/v2/pkg/ui/schema"
 )
 
@@ -218,7 +219,7 @@ func drawnLook(o fyne.CanvasObject) []string {
 func TestFyneThreadChecksAreOff(t *testing.T) {
 	m := paintpaneMetadata()
 	assert.True(t, m.Migrations["fyneDo"], "Fyne is told all UI calls go through fyne.Do")
-	assert.Equal(t, "Paintpane", m.ID)
+	assert.Equal(t, config.DataID, m.ID) // "Paintpane" outside the Store build (config.TestDataID_PortableBuildUsesAppName)
 }
 
 // A PNG source logo is decoded when the row is made, so refreshing the row (every theme switch

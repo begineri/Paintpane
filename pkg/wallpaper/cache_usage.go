@@ -84,15 +84,46 @@ func (u CacheUsage) ClearMessage() string {
 }
 
 // cacheUsageCache remembers the last measurement so the dialog opens at once.
+//
+// The Advanced page measures the cache in the background. Clearing the cache while that runs
+// must not let the old count ("148 images, 900 MB") land on the page afterwards (review R4), so
+// each clear starts a new generation and a measurement begun in an earlier one is dropped.
 type cacheUsageCache struct {
 	mu   sync.Mutex
 	last *CacheUsage
+	gen  uint64 // Bumped by cleared
 }
 
-func (c *cacheUsageCache) set(u CacheUsage) {
+// measure runs measure and shows its summary, unless the cache was cleared while it ran. show is
+// called with c.mu held, so the line under the button gets texts in the order they were decided;
+// it must not block (the preferences window queues it for the UI thread).
+func (c *cacheUsageCache) measure(measure func() CacheUsage, show func(string)) {
 	c.mu.Lock()
-	c.last = &u
+	gen := c.gen
 	c.mu.Unlock()
+
+	u := measure()
+
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.gen != gen {
+		return // Counted before the cache was cleared
+	}
+	c.last = &u
+	show(u.Summary())
+}
+
+// cleared records that the cache is now empty and shows that, ending any measurement in flight.
+// show may be nil.
+func (c *cacheUsageCache) cleared(show func(string)) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.gen++
+	empty := CacheUsage{}
+	c.last = &empty
+	if show != nil {
+		show(empty.Summary())
+	}
 }
 
 func (c *cacheUsageCache) get() (CacheUsage, bool) {

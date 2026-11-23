@@ -6,9 +6,14 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/dixieflatline76/Spice/v2/internal/nettest"
 )
 
+// TestLiveRateLimit prints the rate-limit headers of the real wallhaven.cc API. It checks the live
+// site rather than our code, so it only runs with PAINTPANE_NETWORK_TESTS=1.
 func TestLiveRateLimit(t *testing.T) {
+	nettest.RequireNetwork(t)
 	apiURL := "https://wallhaven.cc/api/v1/search?q=anime&sorting=random"
 	client := &http.Client{Timeout: 10 * time.Second}
 

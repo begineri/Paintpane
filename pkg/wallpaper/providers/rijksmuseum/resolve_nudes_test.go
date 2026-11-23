@@ -6,9 +6,15 @@ import (
 	"io/ioutil"
 	"net/http"
 	"testing"
+
+	"github.com/dixieflatline76/Spice/v2/internal/nettest"
 )
 
+// TestResolveNudesScript is a lookup script, not a check: it logs what the old Rijksmuseum API
+// returns for a few accession numbers. It needs the real site, so it only runs with
+// PAINTPANE_NETWORK_TESTS=1.
 func TestResolveNudesScript(t *testing.T) {
+	nettest.RequireNetwork(t)
 	accessions := []string{"SK-A-3841", "SK-C-1351", "SK-A-26"}
 
 	for _, acc := range accessions {

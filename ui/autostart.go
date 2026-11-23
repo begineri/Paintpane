@@ -1,6 +1,9 @@
 package ui
 
 import (
+	"net/url"
+	"runtime"
+
 	"fyne.io/fyne/v2"
 
 	"github.com/dixieflatline76/Spice/v2/config"
@@ -100,3 +103,15 @@ func refreshAutostart() {
 		utilLog.Printf("[Autostart] The registration now points at %s", exe)
 	}
 }
+
+// The Microsoft Store edition has no switch: Windows starts it at logon through the package's
+// StartupTask, and the person turns that on or off in Windows Settings › Apps › Startup. Its
+// Running group shows one row that says so, with a button to that page (S3-6S). Tests replace
+// both.
+var (
+	storeStartupRowVisible = func() bool { return runtime.GOOS == "windows" && config.IsStoreDistribution() }
+	openStartupSettings    = func(sa *SpiceApp) {
+		u, _ := url.Parse("ms-settings:startupapps")
+		_ = sa.OpenURL(u)
+	}
+)

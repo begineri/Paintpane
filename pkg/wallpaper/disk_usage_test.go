@@ -249,7 +249,7 @@ func TestSync_KeepsDerivativesOfImagesProcessedWithCurrentSettings(t *testing.T)
 		store.Add(img)
 	}
 
-	store.Sync(100, target, nil)
+	store.Sync(100, target, nil, nil)
 	for _, id := range []string{"plain", "framed"} {
 		img, ok := store.GetByID(id)
 		require.True(t, ok)
@@ -257,7 +257,7 @@ func TestSync_KeepsDerivativesOfImagesProcessedWithCurrentSettings(t *testing.T)
 	}
 
 	changed := map[string]bool{"SmartFit": true, "FrameFallback": false, "FrameSize_0.85": true, "Matting": false}
-	store.Sync(100, changed, nil)
+	store.Sync(100, changed, nil, nil)
 	require.True(t, store.WaitTimeout(5*time.Second))
 	for _, id := range []string{"plain", "framed"} {
 		img, ok := store.GetByID(id)
@@ -323,6 +323,80 @@ func TestPruneToLimit_KeepsImagesOnShow(t *testing.T) {
 	// Only images on show: nothing is evicted, the store stays over the limit.
 	store.PruneToLimit(1, map[string]bool{"img0": true, "img3": true})
 	assert.Equal(t, 2, store.Count())
+}
+
+// Sync trims to the cache limit as well (nightly maintenance, settings changes). Like
+// PruneToLimit it must leave the images on show, and their files, alone.
+func TestSync_KeepsImagesOnShow(t *testing.T) {
+	tmpDir := t.TempDir()
+	fm := NewFileManager(tmpDir)
+	store := NewImageStore()
+	store.SetAsyncSave(false)
+	store.SetFileManager(fm, filepath.Join(tmpDir, "cache.json"))
+
+	for i := 0; i < 4; i++ {
+		id := fmt.Sprintf("img%d", i)
+		createMasterFile(t, fm, id)
+		store.Add(provider.Image{ID: id, DerivativePaths: map[string]string{"100x100": id + "_d.jpg"}})
+	}
+
+	store.Sync(2, nil, nil, map[string]bool{"img0": true})
+	require.True(t, store.WaitTimeout(5*time.Second))
+
+	assert.Equal(t, 2, store.Count())
+	assert.True(t, store.Exists("img0"), "the image on screen stays")
+	assert.False(t, store.Exists("img1"))
+	assert.False(t, store.Exists("img2"))
+	assert.True(t, store.Exists("img3"))
+	master, err := fm.GetMasterPath("img0", ".jpg")
+	require.NoError(t, err)
+	assert.FileExists(t, master, "the master of the image on screen is kept")
+	master, err = fm.GetMasterPath("img1", ".jpg")
+	require.NoError(t, err)
+	assert.Eventually(t, func() bool {
+		_, err := os.Stat(master)
+		return os.IsNotExist(err)
+	}, 5*time.Second, 20*time.Millisecond, "the evicted image's master is deleted")
+
+	// Only images on show are over the limit: nothing is evicted, the store stays over it.
+	store.Sync(1, nil, nil, map[string]bool{"img0": true, "img3": true})
+	require.True(t, store.WaitTimeout(5*time.Second))
+	assert.Equal(t, 2, store.Count())
+	assert.True(t, store.Exists("img0"))
+	assert.True(t, store.Exists("img3"))
+}
+
+// syncStoreWithConfig keeps every image on show: each display's wallpaper, the lock screen, and the
+// wallpapers from last time, which a start syncs before it knows them as current images.
+func TestSyncStoreWithConfig_KeepsImagesOnShow(t *testing.T) {
+	env := newDisplayTestEnv(t)
+	env.wp.cfg.SetCacheSize(Cache100Images)
+	limit := env.wp.cfg.GetCacheSize().Size()
+	n := limit + 4
+	for i := 0; i < n; i++ {
+		id := fmt.Sprintf("img%03d", i)
+		createMasterFile(t, env.fm, id)
+		require.True(t, env.store.Add(provider.Image{ID: id, SourceQueryID: "q1"}))
+	}
+
+	mc := &MonitorController{ID: 0, State: &MonitorState{}}
+	mc.State.CurrentImage = provider.Image{ID: "img000"}
+	mc.State.CurrentID = "img000"
+	mc.lockImageID = "img001"
+	env.wp.Monitors = map[int]*MonitorController{0: mc}
+	env.wp.cfg.SetLastShownImage(`\\.\DISPLAY2`, "img002")
+
+	env.wp.syncStoreWithConfig()
+	require.True(t, env.store.WaitTimeout(5*time.Second))
+
+	assert.Equal(t, limit, env.store.Count())
+	for _, id := range []string{"img000", "img001", "img002"} {
+		assert.True(t, env.store.Exists(id), "%s is on show and stays", id)
+	}
+	for _, id := range []string{"img003", "img004", "img005", "img006"} {
+		assert.False(t, env.store.Exists(id), "%s is the oldest not on show and goes", id)
+	}
+	assert.True(t, env.store.Exists(fmt.Sprintf("img%03d", n-1)))
 }
 
 func TestImagesOnShow(t *testing.T) {

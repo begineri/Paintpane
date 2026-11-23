@@ -38,6 +38,27 @@ build-win-console-amd64:
 build-win-arm64:
 	set GOOS=windows&& set GOARCH=arm64&& go build -tags release -o bin/paintpane-arm64.exe -ldflags "-H=windowsgui $(LDFLAGS_RELEASE)" ./cmd/spice
 
+# --- Microsoft Store package (MSIX) ---
+# Builds the msstore exe and packs it with msix/AppxManifest.xml into dist/Paintpane.msix (unsigned:
+# the Store signs it). Needs the Windows SDK's signing tools and App Certification Kit, which brings
+# makeappx.exe. MSIX_TAGS=msstore MSIX_LDFLAGS="$(LDFLAGS_COMMON)" packs a development build, which
+# has the debug API. To try it: turn on Developer Mode, then
+#   powershell -Command "Add-AppxPackage -Register dist/msix/AppxManifest.xml"
+WINKITS := C:/Program Files (x86)/Windows Kits/10
+MSIX_DIR := dist/msix
+MSIX_TAGS ?= release msstore
+MSIX_LDFLAGS ?= $(LDFLAGS_RELEASE)
+
+build-msix:
+	rm -rf $(MSIX_DIR) dist/Paintpane.msix
+	mkdir -p $(MSIX_DIR)/Assets
+	GOOS=windows GOARCH=amd64 go build -tags "$(MSIX_TAGS)" -o $(MSIX_DIR)/Paintpane.exe -ldflags "-H=windowsgui $(MSIX_LDFLAGS)" ./cmd/spice
+	cp msix/AppxManifest.xml LICENSE NOTICE.md $(MSIX_DIR)/
+	cp msix/Assets/*.png $(MSIX_DIR)/Assets/
+	go run cmd/util/bump_msix/main.go $(VERSION) $(MSIX_DIR)/AppxManifest.xml
+	mk="$(WINKITS)/bin/$(WIN_SDK_VERSION)/x64/makeappx.exe"; 	[ -f "$$mk" ] || mk="$(WINKITS)/App Certification Kit/makeappx.exe"; 	"$$mk" pack /d $(MSIX_DIR) /p dist/Paintpane.msix /o
+	@echo "MSIX package: dist/Paintpane.msix (folder for Add-AppxPackage -Register: $(MSIX_DIR))"
+
 build-linux-amd64:
 	GOOS=linux GOARCH=amd64 go build -tags release -o bin/paintpane-amd64 -ldflags "$(LDFLAGS_RELEASE)" ./cmd/spice
 

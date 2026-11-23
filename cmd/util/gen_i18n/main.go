@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -78,8 +79,15 @@ var allowIdenticalToEnglish = map[string]bool{
 	"Error: ": true,
 
 	// Same word in French
-	"{{.Count}} images": true,
-	"1 image":           true,
+	"{{.Count}} images":            true,
+	"{{.Count}} images, {{.Size}}": true,
+	"1 image":                      true,
+	"Graphite":                     true,
+	"Violet":                       true,
+
+	// Same word in German ("Name") / used as is in several languages ("OK")
+	"Name": true,
+	"OK":   true,
 
 	// Attribution keys where some languages use the same prefix as English
 	"attribution_in": true,
@@ -217,7 +225,7 @@ func main() {
 		if metaName != nil {
 			enMap["_meta_name"] = metaName
 		}
-		if enOut, err := json.MarshalIndent(enMap, "", "  "); err == nil {
+		if enOut, err := marshalJSON(enMap); err == nil {
 			if writeErr := os.WriteFile(enPath, enOut, 0600); writeErr != nil {
 				log.Printf("warning: failed to write %s: %v", enPath, writeErr)
 			}
@@ -239,7 +247,7 @@ func main() {
 		}
 
 		pseudoPath := filepath.Join(translationsDir, "pseudo.json")
-		pseudoData, err := json.MarshalIndent(pseudoMap, "", "  ")
+		pseudoData, err := marshalJSON(pseudoMap)
 		if err != nil {
 			log.Fatalf("failed to marshal pseudo.json: %v", err)
 		}
@@ -295,6 +303,15 @@ func main() {
 				}
 			}
 
+			// Check for missing keys. Without this, a language file that was edited
+			// by hand (not rewritten by gen_i18n, which fills gaps with English) could
+			// lack keys and the check would still pass, while the UI fell back to English.
+			for k := range enMap {
+				if _, exists := m[k]; !exists && checkMode {
+					violations = append(violations, fmt.Sprintf("MISSING in %s: %q (in en.json but not translated)", f.Name(), k))
+				}
+			}
+
 			// Check for untranslated keys (value == English value and not allowlisted)
 			for k, v := range enMap {
 				if langVal, exists := m[k]; exists {
@@ -324,7 +341,7 @@ func main() {
 			}
 
 			// Always rewrite the file to guarantee alphabetical sorting
-			if outData, err := json.MarshalIndent(m, "", "  "); err == nil {
+			if outData, err := marshalJSON(m); err == nil {
 				if writeErr := os.WriteFile(path, outData, 0600); writeErr != nil {
 					log.Printf("warning: failed to write %s: %v", path, writeErr)
 				}
@@ -520,4 +537,17 @@ func pseudolocalize(s string) string {
 
 	sb.WriteString(" !!]")
 	return sb.String()
+}
+
+// marshalJSON indents like json.MarshalIndent but leaves &, < and > as they are
+// (MarshalIndent writes them as \u0026 etc., which churns the hand-edited files).
+func marshalJSON(v interface{}) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetEscapeHTML(false)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(v); err != nil {
+		return nil, err
+	}
+	return bytes.TrimSuffix(buf.Bytes(), []byte("\n")), nil
 }

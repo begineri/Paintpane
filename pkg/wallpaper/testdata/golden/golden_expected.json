@@ -1,8 +1,8 @@
 {
   "ClevelandMuseum_135428.jpg": {
-    "hash": "e0f8fcfe7e7800e1",
-    "face_found": true,
-    "face_rect": "(3181,1369)-(3237,1425)"
+    "hash": "f8fefe7800c17838",
+    "face_found": false,
+    "face_rect": "(0,0)-(0,0)"
   },
   "NationalPalaceMuseum_223.jpg": {
     "hash": "ffc3c7ff18000000",
@@ -55,9 +55,9 @@
     "face_rect": "(0,0)-(0,0)"
   },
   "wallhaven-5ym5x8.jpg": {
-    "hash": "9191919181d1d3d3",
+    "hash": "9191919191c1d1d3",
     "face_found": true,
-    "face_rect": "(249,266)-(1071,1088)"
+    "face_rect": "(268,332)-(1044,1108)"
   },
   "wallhaven-e86w3w.jpg": {
     "hash": "1684c484848f8fdf",
@@ -67,7 +67,7 @@
   "wallhaven-k8l1w6.jpg": {
     "hash": "000000d0f8f0f3e7",
     "face_found": true,
-    "face_rect": "(496,118)-(976,598)"
+    "face_rect": "(488,111)-(978,601)"
   },
   "wallhaven-q2wrjl.jpg": {
     "hash": "203c3c3c38181818",
@@ -77,6 +77,6 @@
   "wallhaven-z8wxyy.jpg": {
     "hash": "380000183cfcfcfe",
     "face_found": true,
-    "face_rect": "(3636,1185)-(4228,1777)"
+    "face_rect": "(3570,1179)-(4230,1839)"
   }
 }

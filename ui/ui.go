@@ -53,6 +53,11 @@ type SpiceApp struct {
 	trayIcons   map[string]fyne.Resource
 	update      *trayUpdate // a newer version to offer, if any
 	tuneWindow  fyne.Window // the open Tune Image window, if any (T-L)
+
+	// prefsReleaseGen cancels a pending release of the closed preferences window's memory
+	// (prefs_release.go); prefsReleased counts the releases done.
+	prefsReleaseGen int
+	prefsReleased   int
 }
 
 // trayUpdate is the "Update to …" item the update check adds to the tray.
@@ -148,7 +153,7 @@ func getInstance() *SpiceApp {
 		currentOS := getOS()
 		fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: OS interface created")
 
-		a := app.NewWithID(config.AppName)
+		a := app.NewWithID(config.DataID) // Store builds keep their own settings (config.DataID)
 		fmt.Fprintln(os.Stderr, "[Paintpane] getInstance: Fyne app created")
 
 		if _, ok := a.(desktop.App); ok {
@@ -484,12 +489,15 @@ func (sa *SpiceApp) CreatePreferencesWindow(initialTab string) {
 	}
 
 	sa.os.TransformToForeground()
+	sa.cancelPrefsRelease()
 
 	// If window already exists, just show it and switch tab if requested
 	if sa.prefsWindow != nil {
 		sa.RebuildPreferencesContent(initialTab) // Rebuild to pick up any new pendingAddUrls
 		sa.prefsWindow.Show()
-		sa.prefsWindow.RequestFocus()
+		if !devBackground() { // a dev build started to measure stays behind (always false in release)
+			sa.prefsWindow.RequestFocus()
+		}
 		return
 	}
 
@@ -550,17 +558,7 @@ func (sa *SpiceApp) CreatePreferencesWindow(initialTab string) {
 			targetHeight = fyne.Min(targetHeight, maxH)
 		}
 
-		prefsWindow.SetOnClosed(func() {
-			// Apply any change made just before closing.
-			if sa.prefsSM != nil {
-				sa.prefsSM.FlushPending()
-				sa.prefsSM = nil
-			}
-			sa.savePrefsWindowSize(prefsWindow.Canvas().Size())
-			sa.os.TransformToBackground()
-			sa.prefsWindow = nil // Clear reference on close
-			sa.prefsNav = nil    // Clear navigation reference
-		})
+		prefsWindow.SetOnClosed(func() { sa.prefsClosed(prefsWindow) })
 
 		// Resize before Show so macOS and Wayland allocate the right framebuffer
 		// size before the first paint.

@@ -117,6 +117,7 @@ func newE2EApp(t *testing.T, root string, prefs fyne.Preferences, monitors ...Mo
 		downloadWaitGroup:  &sync.WaitGroup{},
 		actionChan:         make(chan func(), 5),
 	}
+	wp.LicenceAccepted() // a person who accepted the licence; first_wallpaper_test.go covers the rest
 	return &e2eApp{wp: wp, os: desktop, fm: fm, store: store}
 }
 

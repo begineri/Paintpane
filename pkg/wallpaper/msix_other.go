@@ -12,5 +12,4 @@ var (
 	msixDocumentStaging   string
 )
 
-func resolveMSIXPicturePath(p string) string  { return p }
 func resolveMSIXDocumentPath(p string) string { return p }

@@ -94,7 +94,7 @@ func (sm *SettingsManager) ShowAddQueryDialog(cfg schema.AddQueryConfig, initial
 	field := func(label string, entry *widget.Entry) fyne.CanvasObject {
 		return vstack(4, newStyledText(label, 12, false, theme.ColorNamePlaceHolder), entry)
 	}
-	parts := []fyne.CanvasObject{newDialogTitle(cfg.Title)}
+	parts := []fyne.CanvasObject{newDialogTitle(cfg.Title, addQueryDialogWidth)}
 	if cfg.Description != "" {
 		parts = append(parts, noInset(newDialogText(cfg.Description, addQueryDialogWidth)))
 	}

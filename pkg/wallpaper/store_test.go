@@ -159,7 +159,7 @@ func TestStoreSync_Validation(t *testing.T) {
 
 	// Run Sync
 	// Limit 100 (high enough)
-	store.Sync(100, nil, nil)
+	store.Sync(100, nil, nil, nil)
 
 	// Verify
 	assert.Equal(t, 1, store.Count())
@@ -191,7 +191,7 @@ func TestStoreSync_Grooming(t *testing.T) {
 
 	// Sync with Limit 2
 	// Should remove "oldest" (index 0)
-	store.Sync(2, nil, nil)
+	store.Sync(2, nil, nil, nil)
 
 	assert.Equal(t, 2, store.Count())
 
@@ -234,7 +234,7 @@ func TestStoreSync_CacheInvalidation(t *testing.T) {
 
 	// Sync with Target: SmartFit=false
 	targetFlags := map[string]bool{"SmartFit": false}
-	store.Sync(100, targetFlags, nil)
+	store.Sync(100, targetFlags, nil, nil)
 
 	// Expect: Image refreshed (properties cleared) but record kept
 	// (Note: Master file persists, record stays but derivatives and previous flags are cleared/updated)
@@ -292,7 +292,7 @@ func TestStoreSync_IncompatibleTagsPreserved(t *testing.T) {
 		"FaceCrop":       false,
 		"FaceBoost":      false,
 	}
-	store.Sync(100, targetFlags, nil)
+	store.Sync(100, targetFlags, nil, nil)
 
 	// Image should be KEPT (not invalidated), because the processing flags match.
 	// The "incompatible:1920x1080" tag should be ignored by flagsMatch.
@@ -400,7 +400,7 @@ func TestStoreSync_StrictPruning(t *testing.T) {
 	}
 
 	// Run Sync
-	store.Sync(100, nil, activeIDs)
+	store.Sync(100, nil, activeIDs, nil)
 
 	// Verify Store Content
 	assert.Equal(t, 1, store.Count())
@@ -502,7 +502,7 @@ func TestStore_ResolutionBuckets(t *testing.T) {
 	store.Add(img1)
 	store.Add(img2)
 	// Sync with limit 1 should prune img1 (oldest)
-	store.Sync(1, nil, nil)
+	store.Sync(1, nil, nil, nil)
 	assert.Equal(t, 1, store.GetBucketSize("1920x1080"))
 	ids = store.GetIDsForResolution("1920x1080")
 	assert.Equal(t, "img2", ids[0])
@@ -673,7 +673,7 @@ func TestNightlyGroomingSimulation(t *testing.T) {
 		target := makeGroomingTarget(currentSmartFit, currentMode, currentFaceCrop, currentFaceBoost)
 		activeQueries := map[string]bool{"qA": true, "qB": true}
 
-		store.Sync(100, target, activeQueries)
+		store.Sync(100, target, activeQueries, nil)
 
 		// 4 images should remain
 		assert.Equal(t, 4, store.Count(), "Expected 4 images after steady-state grooming")
@@ -713,7 +713,7 @@ func TestNightlyGroomingSimulation(t *testing.T) {
 		newMode := SmartFitNormal // User changed mode
 		target := makeGroomingTarget(currentSmartFit, newMode, currentFaceCrop, currentFaceBoost)
 		// No query filter this time
-		store.Sync(100, target, nil)
+		store.Sync(100, target, nil, nil)
 
 		assert.Equal(t, 4, store.Count(), "All 4 images should remain (invalidated, not deleted)")
 
@@ -757,7 +757,7 @@ func TestNightlyGroomingSimulation(t *testing.T) {
 		assert.Equal(t, 4, store.Count(), "All 4 images should still be present before pruning")
 
 		// Now Sync with limit 2 should prune the 2 oldest.
-		store.Sync(2, nil, nil)
+		store.Sync(2, nil, nil, nil)
 		assert.Equal(t, 2, store.Count(), "Should prune down to cache limit of 2")
 	})
 }
@@ -789,7 +789,7 @@ func TestNightlyGrooming_RegressionGuard_IncompleteFlags(t *testing.T) {
 
 	// The CORRECT target (5 flags) — should NOT invalidate
 	correctTarget := makeGroomingTarget(true, SmartFitAggressive, false, false)
-	store.Sync(100, correctTarget, nil)
+	store.Sync(100, correctTarget, nil, nil)
 
 	got, _ := store.GetByID("Regression_001")
 	assert.NotEmpty(t, got.DerivativePaths,
@@ -814,7 +814,7 @@ func TestNightlyGrooming_RegressionGuard_IncompleteFlags(t *testing.T) {
 		"SmartFit": true,
 		"FaceCrop": false,
 	}
-	store.Sync(100, brokenTarget, nil)
+	store.Sync(100, brokenTarget, nil, nil)
 
 	got2, _ := store.GetByID("Regression_002")
 	assert.Empty(t, got2.DerivativePaths,
@@ -1030,7 +1030,7 @@ func TestBlocklist_SyncPrunesBlockedImages(t *testing.T) {
 	})
 
 	// Run Sync (as nightly grooming would)
-	store.Sync(100, nil, nil)
+	store.Sync(100, nil, nil, nil)
 
 	// bad_img should be gone
 	assert.Equal(t, 2, store.Count())
@@ -1164,7 +1164,7 @@ func TestBlocklist_ResolutionBucketsAfterSyncPrune(t *testing.T) {
 	store.LoadAvoidSet(map[string]bool{"will_be_blocked": true})
 
 	// Sync prunes it
-	store.Sync(100, nil, nil)
+	store.Sync(100, nil, nil, nil)
 
 	assert.Equal(t, 1, store.Count())
 	assert.Equal(t, 1, store.GetBucketSize("3440x1440"), "Only clean_img in 3440x1440")
@@ -1255,7 +1255,7 @@ func TestNightlyCycle_ProcessImageJobDoesNotClobber(t *testing.T) {
 
 	// Step 2: Grooming pass
 	activeQueries := map[string]bool{"q1": true}
-	store.Sync(100, target, activeQueries)
+	store.Sync(100, target, activeQueries, nil)
 	assert.Equal(t, 5, store.Count())
 
 	// Step 3: Simulate pipeline re-processing

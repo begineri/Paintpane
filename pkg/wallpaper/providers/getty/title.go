@@ -30,21 +30,15 @@ func stripAccessionNumber(title string) string {
 	return stripped
 }
 
-// objectNames reads the title and the first artist from a framed Linked Art
-// object. A name the record does not give is left empty, so the tray shows
+// objectNames reads the title and the first artist from a Linked Art object
+// record. A name the record does not give is left empty, so the tray shows
 // its usual text for a missing title or artist instead of a placeholder.
-func objectNames(obj map[string]interface{}) (title, artist string) {
-	if label, ok := obj["_label"].(string); ok {
-		title = stripAccessionNumber(label)
+func objectNames(obj linkedArtObject) (title, artist string) {
+	if obj.Label != "" {
+		title = stripAccessionNumber(obj.Label)
 	}
-	if prodBy, ok := obj["produced_by"].(map[string]interface{}); ok {
-		if carried, ok := prodBy["carried_out_by"].([]interface{}); ok && len(carried) > 0 {
-			if a, ok := carried[0].(map[string]interface{}); ok {
-				if name, ok := a["_label"].(string); ok {
-					artist = strings.TrimSpace(name)
-				}
-			}
-		}
+	if len(obj.ProducedBy) > 0 && len(obj.ProducedBy[0].CarriedOutBy) > 0 {
+		artist = strings.TrimSpace(obj.ProducedBy[0].CarriedOutBy[0].Label)
 	}
 	return title, artist
 }

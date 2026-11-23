@@ -24,7 +24,7 @@ func TestCheckAndRunRefresh_Logic(t *testing.T) {
 		fetchingInProgress: util.NewSafeBool(),
 		queryPages:         make(map[string]*util.SafeCounter),
 		providers:          make(map[string]provider.ImageProvider),
-		httpClient:         &http.Client{Timeout: 10 * time.Millisecond}, // Fail fast
+		httpClient:         &http.Client{Transport: noNetworkTransport{}}, // the connectivity check fails at once
 		store:              NewImageStore(),
 		fm:                 NewFileManager(tempDir),
 	}
@@ -128,6 +128,16 @@ func TestCheckAndRunRefresh_OTAIntegration(t *testing.T) {
 	if _, err := os.Stat(cachePath); os.IsNotExist(err) {
 		t.Errorf("Expected OTA curation cache file to be written at %s", cachePath)
 	}
+}
+
+// noNetworkTransport fails every request at once, like a machine without a network. The nightly
+// refresh tests use it so the connectivity check (connectivitycheck.gstatic.com) never leaves the
+// machine and always takes the "network unavailable" path; with a real client and a 10 ms timeout
+// it went to the real host and, on a fast enough connection, could take the other path.
+type noNetworkTransport struct{}
+
+func (noNetworkTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	return nil, fmt.Errorf("no network in this test: %s", r.URL)
 }
 
 type mockTransport struct{}

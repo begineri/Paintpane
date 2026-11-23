@@ -26,4 +26,6 @@ It writes `ui/fonts/NotoSansSC-Regular.subset.otf` and `NotoSansSC-Bold.subset.o
 files, GB2312 (6,763 Chinese characters), Big5 level 1 (5,401), Latin, Greek, Cyrillic, kana, and
 CJK and full-width punctuation: 11,126 characters, about 2.3 MB per weight. Run it again when a
 translation adds characters outside these sets. Characters that are still missing fall back to
-Fyne's built-in font, then to a Windows font.
+Fyne's built-in font, then to a Windows font. At run time the app leaves · ‘ ’ “ ” … × • out of the
+font's character map (only · for Chinese and Japanese), so they come from Fyne's Latin font at
+Latin widths (`ui/font_narrow.go`); the subset itself is unchanged.

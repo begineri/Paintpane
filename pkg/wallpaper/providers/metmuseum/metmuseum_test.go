@@ -2,7 +2,6 @@ package metmuseum
 
 import (
 	"context"
-	"net/http"
 	"testing"
 	"time"
 
@@ -75,7 +74,9 @@ func TestMetMuseumBestOfCollection(t *testing.T) {
 	cfg := &wallpaper.Config{
 		Preferences: NewMockPreferences(),
 	}
-	client := &http.Client{Timeout: 5 * time.Second}
+	// Object records come from testdata (the first three IDs of the collection); the rest get
+	// 404 and are skipped, so the test never touches the real API.
+	client := replayClient(t)
 
 	// 2. Initialize Provider
 	p := NewProvider(cfg, client)

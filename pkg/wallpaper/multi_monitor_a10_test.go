@@ -34,13 +34,11 @@ func (a *e2eApp) waitForWallpaperCalls(t *testing.T, monitorID, n int) {
 	}, e2eSettle, 50*time.Millisecond, "monitor %d should receive wallpaper call #%d", monitorID, n)
 }
 
-// showFirstWallpapers asks every monitor for its first wallpaper (the harness does not change
-// wallpapers on start) and waits until the desktop has received them.
+// showFirstWallpapers waits until every monitor shows its first wallpaper. The harness starts
+// without a wallpaper from last time, like a fresh install, so the start itself sets one on each
+// display as soon as an image is ready (showFirstWallpaper).
 func (a *e2eApp) showFirstWallpapers(t *testing.T) {
 	t.Helper()
-	for _, m := range a.os.monitors {
-		a.wp.SetNextWallpaper(m.ID, true)
-	}
 	for _, m := range a.os.monitors {
 		a.waitForWallpaperCalls(t, m.ID, 1)
 	}

@@ -319,7 +319,7 @@ func TestFavCrossCutting_IsFavoritedDoesNotAffectPruning(t *testing.T) {
 	activeQueries := map[string]bool{
 		"wallhaven_query_1": true,
 	}
-	store.Sync(5000, map[string]bool{"SmartFit": true}, activeQueries)
+	store.Sync(5000, map[string]bool{"SmartFit": true}, activeQueries, nil)
 
 	// Both should survive — IsFavorited is irrelevant to Sync
 	_, ok := store.GetByID("Wallhaven_xyz")

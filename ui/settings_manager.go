@@ -1994,10 +1994,18 @@ func (sm *SettingsManager) renderQueryList(v schema.QueryListItem) *widget.List 
 		},
 		// CreateItem — builds the cell template (no data binding here)
 		func() fyne.CanvasObject {
+			// The name takes the row's free width, so the link always spans its whole name (a link
+			// reacts only over its text) and a name too long for the row ends in "…" instead of
+			// running under the switch. In an HBox the link kept the width of "Placeholder": the
+			// cell is not laid out again after UpdateItem sets the name.
 			urlLink := widget.NewHyperlink(i18n.T("Placeholder"), nil)
+			urlLink.Truncation = fyne.TextTruncateEllipsis
+			// NewHyperlink does not do this, and without it the first Resize (from the Border layout,
+			// before anything asks for its MinSize) never lays the name out: it is drawn uncut.
+			urlLink.ExtendBaseWidget(urlLink)
 			activeCheck := widget.NewCheck(i18n.T("Active"), nil)
 			deleteButton := newDangerButton(i18n.T("Delete"), nil) // red text, as every destructive button (v43)
-			return container.NewHBox(urlLink, layout.NewSpacer(), activeCheck, deleteButton)
+			return container.NewBorder(nil, nil, nil, container.NewHBox(activeCheck, deleteButton), urlLink)
 		},
 		// UpdateItem — binds data to a recycled cell (scroll-safe)
 		func(i int, o fyne.CanvasObject) {
@@ -2010,8 +2018,9 @@ func (sm *SettingsManager) renderQueryList(v schema.QueryListItem) *widget.List 
 
 			c := o.(*fyne.Container)
 			urlLink := c.Objects[0].(*widget.Hyperlink)
-			activeCheck := c.Objects[2].(*widget.Check)
-			deleteButton := c.Objects[3].(*dangerButton)
+			controls := c.Objects[1].(*fyne.Container)
+			activeCheck := controls.Objects[0].(*widget.Check)
+			deleteButton := controls.Objects[1].(*dangerButton)
 
 			// Set display text
 			if v.GetDisplayText != nil {

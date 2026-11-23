@@ -1,3 +1,5 @@
+//go:build !appstore && !msstore
+
 package config
 
 import (

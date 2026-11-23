@@ -54,6 +54,8 @@ go build -tags release -o bin/paintpane.exe -ldflags "-s -w -H=windowsgui -X mai
 
 Go 模块路径仍是 `github.com/dixieflatline76/Spice/v2`，有意保留，方便和 Spice 的代码对照。
 
+Fyne 图形界面库用的是 [`third_party/fyne`](../third_party/fyne/) 里修改过的副本（Fyne 2.7.4，`go.mod` 用 `replace` 指向它），改动都列在它的 [PAINTPANE.md](../third_party/fyne/PAINTPANE.md) 里。
+
 介绍页是 [`site/`](../site/) 里的纯 HTML 和 CSS，用浏览器打开 `site/zh/index.html` 即可预览。
 
 ## 参与贡献
@@ -67,3 +69,5 @@ Go 模块路径仍是 `github.com/dixieflatline76/Spice/v2`，有意保留，方
 ## 许可证
 
 与 Spice 相同，使用 [PolyForm Noncommercial License 1.0.0](../LICENSE)，并保留 Karl Kwong 的版权声明。**仅限非商业用途**：可以使用、修改、分享，但不能用于商业目的或获取报酬。详见 [NOTICE.md](../NOTICE.md)。
+
+仓库里的第三方代码保留各自的许可证：[`third_party/fyne`](../third_party/fyne/) 里修改过的 Fyne 和 [`pkg/wallpaper/internal/progjpeg`](../pkg/wallpaper/internal/progjpeg/) 里的 JPEG 解码器都用 BSD 3-Clause 许可证（见 NOTICE.md）。

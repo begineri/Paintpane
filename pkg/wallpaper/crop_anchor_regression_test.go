@@ -189,7 +189,7 @@ func TestCropAnchor_SurviveDoubleSyncModeChange(t *testing.T) {
 	// === SYNC #1: User changes SmartFit to Normal mode ===
 	// This is the mode change that triggers invalidation
 	newTarget := makeGroomingTarget(true, SmartFitNormal, false, false)
-	store.Sync(100, newTarget, nil)
+	store.Sync(100, newTarget, nil, nil)
 
 	// After Sync #1: image should be invalidated (derivatives wiped) but alive
 	got, ok := store.GetByID("victim_img")
@@ -200,7 +200,7 @@ func TestCropAnchor_SurviveDoubleSyncModeChange(t *testing.T) {
 
 	// === SYNC #2: The killer — same flags, zero derivatives ===
 	// Without the fix, this zombie-deletes the image and Tuning are gone forever.
-	store.Sync(100, newTarget, nil)
+	store.Sync(100, newTarget, nil, nil)
 
 	// === ASSERTION: Image and anchors MUST survive ===
 	got, ok = store.GetByID("victim_img")
@@ -229,9 +229,9 @@ func TestCropAnchor_SurviveTripleSyncStartup(t *testing.T) {
 	store.Add(img)
 
 	// Three consecutive syncs with identical flags (steady-state startup)
-	store.Sync(100, target, nil)
-	store.Sync(100, target, nil)
-	store.Sync(100, target, nil)
+	store.Sync(100, target, nil, nil)
+	store.Sync(100, target, nil, nil)
+	store.Sync(100, target, nil, nil)
 
 	got, ok := store.GetByID("triple_sync")
 	assert.True(t, ok, "Image must survive three consecutive Syncs")
@@ -305,7 +305,7 @@ func TestCropAnchor_NotExemptFromQueryPruning(t *testing.T) {
 	// Sync with strict query filtering — qDEAD is not in active set
 	activeQueries := map[string]bool{"qLIVE": true}
 	target := makeGroomingTarget(true, SmartFitAggressive, false, false)
-	store.Sync(100, target, activeQueries)
+	store.Sync(100, target, activeQueries, nil)
 
 	known := store.GetKnownIDs()
 	assert.False(t, known["orphan_anchored"],
@@ -337,7 +337,7 @@ func TestCropAnchor_NotExemptFromLRUPruning(t *testing.T) {
 
 	// Sync with limit 2 — oldest 3 should be pruned despite having anchors
 	target := makeGroomingTarget(true, SmartFitAggressive, false, false)
-	store.Sync(2, target, nil)
+	store.Sync(2, target, nil, nil)
 
 	assert.Equal(t, 2, store.Count(),
 		"Cache limit must be enforced even for images with Tuning")

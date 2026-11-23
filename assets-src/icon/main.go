@@ -98,6 +98,9 @@ func main() {
 	frames, delays := aboutFrames()
 	writeGIF(out("asset/images/about_splash.gif"), frames, delays)
 	writeBMP(out("assets-src/installer/Paintpane.bmp"), wizardImage())
+	for name, img := range msixLogos() {
+		writePNG(out("msix/Assets/"+name), img)
+	}
 
 	if *preview != "" {
 		base := strings.TrimSuffix(*preview, ".png")

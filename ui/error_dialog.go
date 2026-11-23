@@ -52,7 +52,7 @@ func showErrorDialog(parent fyne.Window, err error) {
 	ok := newDialogButton(i18n.TMap("OK", map[string]string{"zh": "好", "zh-Hant": "好"}), buttonPrimary, func() { popup.Hide() })
 	buttons := container.New(&rightRowLayout{gap: 8}, ok)
 
-	parts := []fyne.CanvasObject{newDialogTitle(title), noInset(newDialogText(bodyText, dialogWidth))}
+	parts := []fyne.CanvasObject{newDialogTitle(title, dialogWidth), noInset(newDialogText(bodyText, dialogWidth))}
 	if detail != "" {
 		parts = append(parts, noInset(newErrorDetail(detail)))
 	}

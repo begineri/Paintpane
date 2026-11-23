@@ -1,6 +1,7 @@
 package getty
 
 import (
+	"bytes"
 	"context"
 	_ "embed"
 	"encoding/json"
@@ -12,8 +13,6 @@ import (
 	"time"
 
 	"golang.org/x/time/rate"
-
-	"github.com/piprate/json-gold/ld"
 
 	"github.com/dixieflatline76/Spice/v2/pkg/curation"
 	"github.com/dixieflatline76/Spice/v2/pkg/i18n"
@@ -29,10 +28,6 @@ type Provider struct {
 	cfg    *wallpaper.Config
 	client *http.Client
 	mu     sync.RWMutex
-
-	// JSON-LD Processor
-	proc    *ld.JsonLdProcessor
-	options *ld.JsonLdOptions
 }
 
 func init() {
@@ -43,13 +38,7 @@ func init() {
 
 // NewProvider creates a new Getty provider.
 func NewProvider(cfg *wallpaper.Config, client *http.Client) *Provider {
-	p := &Provider{
-		cfg:     cfg,
-		client:  client,
-		proc:    ld.NewJsonLdProcessor(),
-		options: ld.NewJsonLdOptions(""),
-	}
-	return p
+	return &Provider{cfg: cfg, client: client}
 }
 
 func (p *Provider) ID() string      { return ProviderName }
@@ -143,12 +132,12 @@ func (p *Provider) fetchObjectByUUID(ctx context.Context, uuid string) (*provide
 		return nil, fmt.Errorf("bad status from API: %s", resp.Status)
 	}
 
-	var doc map[string]interface{}
-	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
+	var obj linkedArtObject
+	if err := json.NewDecoder(resp.Body).Decode(&obj); err != nil {
 		return nil, err
 	}
 
-	img, err := p.parseGettyJSONLD(doc)
+	img, err := parseObject(obj)
 	if err != nil {
 		return nil, err
 	}
@@ -204,90 +193,92 @@ func (p *Provider) FetchThumbnails(ctx context.Context, ids []string) ([]provide
 	return validThumbnails, nil
 }
 
-func (p *Provider) parseGettyJSONLD(doc map[string]interface{}) (*provider.Image, error) {
-	// Create a frame to extract exactly what we need
-	frame := map[string]interface{}{
-		"@context": "https://linked.art/ns/v1/linked-art.json",
-		"@type":    "HumanMadeObject",
-	}
+// linkedArtObject is the part of a Getty object record (Linked Art, data.getty.edu) that Paintpane
+// reads. The record is plain JSON in Linked Art's fixed shape, so it is decoded directly: framing
+// it as JSON-LD first (json-gold) gave the same fields but loaded two context documents over the
+// network for every record and took most of the CPU of a Getty fetch.
+type linkedArtObject struct {
+	Type           string                  `json:"type"`
+	Label          string                  `json:"_label"`
+	ProducedBy     oneOrMany[linkedArtProduction] `json:"produced_by"`
+	Representation oneOrMany[linkedArtRef] `json:"representation"`
+	SubjectOf      oneOrMany[linkedArtRef] `json:"subject_of"`
+}
 
-	framed, err := p.proc.Frame(doc, frame, p.options)
-	if err != nil {
-		return nil, err
-	}
+type linkedArtProduction struct {
+	CarriedOutBy oneOrMany[linkedArtRef] `json:"carried_out_by"`
+	Timespan     oneOrMany[linkedArtRef] `json:"timespan"`
+}
 
-	// Safely extract from framed graph
-	graph, ok := framed["@graph"].([]interface{})
-	if !ok || len(graph) == 0 {
-		return nil, errors.New("no graph in framed json-ld")
-	}
+type linkedArtRef struct {
+	ID     string `json:"id"`
+	Label  string `json:"_label"`
+	Format string `json:"format"`
+}
 
-	obj, ok := graph[0].(map[string]interface{})
-	if !ok {
-		return nil, errors.New("invalid graph object")
-	}
+// oneOrMany reads a JSON-LD property written either as one value or as a list of them.
+type oneOrMany[T any] []T
 
+func (m *oneOrMany[T]) UnmarshalJSON(b []byte) error {
+	b = bytes.TrimSpace(b)
+	if len(b) > 0 && b[0] == '[' {
+		var list []T
+		if err := json.Unmarshal(b, &list); err != nil {
+			return err
+		}
+		*m = list
+		return nil
+	}
+	if bytes.Equal(b, []byte("null")) {
+		*m = nil
+		return nil
+	}
+	var one T
+	if err := json.Unmarshal(b, &one); err != nil {
+		return err
+	}
+	*m = oneOrMany[T]{one}
+	return nil
+}
+
+// parseObject turns a Getty object record into an image: the first representation is the
+// picture (asked for at full size), the text/html page it is the subject of is where to view it.
+func parseObject(obj linkedArtObject) (*provider.Image, error) {
+	if obj.Type != "HumanMadeObject" {
+		return nil, fmt.Errorf("not an object record (type %q)", obj.Type)
+	}
 	title, author := objectNames(obj)
 
 	imageURL := ""
-	if rep, ok := obj["representation"].([]interface{}); ok && len(rep) > 0 {
-		if rObj, ok := rep[0].(map[string]interface{}); ok {
-			if id, ok := rObj["id"].(string); ok {
-				// Convert IIIF default to max resolution
-				imageURL = strings.ReplaceAll(id, "/full/full/0/default.jpg", "/full/max/0/default.jpg")
-			}
-		}
+	if len(obj.Representation) > 0 {
+		// Convert IIIF default to max resolution
+		imageURL = strings.ReplaceAll(obj.Representation[0].ID, "/full/full/0/default.jpg", "/full/max/0/default.jpg")
 	}
-
-	// Fallback: JSON-LD framing can drop the representation field for some objects.
-	// In that case, extract the IIIF URL directly from the raw (unframed) document.
-	if imageURL == "" {
-		if rep, ok := doc["representation"].([]interface{}); ok && len(rep) > 0 {
-			if rObj, ok := rep[0].(map[string]interface{}); ok {
-				if id, ok := rObj["id"].(string); ok {
-					imageURL = strings.ReplaceAll(id, "/full/full/0/default.jpg", "/full/max/0/default.jpg")
-				}
-			}
-		}
-	}
-
 	if imageURL == "" {
 		return nil, errors.New("no image representation found")
 	}
 
 	viewURL := ""
-	if subjectOf, ok := obj["subject_of"].([]interface{}); ok {
-		for _, so := range subjectOf {
-			if soMap, ok := so.(map[string]interface{}); ok {
-				if format, ok := soMap["format"].(string); ok && format == "text/html" {
-					if id, ok := soMap["id"].(string); ok {
-						viewURL = id
-						break
-					}
-				}
-			}
+	for _, so := range obj.SubjectOf {
+		if so.Format == "text/html" && so.ID != "" {
+			viewURL = so.ID
+			break
 		}
 	}
 
 	year := ""
-	if prodBy, ok := obj["produced_by"].(map[string]interface{}); ok {
-		if timespan, ok := prodBy["timespan"].(map[string]interface{}); ok {
-			if l, ok := timespan["_label"].(string); ok {
-				year = l
-			}
-		}
+	if len(obj.ProducedBy) > 0 && len(obj.ProducedBy[0].Timespan) > 0 {
+		year = obj.ProducedBy[0].Timespan[0].Label
 	}
 
-	img := &provider.Image{
+	return &provider.Image{
 		Path:        imageURL,
 		Attribution: attribution(author, title),
 		Title:       title,
 		Artist:      author,
 		Year:        year,
 		ViewURL:     viewURL,
-	}
-
-	return img, nil
+	}, nil
 }
 
 // EnrichImage is a no-op
@@ -305,14 +296,14 @@ func (p *Provider) EnrichImage(_ context.Context, img provider.Image) (provider.
 
 func (p *Provider) CreateSettingsPanel(sm setting.SettingsManager) *schema.PanelSchema {
 	return schema.CreateMuseumSettingsPanel(schema.MuseumSettingsConfig{
-		ID:                   "Getty",
-		Title:                i18n.T("The J. Paul Getty Museum"),
-		Location:             i18n.T("Los Angeles, CA, USA"),
-		LicenseURL:           "https://www.getty.edu/about/open-content-program/",
-		Description:          i18n.T("The J. Paul Getty Museum features European paintings, drawings, sculpture, illuminated manuscripts, decorative arts, and photography from its beginnings to the present, gathered internationally."),
-		MapQuery:             "J. Paul Getty Museum Los Angeles",
-		WebsiteURL:           "https://www.getty.edu/visit/",
-		DonateURL:            "https://www.getty.edu/about/join-and-give/",
+		ID:          "Getty",
+		Title:       i18n.T("The J. Paul Getty Museum"),
+		Location:    i18n.T("Los Angeles, CA, USA"),
+		LicenseURL:  "https://www.getty.edu/about/open-content-program/",
+		Description: i18n.T("The J. Paul Getty Museum features European paintings, drawings, sculpture, illuminated manuscripts, decorative arts, and photography from its beginnings to the present, gathered internationally."),
+		MapQuery:    "J. Paul Getty Museum Los Angeles",
+		WebsiteURL:  "https://www.getty.edu/visit/",
+		DonateURL:   "https://www.getty.edu/about/join-and-give/",
 	}, sm.OpenURL)
 }
 

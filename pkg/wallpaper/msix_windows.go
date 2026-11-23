@@ -29,10 +29,16 @@ const (
 // Empty string means "not running in MSIX" (or detection failed).
 var msixPackageFamilyName string
 
-// Staging directories outside the MSIX container boundary.
+// msixStagingFolder names the folders in Pictures and Documents that hold copies of our files.
+// Upstream Spice uses Pictures\SpiceWallpapers; that folder may belong to an installed Spice,
+// so it is never touched.
+const msixStagingFolder = config.AppName
+
+// Staging directories outside the MSIX container boundary. They are created on first use,
+// so a user who never opens a gallery page gets no Documents folder.
 var (
-	msixPictureStaging  string // %USERPROFILE%\Pictures\SpiceWallpapers
-	msixDocumentStaging string // %USERPROFILE%\Documents\Spice
+	msixPictureStaging  string // %USERPROFILE%\Pictures\Paintpane
+	msixDocumentStaging string // %USERPROFILE%\Documents\Paintpane
 )
 
 func init() {
@@ -40,11 +46,8 @@ func init() {
 	if msixPackageFamilyName != "" {
 		home, err := os.UserHomeDir()
 		if err == nil {
-			msixPictureStaging = filepath.Join(home, "Pictures", "SpiceWallpapers")
-			_ = os.MkdirAll(msixPictureStaging, 0755)
-
-			msixDocumentStaging = filepath.Join(home, "Documents", "Paintpane")
-			_ = os.MkdirAll(msixDocumentStaging, 0755)
+			msixPictureStaging = filepath.Join(home, "Pictures", msixStagingFolder)
+			msixDocumentStaging = filepath.Join(home, "Documents", msixStagingFolder)
 		}
 		log.Printf("MSIX: Running in package %s", msixPackageFamilyName)
 		log.Printf("MSIX: Picture staging dir: %s", msixPictureStaging)
@@ -82,14 +85,8 @@ func detectMSIXFamilyName() string {
 	return syscall.UTF16ToString(buf)
 }
 
-// resolveMSIXPicturePath ensures image/wallpaper files are accessible by explorer.exe or Windows APIs
-// outside the MSIX container by staging them into %USERPROFILE%\Pictures\SpiceWallpapers.
-func resolveMSIXPicturePath(imagePath string) string {
-	return resolveMSIXStagedPath(imagePath, msixPictureStaging, true)
-}
-
 // resolveMSIXDocumentPath ensures HTML/document files are accessible by external applications (e.g. web browsers)
-// outside the MSIX container by staging them into %USERPROFILE%\Documents\Spice.
+// outside the MSIX container by staging them into %USERPROFILE%\Documents\Paintpane.
 func resolveMSIXDocumentPath(docPath string) string {
 	return resolveMSIXStagedPath(docPath, msixDocumentStaging, false)
 }
@@ -132,10 +129,10 @@ func resolveMSIXStagedPath(srcPath, baseStagingDir string, flat bool) string {
 		return srcPath
 	}
 
-	// Skip if already staged and same size
+	// Skip if already staged: same size and not older than the source
 	srcInfo, _ := os.Stat(srcPath)
 	if dstInfo, err := os.Stat(stagedPath); err == nil {
-		if srcInfo != nil && dstInfo.Size() == srcInfo.Size() {
+		if srcInfo != nil && dstInfo.Size() == srcInfo.Size() && !dstInfo.ModTime().Before(srcInfo.ModTime()) {
 			return stagedPath
 		}
 	}

@@ -53,8 +53,18 @@ func main() {
 
 	breadcrumb("main() entered")
 
-	// Create a mutex to ensure only one instance is running
-	ok, err := acquireLock()
+	// The Microsoft Store edition leaves a logon to the portable exe when both start with Windows.
+	if storeGivesWay() {
+		return
+	}
+
+	// Create a mutex to ensure only one instance is running. The restart after an import waits for
+	// the process that imported to quit.
+	acquire := acquireLock
+	if startedAfterImport() {
+		acquire = acquireLockAfterImport
+	}
+	ok, err := acquire()
 	if err != nil {
 		breadcrumb(fmt.Sprintf("acquireLock failed: %v", err))
 		log.Fatalf("Failed to launch: %v", err)
@@ -76,9 +86,12 @@ func main() {
 		log.Printf("Could not lower the process priority: %v", err)
 	}
 
+	// Store edition: settings imported from the portable exe go in place before Fyne reads them.
+	applyStoreImport()
+
 	// Fyne cannot read a preferences file with a byte order mark and would replace the person's
 	// settings with defaults (A2 §14.9 #4); fix the file before Fyne loads it.
-	if note, err := config.RepairPreferencesFile(config.FynePreferencesPath(config.AppName)); err != nil {
+	if note, err := config.RepairPreferencesFile(config.FynePreferencesPath(config.DataID)); err != nil {
 		log.Printf("Preferences file check failed: %v", err)
 	} else if note != "" {
 		log.Print(note)

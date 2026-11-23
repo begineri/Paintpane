@@ -26,14 +26,35 @@ func acquireLock() (bool, error) {
 
 	mutex, err = windows.CreateMutex(nil, false, namePtr)
 	if err != nil {
+		// The handle of a mutex that already exists keeps it alive: close it, so the mutex goes
+		// away with the instance that made it (a start that waits for it retries).
+		if mutex != 0 {
+			_ = windows.CloseHandle(mutex)
+			mutex = 0
+		}
 		// Check if the error is because the mutex already exists.
-		if windows.GetLastError() == windows.ERROR_ALREADY_EXISTS {
+		if errors.Is(err, windows.ERROR_ALREADY_EXISTS) {
 			return false, nil // Another instance is running
 		}
 		return false, errors.New("another instance is already running")
 	}
 
 	return true, nil
+}
+
+// instanceRunning reports whether another instance holds the single-instance mutex, without
+// taking it.
+func instanceRunning() bool {
+	namePtr, err := syscall.UTF16PtrFromString(config.AppName + "_SingleInstanceMutex")
+	if err != nil {
+		return false
+	}
+	h, err := windows.OpenMutex(windows.SYNCHRONIZE, false, namePtr)
+	if err != nil {
+		return false
+	}
+	_ = windows.CloseHandle(h)
+	return true
 }
 
 // releaseLock releases the single-instance lock handle.

@@ -404,8 +404,10 @@ func (p *winTrayPopup) release() {
 	if !p.prepared || p.open {
 		return
 	}
+	releaseClosingWindow(p.main)
 	p.main.Close()
 	if p.sub != nil {
+		releaseClosingWindow(p.sub)
 		p.sub.Close()
 	}
 	p.main, p.sub = nil, nil

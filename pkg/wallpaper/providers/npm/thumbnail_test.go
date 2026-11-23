@@ -2,12 +2,11 @@ package npm
 
 import (
 	"context"
-	"net/http"
 	"testing"
 )
 
 func TestFetchThumbnails_TDD(t *testing.T) {
-	p := NewProvider(nil, http.DefaultClient)
+	p := NewProvider(nil, replayClient(t))
 
 	// Valid ID from NPM
 	ids := []string{"299"}

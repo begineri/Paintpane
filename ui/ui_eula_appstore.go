@@ -19,6 +19,7 @@ func (sa *SpiceApp) verifyEULA() {
 	if !util.HasAcceptedEULA(sa.Preferences()) {
 		util.MarkEULAAccepted(sa.Preferences())
 	}
+	licenceAccepted()
 
 	// There is no startup splash screen.
 	// This ensures the app starts silently in the tray, avoiding OpenGL window creation

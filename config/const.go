@@ -32,7 +32,7 @@ func GetWorkingDir() string {
 	if err != nil {
 		cacheDir = os.TempDir() // Fallback
 	}
-	return filepath.Join(cacheDir, strings.ToLower(AppName))
+	return filepath.Join(cacheDir, strings.ToLower(DataID))
 }
 
 // GetCacheDir returns the directory for cached gallery and curation files. Use it instead of
@@ -61,21 +61,21 @@ func init() {
 	switch runtime.GOOS {
 	case "windows":
 		userCacheDir, _ := os.UserCacheDir()
-		appDir = filepath.Join(userCacheDir, AppName)
+		appDir = filepath.Join(userCacheDir, DataID)
 	case "darwin":
 		// macOS: Use standard Application Support for sandbox compliance.
 		// os.UserConfigDir() correctly points to the sandbox container when enabled.
 		configDir, err := os.UserConfigDir()
 		if err == nil {
-			appDir = filepath.Join(configDir, AppName)
+			appDir = filepath.Join(configDir, DataID)
 		} else {
 			// Fallback to home dir if config dir is unavailable
 			userHomeDir, _ := os.UserHomeDir()
-			appDir = filepath.Join(userHomeDir, "."+strings.ToLower(AppName))
+			appDir = filepath.Join(userHomeDir, "."+strings.ToLower(DataID))
 		}
 	default:
 		userHomeDir, _ := os.UserHomeDir()
-		appDir = filepath.Join(userHomeDir, "."+strings.ToLower(AppName))
+		appDir = filepath.Join(userHomeDir, "."+strings.ToLower(DataID))
 	}
 
 	// We don't panic here because it crashes the app before logging starts.
