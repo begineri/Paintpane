@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Paintpane</title>
+<meta name="description" content="Paintpane collects no personal data. What it stores on your PC and which servers it connects to.">
+<link rel="canonical" href="https://begineri.github.io/Paintpane/privacy.html">
+<link rel="alternate" hreflang="en" href="https://begineri.github.io/Paintpane/privacy.html">
+<link rel="alternate" hreflang="zh-CN" href="https://begineri.github.io/Paintpane/zh/privacy.html">
+<link rel="alternate" hreflang="x-default" href="https://begineri.github.io/Paintpane/privacy.html">
+<link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png">
+<link rel="stylesheet" href="assets/site.css">
+<!--
+  Privacy policy, required for the Microsoft Store listing (Store policy 10.5.1).
+  Its Chinese twin is zh/privacy.html: same sections in the same order. Change both together, and check
+  the facts against the code before each release (sources, folders, the update check).
+-->
+</head>
+<body>
+
+<header class="top"><div class="wrap">
+  <a class="brand" href="./"><img class="icon" src="assets/icon-256.png" alt="" width="28" height="28">Paintpane</a>
+  <nav>
+    <a href="zh/privacy.html" hreflang="zh-CN" lang="zh-CN">中文</a>
+    <a class="gh" href="https://github.com/begineri/Paintpane">GitHub</a>
+  </nav>
+</div></header>
+
+<main class="doc">
+<section><div class="wrap">
+  <h1>Privacy</h1>
+  <p class="fine">Applies to Paintpane for Windows: the portable exe from this site and the Microsoft Store version. Last updated 19 November 2026.</p>
+
+  <h2>In short</h2>
+  <p><b>Paintpane does not collect any personal data.</b> It has no account, no analytics, no advertising and no crash reporting. Nothing about you or your PC is sent to the developer.</p>
+  <p>It downloads pictures from the sources you turn on, and keeps your settings and pictures on your PC.</p>
+
+  <h2>What is kept on your PC</h2>
+  <table>
+    <thead><tr><th>What</th><th>Where (portable exe)</th><th>Where (Microsoft Store version)</th></tr></thead>
+    <tbody>
+      <tr><td>Settings: sources and collections you chose, display options and the works you blocked</td><td><code>%APPDATA%\fyne\Paintpane\preferences.json</code></td><td><code>%APPDATA%\fyne\PaintpaneStore\preferences.json</code></td></tr>
+      <tr><td>Downloaded pictures, their titles and credits, your favorites, small previews of blocked works, and a log of what the app did (no personal data beyond file paths on your PC)</td><td><code>%LOCALAPPDATA%\Paintpane</code></td><td>The app’s private folder, which Windows keeps for the package</td></tr>
+      <tr><td>The wallhaven or Pexels API key, if you enter one</td><td colspan="2">Windows Credential Manager (your Windows account’s protected store), under <code>wallhaven_api_key</code> or <code>pexels_api_key</code>; both versions use the same entry</td></tr>
+      <tr><td>Copies of the pictures now on your desktop and lock screen, so Windows can show them</td><td>Not used</td><td><code>Pictures\Paintpane</code>; only the pictures in use are kept</td></tr>
+      <tr><td>Collection pages you open in your browser</td><td>Not used</td><td><code>Documents\Paintpane</code>, made the first time you open one</td></tr>
+    </tbody>
+  </table>
+  <p>None of this leaves your PC, except an API key, which is sent only to the site it belongs to.</p>
+
+  <h2>What it connects to</h2>
+  <p>Paintpane connects directly to these servers. It sends no information about you; like any website, they see your IP address and which pictures are requested, and their own privacy policies apply.</p>
+  <ul>
+    <li><b>Museum open-access servers</b>, for the museums you turn on: The Metropolitan Museum of Art, Art Institute of Chicago, Cleveland Museum of Art, Rijksmuseum, National Palace Museum (Taipei), Statens Museum for Kunst, J. Paul Getty Museum, National Gallery of Art (Washington), Yale University Art Collections and Paris Musées, and the image servers they use.</li>
+    <li><b>Wikimedia Commons</b>, if you turn it on.</li>
+    <li><b>wallhaven</b>, if you turn it on. If you enter your wallhaven API key, it is sent to wallhaven with each request.</li>
+    <li><b>Pexels</b>, if you turn it on. Pexels needs an API key, which is sent only to Pexels.</li>
+    <li><b>GitHub</b> (<code>raw.githubusercontent.com</code>), for updated lists of museum collections.</li>
+    <li><b>GitHub</b> (<code>api.github.com</code>), to check for a new version. Portable exe only; the Microsoft Store version is updated by the Store and does not check.</li>
+  </ul>
+  <p>Links you click in the app, such as a work’s page at its museum or a museum on a map, open in your web browser.</p>
+  <p>Paintpane also runs a small local service on <code>127.0.0.1</code> (port 49452) for its own pages. It cannot be reached from other computers and refuses requests from websites.</p>
+
+  <h2>Removing your data</h2>
+  <ul>
+    <li><b>Microsoft Store version:</b> uninstall it in Settings › Apps. Windows deletes the app’s private folder. These stay and can be deleted by hand: <code>%APPDATA%\fyne\PaintpaneStore</code> (the settings file), <code>Pictures\Paintpane</code> and <code>Documents\Paintpane</code>, and an API key you entered, in Control Panel › Credential Manager › Windows Credentials.</li>
+    <li><b>Portable exe:</b> turn off <b>Start with Windows</b> in Settings › General, quit the app, then delete the exe, <code>%LOCALAPPDATA%\Paintpane</code> and <code>%APPDATA%\fyne\Paintpane</code>, and an API key you entered in Credential Manager.</li>
+  </ul>
+  <p>To delete only the downloaded pictures, use <b>Clear cache</b> in Settings › Advanced › Storage.</p>
+
+  <h2>Children</h2>
+  <p>Paintpane collects no data from anyone, including children.</p>
+
+  <h2>Changes</h2>
+  <p>If what Paintpane stores or connects to changes, this page is updated in the same release, and the date at the top changes.</p>
+
+  <h2>Contact</h2>
+  <p>Questions about privacy: <a href="https://github.com/begineri/Paintpane/issues">open an issue on GitHub</a>.</p>
+</div></section>
+</main>
+
+<footer><div class="wrap">
+  <a href="./">Paintpane</a>
+  <a href="https://github.com/begineri/Paintpane">GitHub</a>
+  <a href="https://github.com/begineri/Paintpane/blob/main/LICENSE">License</a>
+  <a class="lang" href="zh/privacy.html" hreflang="zh-CN" lang="zh-CN">中文</a>
+</div></footer>
+
+</body>
+</html>
