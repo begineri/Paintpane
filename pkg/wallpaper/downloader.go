@@ -1,6 +1,7 @@
 package wallpaper
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -431,6 +432,14 @@ func (wp *Plugin) downloadMasterFile(ctx context.Context, client *http.Client, r
 			return path, nil
 		}
 		if !isRetryableDownloadError(ctx, err) {
+			var ni *notImageError
+			if errors.As(err, &ni) {
+				log.Printf("Download of %s failed: %v", reqUrl, err)
+				if ni.botCheck {
+					// The same answer would come for every image of the source: pause it.
+					backoff.blocked(source)
+				}
+			}
 			return "", err
 		}
 		if op, ok := imgProvider.(provider.OutagePauseProvider); ok {
@@ -488,6 +497,14 @@ func (wp *Plugin) downloadMasterFileOnce(ctx context.Context, client *http.Clien
 		return "", &statusError{provider: providerName, code: resp.StatusCode}
 	}
 
+	// A server behind a bot-protection service can answer an image request with 200 and a web
+	// page (the Met's images.metmuseum.org since 2026-11). Saved as the master, the page would
+	// fail to decode later ("image: unknown format"), so it is recognised before anything is written.
+	body := bufio.NewReaderSize(resp.Body, sniffLen)
+	if err := checkImageResponse(resp, body, imgProvider); err != nil {
+		return "", err
+	}
+
 	// Write to a temporary file and rename it when complete, so nothing ever reads half a master
 	// (A2 phase 5 #4). The name ends in the image extension, so the orphan sweep removes one left
 	// behind by a crash.
@@ -503,7 +520,7 @@ func (wp *Plugin) downloadMasterFileOnce(ctx context.Context, client *http.Clien
 			log.Printf("Failed to clean up aborted download %s: %v", tmpPath, err)
 		}
 	}
-	if _, err := io.Copy(file, resp.Body); err != nil {
+	if _, err := io.Copy(file, body); err != nil {
 		file.Close() // Close before attempting removal
 		discard()
 		return "", err

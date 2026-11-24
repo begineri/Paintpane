@@ -3,6 +3,8 @@
 package ui
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -57,4 +59,45 @@ func TestRefreshAutostartKeepsTheRegistrationCurrent(t *testing.T) {
 	refreshAutostart()
 	cmd, _, _ := store.Command()
 	assert.Equal(t, autostart.Command(fakeExe), cmd, "it points at the running exe, with the flag")
+}
+
+// The 2026-11-21 incident: a copy started once from a scratch folder must not take Start with
+// Windows over while the copy the person registered is still there. Only when that copy is gone
+// does the running one take over.
+func TestRefreshAutostartLeavesAnotherExistingCopyAlone(t *testing.T) {
+	store := useFakeAutostart(t)
+	chosen := filepath.Join(t.TempDir(), "paintpane-v1.3.0.exe")
+	require.NoError(t, os.WriteFile(chosen, []byte("exe"), 0o600))
+	require.NoError(t, store.SetCommand(autostart.Command(chosen)))
+
+	refreshAutostart() // the running program is fakeExe, somewhere else
+	cmd, _, _ := store.Command()
+	assert.Equal(t, autostart.Command(chosen), cmd, "the registered copy still exists: left alone")
+
+	require.NoError(t, os.Remove(chosen))
+	refreshAutostart()
+	cmd, _, _ = store.Command()
+	assert.Equal(t, autostart.Command(fakeExe), cmd, "the registered copy is gone: this one takes over")
+}
+
+// Turning Start with Windows on by hand registers the running copy, even when another copy that
+// still exists is registered (switched off in Windows' Startup apps, so the switch read off).
+func TestScenarioTurningStartWithWindowsOnRegistersThisCopy(t *testing.T) {
+	store := useFakeAutostart(t)
+	chosen := filepath.Join(t.TempDir(), "paintpane-v1.3.0.exe")
+	require.NoError(t, os.WriteFile(chosen, []byte("exe"), 0o600))
+	require.NoError(t, store.SetCommand(autostart.Command(chosen)))
+	store.SetDisabledByUser(true)
+
+	s := newScenarioWith(t, wallpaper.GetInstance())
+	s.tapText("General")
+	require.False(t, s.switchOn("startWithWindows"))
+	s.toggle("startWithWindows")
+	s.sa.prefsSM.FlushPending()
+
+	cmd, _, _ := store.Command()
+	assert.Equal(t, autostart.Command(fakeExe), cmd)
+	on, err := autostart.Enabled(store)
+	require.NoError(t, err)
+	assert.True(t, on)
 }

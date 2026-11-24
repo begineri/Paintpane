@@ -79,30 +79,101 @@ func SetEnabled(s Store, exe string, on bool) error {
 	return s.ClearDisabledByUser()
 }
 
-// Refresh keeps an existing registration pointing at the running program: after an update moved
-// the exe, or when an older installer registered it without the flag. It never creates a
-// registration and never turns a switched-off entry back on. It returns whether it rewrote the
-// command.
-func Refresh(s Store, exe string) (bool, error) {
+// Refreshed is what Refresh found and did.
+type Refreshed int
+
+const (
+	RefreshNotRegistered Refreshed = iota // nothing registered: nothing created
+	RefreshCurrent                        // the entry already starts this program as it should
+	RefreshOtherCopy                      // the entry starts another copy that still exists: left alone
+	RefreshRewritten                      // rewritten to start this program (see Refresh)
+)
+
+func (r Refreshed) String() string {
+	switch r {
+	case RefreshNotRegistered:
+		return "not registered"
+	case RefreshCurrent:
+		return "already current"
+	case RefreshOtherCopy:
+		return "another copy that still exists is registered; left as it is"
+	case RefreshRewritten:
+		return "rewritten"
+	}
+	return "unknown"
+}
+
+// Refresh repairs an existing registration at start. It rewrites the entry to start exe only when
+// the program the entry names is gone (the person moved, renamed or deleted it), or when the entry
+// already names exe but differs from Command(exe) (an older installer wrote it without the flag).
+// An entry that names another copy which still exists is left alone: any other copy of the
+// program, started once from wherever it lies, must not take the logon start over from the copy
+// the person chose (2026-11-21, a measurement copy in a scratch folder took it over and was then
+// deleted; owner's rule of 2026-11-23). Turning the switch on (SetEnabled) still registers exe.
+//
+// Refresh never creates a registration and never turns a switched-off entry back on.
+func Refresh(s Store, exe string) (Refreshed, error) {
 	if s == nil {
-		return false, nil
+		return RefreshNotRegistered, nil
 	}
 	current, registered, err := s.Command()
 	if err != nil || !registered {
-		return false, err
+		return RefreshNotRegistered, err
 	}
 	want := Command(exe)
 	if sameCommand(current, want) {
-		return false, nil
+		return RefreshCurrent, nil
+	}
+	if target := CommandExe(current); !SamePath(target, exe) && FileExists(target) {
+		return RefreshOtherCopy, nil
 	}
 	if err := s.SetCommand(want); err != nil {
-		return false, err
+		return RefreshNotRegistered, err
 	}
-	return true, nil
+	return RefreshRewritten, nil
 }
 
 func sameCommand(a, b string) bool {
 	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+}
+
+// normalPath makes a path from a Run command comparable: surrounding spaces and quotes removed,
+// made absolute (a relative path is taken from the current folder) and cleaned. Case and 8.3 short
+// names are left to SamePath.
+func normalPath(p string) string {
+	p = strings.Trim(strings.TrimSpace(p), `"`)
+	if p == "" {
+		return ""
+	}
+	if abs, err := filepath.Abs(p); err == nil {
+		p = abs
+	}
+	return filepath.Clean(p)
+}
+
+// SamePath reports whether a and b name the same file: equal ignoring case once made absolute and
+// cleaned, or, when both exist, the same file on disk (an 8.3 short name, a different case, a link).
+func SamePath(a, b string) bool {
+	na, nb := normalPath(a), normalPath(b)
+	if na == "" || nb == "" {
+		return false
+	}
+	if strings.EqualFold(na, nb) {
+		return true
+	}
+	ia, errA := os.Stat(na)
+	ib, errB := os.Stat(nb)
+	return errA == nil && errB == nil && os.SameFile(ia, ib)
+}
+
+// FileExists reports whether path (as SamePath reads it) is an existing file, not a folder.
+func FileExists(path string) bool {
+	p := normalPath(path)
+	if p == "" {
+		return false
+	}
+	info, err := os.Stat(p)
+	return err == nil && !info.IsDir()
 }
 
 // SetupMarker is the file assets-src/installer/Paintpane.iss writes next to the exe it installs. Its presence means the

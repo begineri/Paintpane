@@ -5,8 +5,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -47,11 +47,36 @@ func init() {
 func NewProvider(cfg *wallpaper.Config, client *http.Client) *Provider {
 	p := &Provider{
 		cfg:       cfg,
-		client:    client,
+		client:    identifiedClient(client),
 		idCache:   make(map[string][]int),
 		poolCache: make(map[int]*provider.Image),
 	}
 	return p
+}
+
+// identifiedClient returns a copy of client that names this application in the User-Agent. The
+// shared client presents itself as a desktop browser; the Met's servers are told who is asking
+// instead, as its API and image downloads both go through this client (GetClient).
+func identifiedClient(client *http.Client) *http.Client {
+	if client == nil {
+		client = http.DefaultClient
+	}
+	next := client.Transport
+	if next == nil {
+		next = http.DefaultTransport
+	}
+	if ua, ok := next.(*wallpaper.UserAgentTransport); ok {
+		next = ua.RoundTripper
+	}
+	c := *client
+	c.Transport = &wallpaper.UserAgentTransport{RoundTripper: next, UserAgent: ClientUserAgent}
+	return &c
+}
+
+// GetClient implements provider.CustomClientProvider, so images are downloaded with the same
+// identity as the API calls.
+func (p *Provider) GetClient() *http.Client {
+	return p.client
 }
 
 func (p *Provider) ID() string {
@@ -262,81 +287,83 @@ func (p *Provider) resolveQueryToIDs(ctx context.Context, query string) ([]int, 
 }
 
 func (p *Provider) fetchSearchHighlights(ctx context.Context, q string) ([]int, error) {
-	// Search for highlights with images
-	// e.g. "American Paintings"
-	url := fmt.Sprintf("%s/search?isHighlight=true&hasImages=true&isPublicDomain=true&q=%s", APIBaseURL, strings.ReplaceAll(q, " ", "%20"))
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return []int{}, nil
-	}
-
-	var result struct {
-		ObjectIDs []int `json:"objectIDs"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	return result.ObjectIDs, nil
+	// Highlights with images for a search term, e.g. "American Paintings".
+	params := url.Values{}
+	params.Set("q", q)
+	params.Set("isHighlight", "true")
+	params.Set("hasImages", "true")
+	params.Set("isPublicDomain", "true")
+	return p.searchIDs(ctx, params)
 }
 
 func (p *Provider) fetchDepartmentHighlights(ctx context.Context, deptID int) ([]int, error) {
-	// Base URL construction
-	// Note: For European (11), we drop isHighlight to get more volume (~2600 vs 125)
-	isHighlight := "true"
+	params := url.Values{}
+	params.Set("departmentId", strconv.Itoa(deptID))
+	// For European Paintings (11) every work is taken, not only highlights (~2600 vs 125), and
+	// only paintings, to avoid clutter.
 	if deptID == DeptEuropeanPaintings {
-		isHighlight = "false"
+		params.Set("isHighlight", "false")
+		params.Set("medium", "Paintings")
+	} else {
+		params.Set("isHighlight", "true")
 	}
+	params.Set("hasImages", "true")
+	params.Set("isPublicDomain", "true")
+	// v1.1 needs no search term with filters (v1 took q=*).
+	return p.searchIDs(ctx, params)
+}
 
-	url := fmt.Sprintf("%s/search?departmentId=%d&isHighlight=%s&hasImages=true&isPublicDomain=true&q=*", APIBaseURL, deptID, isHighlight)
+// searchIDs runs a Collection API search and returns the object IDs of all its pages, up to
+// maxSearchIDs. The v1 search, which sent every ID in one answer, was retired on 2026-10-01 and
+// answers 410 Gone; v1.1 takes the same filters and pages its answer with offset and limit.
+// A failed page is an error and is logged, so a collection does not just come up empty.
+func (p *Provider) searchIDs(ctx context.Context, params url.Values) ([]int, error) {
+	var ids []int
+	for offset := 0; offset < maxSearchIDs; offset += searchPageSize {
+		if offset > 0 {
+			select { // be gentle between pages
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(searchPagePause):
+			}
+		}
+		params.Set("offset", strconv.Itoa(offset))
+		params.Set("limit", strconv.Itoa(searchPageSize))
+		reqURL := SearchURL + "?" + params.Encode()
 
-	// Refine query based on department to improve results
-	switch deptID {
-	case DeptEuropeanPaintings:
-		// Keep medium=Paintings for European to avoid clutter
-		url += "&medium=Paintings"
-	case DeptAsianArt:
-		// Asian art includes scrolls, screens, diverse media.
-	case DeptEgyptianArt:
-		// Papyri, reliefs, jewelry.
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := p.client.Do(req)
+		if err != nil {
+			log.Printf("MET: search %s failed: %v", reqURL, err)
+			return nil, err
+		}
+		var page struct {
+			Total     int   `json:"total"`
+			ObjectIDs []int `json:"objectIDs"`
+		}
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			log.Printf("MET: search %s answered %s", reqURL, resp.Status)
+			return nil, fmt.Errorf("met search failed: %s", resp.Status)
+		}
+		err = json.NewDecoder(resp.Body).Decode(&page)
+		resp.Body.Close()
+		if err != nil {
+			log.Printf("MET: search %s sent an unreadable answer: %v", reqURL, err)
+			return nil, fmt.Errorf("met search: %w", err)
+		}
+		ids = append(ids, page.ObjectIDs...)
+		if len(page.ObjectIDs) < searchPageSize || offset+searchPageSize >= page.Total {
+			break
+		}
 	}
-
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-	if err != nil {
-		return nil, err
+	if len(ids) == 0 {
+		log.Printf("MET: search %s found no objects", params.Encode())
 	}
-	resp, err := p.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("search API failed: %s", resp.Status)
-	}
-
-	var result struct {
-		ObjectIDs []int `json:"objectIDs"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return nil, err
-	}
-
-	// CRITICAL: Sort IDs to ensure stable pagination across requests.
-	// This sort is now handled in resolveQueryToIDs for all ID sources.
-	// sort.Ints(result.ObjectIDs)
-
-	return result.ObjectIDs, nil
+	return ids, nil
 }
 
 func (p *Provider) fetchObjectDetails(ctx context.Context, id int) (*provider.Image, error) {

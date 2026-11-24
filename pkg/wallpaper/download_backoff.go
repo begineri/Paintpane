@@ -19,6 +19,13 @@ const (
 	// backoffMaxPause, until an image downloads again.
 	backoffFirstPause = 2 * time.Minute
 	backoffMaxPause   = 30 * time.Minute
+
+	// A source whose image server answers with a bot-protection page (see notImageError) is
+	// paused at once: the next image would get the same page. The pause starts at
+	// blockedFirstPause and doubles, up to blockedMaxPause, while the first image after each pause
+	// is turned away again, so a blocked source costs its server a few requests a day.
+	blockedFirstPause = 1 * time.Hour
+	blockedMaxPause   = 12 * time.Hour
 )
 
 type downloadBackoff struct {
@@ -31,6 +38,7 @@ type backoffState struct {
 	failures    int // images in a row whose server could not be reached
 	pauses      int // pauses since the last image that downloaded
 	pausedUntil time.Time
+	blocks      int // bot-protection pauses since the last image that downloaded
 }
 
 func newDownloadBackoff() *downloadBackoff {
@@ -102,6 +110,33 @@ func (b *downloadBackoff) pauseForOutage(source string, pause time.Duration) {
 	log.Printf("Downloads from %s paused for %v: its image server does not answer at this time of day", source, pause.Round(time.Minute))
 }
 
+// blocked pauses source's downloads after its image server answered with a bot-protection page,
+// and returns the pause it started, or 0 while a pause for that reason is still running (downloads
+// that were already under way when it started).
+func (b *downloadBackoff) blocked(source string) time.Duration {
+	if b == nil || source == "" {
+		return 0
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	s := b.state(source)
+	now := b.now()
+	if s.blocks > 0 && now.Before(s.pausedUntil) {
+		return 0
+	}
+	pause := blockedFirstPause << s.blocks
+	if pause > blockedMaxPause || pause <= 0 {
+		pause = blockedMaxPause
+	} else {
+		s.blocks++
+	}
+	if until := now.Add(pause); until.After(s.pausedUntil) {
+		s.pausedUntil = until
+	}
+	log.Printf("Downloads from %s paused for %v: its image server sends a bot-protection page instead of images", source, pause)
+	return pause
+}
+
 // succeeded records an image of source that downloaded, which ends any backoff.
 func (b *downloadBackoff) succeeded(source string) {
 	if b == nil || source == "" {
@@ -109,8 +144,8 @@ func (b *downloadBackoff) succeeded(source string) {
 	}
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	if s, ok := b.states[source]; ok && (s.failures > 0 || s.pauses > 0) {
-		if s.pauses > 0 {
+	if s, ok := b.states[source]; ok && (s.failures > 0 || s.pauses > 0 || s.blocks > 0) {
+		if s.pauses > 0 || s.blocks > 0 {
 			log.Printf("Downloads from %s work again", source)
 		}
 		delete(b.states, source)

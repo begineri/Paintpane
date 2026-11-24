@@ -1,8 +1,6 @@
 package autostart
 
 import (
-	"os"
-	"path/filepath"
 	"strings"
 	"time"
 )
@@ -27,10 +25,7 @@ func OtherCopyAtLogon(s Store, self string) (string, bool) {
 		return "", false
 	}
 	exe := CommandExe(cmd)
-	if exe == "" || samePath(exe, self) {
-		return "", false
-	}
-	if info, err := os.Stat(exe); err != nil || info.IsDir() {
+	if exe == "" || SamePath(exe, self) || !FileExists(exe) {
 		return "", false
 	}
 	return exe, true
@@ -50,13 +45,6 @@ func CommandExe(cmd string) string {
 		return cmd[:i]
 	}
 	return cmd
-}
-
-func samePath(a, b string) bool {
-	if a == "" || b == "" {
-		return false
-	}
-	return strings.EqualFold(filepath.Clean(a), filepath.Clean(b))
 }
 
 // WaitFor calls running every step until it reports true or timeout has passed, and reports

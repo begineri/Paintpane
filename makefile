@@ -163,6 +163,14 @@ screenshots:
 	mkdir -p "$(SHOTS)"
 	LOCALAPPDATA="$$(mktemp -d)" SCREENSHOT_DIR="$(abspath $(SHOTS))" go test -tags screenshots ./ui/ -run TestPreferencesScreenshots -count=1
 
+# Microsoft Store screenshots: the desktop with Renoir's Two Sisters
+# shown whole and in a museum frame, then the tray menu and Settings > Sources on it, zh and en,
+# 1920 x 1080, into $(SHOTS)/store. Store build (msstore), light theme; nothing opens on the screen.
+store-screenshots:
+	mkdir -p "$(SHOTS)"
+	LOCALAPPDATA="$$(mktemp -d)" SCREENSHOT_DIR="$(abspath $(SHOTS))" go test -tags screenshots ./pkg/wallpaper/ -run TestStoreWallpapers -count=1
+	LOCALAPPDATA="$$(mktemp -d)" SCREENSHOT_DIR="$(abspath $(SHOTS))" go test -tags "screenshots msstore" ./ui/ -run TestStoreScreenshots -count=1
+
 test-coverage:
 	go test -coverprofile=coverage.out ./...
 	go tool cover -html=coverage.out -o coverage.html
@@ -263,4 +271,4 @@ bump-major: build-version-bump
 	@echo "Bumping major version..."
 	./bin/util/version_bump major
 
-.PHONY: build-win-amd64 build-win-console-amd64 build-win-arm64 build-linux-amd64 build-darwin-amd64 build-darwin-arm64 build-win-amd64-dev build-win-console-amd64-dev build-linux-amd64-dev gen-i18n check-i18n lint test screenshots update-patch-deps update-minor-deps list-updates win-amd64 win-amd64-dev linux-amd64 linux-amd64-dev darwin-amd64 darwin-amd64-dev darwin-arm64 darwin-arm64-dev clean build-version-bump bump-patch bump-minor bump-major coverage
+.PHONY: build-win-amd64 build-win-console-amd64 build-win-arm64 build-linux-amd64 build-darwin-amd64 build-darwin-arm64 build-win-amd64-dev build-win-console-amd64-dev build-linux-amd64-dev gen-i18n check-i18n lint test screenshots store-screenshots update-patch-deps update-minor-deps list-updates win-amd64 win-amd64-dev linux-amd64 linux-amd64-dev darwin-amd64 darwin-amd64-dev darwin-arm64 darwin-arm64-dev clean build-version-bump bump-patch bump-minor bump-major coverage

@@ -85,9 +85,10 @@ func registerAutostartOnFirstRun(prefs fyne.Preferences, acceptedBefore bool) {
 	utilLog.Printf("[Autostart] First run: %v", result)
 }
 
-// refreshAutostart keeps an existing registration pointing at this program, so an update that
-// moved the exe, or an installer that registered it without --autostart, does not leave a stale
-// entry. It never creates a registration.
+// refreshAutostart repairs an existing registration at start: when the exe it names is gone (moved,
+// renamed or deleted), or it names this exe without --autostart, it now starts this program. An
+// entry that names another copy which still exists stays as it is, so a copy started once from
+// elsewhere cannot take the logon start over (autostart.Refresh). It never creates a registration.
 func refreshAutostart() {
 	if !autostartAvailable() {
 		return
@@ -96,11 +97,14 @@ func refreshAutostart() {
 	if err != nil {
 		return
 	}
-	changed, err := autostart.Refresh(autostartStore(), exe)
-	if err != nil {
+	result, err := autostart.Refresh(autostartStore(), exe)
+	switch {
+	case err != nil:
 		utilLog.Printf("[Autostart] Could not refresh the registration: %v", err)
-	} else if changed {
+	case result == autostart.RefreshRewritten:
 		utilLog.Printf("[Autostart] The registration now points at %s", exe)
+	case result == autostart.RefreshOtherCopy:
+		utilLog.Printf("[Autostart] The registration starts another copy that still exists; left as it is")
 	}
 }
 

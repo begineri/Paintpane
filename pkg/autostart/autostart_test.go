@@ -59,9 +59,9 @@ func TestNoStoreMeansOffAndAnError(t *testing.T) {
 	assert.NoError(t, err)
 	assert.False(t, on)
 	assert.Error(t, SetEnabled(nil, exe, true))
-	changed, err := Refresh(nil, exe)
+	result, err := Refresh(nil, exe)
 	assert.NoError(t, err)
-	assert.False(t, changed)
+	assert.Equal(t, RefreshNotRegistered, result)
 }
 
 func TestStoreErrorsAreReturned(t *testing.T) {
@@ -73,30 +73,19 @@ func TestStoreErrorsAreReturned(t *testing.T) {
 	assert.ErrorIs(t, SetEnabled(s, exe, false), boom)
 }
 
-func TestRefreshKeepsARegistrationCurrentButNeverCreatesOne(t *testing.T) {
+func TestRefreshNeverCreatesARegistrationNorSwitchesOneBackOn(t *testing.T) {
 	s := &MemoryStore{}
-	changed, err := Refresh(s, exe)
+	result, err := Refresh(s, exe)
 	require.NoError(t, err)
-	assert.False(t, changed, "no registration: nothing is created")
+	assert.Equal(t, RefreshNotRegistered, result, "no registration: nothing is created")
 	_, registered, _ := s.Command()
 	assert.False(t, registered)
 
-	// An older installer registered it without the flag, from the old folder.
-	require.NoError(t, s.SetCommand(`"D:\Old\paintpane.exe"`))
-	changed, err = Refresh(s, exe)
-	require.NoError(t, err)
-	assert.True(t, changed)
-	cmd, _, _ := s.Command()
-	assert.Equal(t, Command(exe), cmd)
-
-	changed, err = Refresh(s, exe)
-	require.NoError(t, err)
-	assert.False(t, changed, "already current: no write")
-
-	// A switched-off entry stays switched off.
+	// A switched-off entry whose exe is gone is repointed but stays switched off.
 	s.disabled = true
 	require.NoError(t, s.SetCommand(`"D:\Old\paintpane.exe"`))
-	_, err = Refresh(s, exe)
+	result, err = Refresh(s, exe)
 	require.NoError(t, err)
+	assert.Equal(t, RefreshRewritten, result)
 	assert.True(t, s.disabled, "Refresh does not turn it back on")
 }

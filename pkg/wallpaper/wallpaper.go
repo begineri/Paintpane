@@ -79,6 +79,7 @@ type Plugin struct {
 	jobSubmitter  JobSubmitter       // Interface for testing
 	rebuildMu     sync.Mutex         // Protects rebuildCancel
 	rebuildCancel context.CancelFunc // Cancels the derivative rebuild in progress
+	storeSyncMu   sync.Mutex         // Makes syncStoreWithConfig read the settings and Sync as one step
 
 	// Configuration and State
 	fetchingInProgress *util.SafeFlag
@@ -1336,7 +1337,15 @@ func (wp *Plugin) targetProcessingFlags() map[string]bool {
 // It handles query activation, cache sizing, and derivative invalidation for processing modes.
 // Images on show are never evicted for the cache limit. That includes each display's wallpaper
 // from last time: at start this runs before restoreLastShownImages, while the desktop still shows them.
+//
+// Calls are serialised, and each reads the settings only once it holds the lock. Rapid display mode
+// switches start one of these per switch; without the lock an earlier switch could read its mode,
+// lose the CPU, and Sync after a later one. The store then kept the old mode while the settings had
+// the new one, so every rebuilt image counted as stale and was dropped, and the library stayed
+// without wallpapers until the mode was changed again (CI, v1.3.0).
 func (wp *Plugin) syncStoreWithConfig() {
+	wp.storeSyncMu.Lock()
+	defer wp.storeSyncMu.Unlock()
 	keep := wp.imagesOnShow()
 	for id := range wp.cfg.LastShownImageIDs() {
 		keep[id] = true
