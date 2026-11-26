@@ -51,7 +51,11 @@ a.btn:hover { text-decoration: none; opacity: .88; }
 .lead span { display: block; text-wrap: balance; }   /* break after the comma; a long clause wraps evenly within itself */
 :lang(zh) .lead span { word-break: keep-all; }        /* Chinese: break only at spaces and punctuation */
 h1, h2, figcaption { text-wrap: balance; }
-.actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+.actions { display: flex; gap: 12px; justify-content: center; align-items: center; flex-wrap: wrap; }
+.actions .btn { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }   /* as tall as the Store badge */
+.store-badge { display: inline-block; line-height: 0; border-radius: 4px; }
+.store-badge img { width: auto; height: 44px; display: block; }   /* Microsoft's artwork at its own size: never stretch or recolour it */
+a.store-badge:hover { opacity: .88; }
 .fine { color: var(--muted); font-size: 14px; margin-top: 16px; }
 
 figure { margin: 0; }

@@ -31,8 +31,8 @@
 <meta name="twitter:image:alt" content="雷诺阿的《两姐妹（在露台上）》，旁边是“观画壁纸 Paintpane”">
 <!-- Structured data. Every statement here must also be visible on the page; the FAQPage answers are the
      Z10 answers word for word (checked by internal/sitecheck).
-     softwareVersion follows version.txt. Once the Store listing is live, add its address to
-     "sameAs", together with the Store button. -->
+     softwareVersion follows version.txt. "sameAs" lists the GitHub repository and the
+     Microsoft Store listing. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -53,7 +53,7 @@
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "license": "https://polyformproject.org/licenses/noncommercial/1.0.0/",
   "isBasedOn": { "@type": "SoftwareApplication", "name": "Spice", "url": "https://github.com/dixieflatline76/Spice" },
-  "sameAs": ["https://github.com/begineri/Paintpane"]
+  "sameAs": ["https://github.com/begineri/Paintpane", "https://apps.microsoft.com/detail/9PM9S0JCPJTX"]
 }
 </script>
 <script type="application/ld+json">
@@ -83,7 +83,7 @@
       "name": "需要安装吗？要联网吗？会收集数据吗？",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "不用安装，观画壁纸只是一个 exe 文件，放在哪个文件夹都能运行。下载图片需要联网。它没有账号、没有统计分析，也没有崩溃上报，不会把你或你电脑的任何信息发给开发者。详见隐私说明。"
+        "text": "不用安装，观画壁纸只是一个 exe 文件，放在哪个文件夹都能运行。也可以从 Microsoft Store 安装，由商店自动更新。下载图片需要联网。它没有账号、没有统计分析，也没有崩溃上报，不会把你或你电脑的任何信息发给开发者。详见隐私说明。"
       }
     },
     {
@@ -171,8 +171,14 @@
     <h1>博物馆名作，就在你的桌面上。</h1>
     <p class="lead"><span>把你的 Windows&nbsp;壁纸换成<wbr>博物馆里的名画，</span><span>随时欣赏，自由选择。</span></p>
     <div class="actions">
-      <a class="btn primary" href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe">下载 Windows 版</a>
-      <a class="btn ghost" href="https://github.com/begineri/Paintpane">在 GitHub 查看</a>
+      <!-- S8 (owner, 2026-11-19): Microsoft Store and direct download, side by side. Store badge: Microsoft's
+           official artwork, copied unchanged into assets/ (no request to Microsoft), dark on a light page and light
+           on a dark page; link from Microsoft's badge generator, "full" mode. 在 GitHub 查看 is in the top bar
+           (owner, 2026-11-26). Same in ../index.html. -->
+      <a class="store-badge" href="https://apps.microsoft.com/detail/9PM9S0JCPJTX?referrer=appbadge&amp;mode=full"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="../assets/ms-store-badge-zh-light.svg">
+        <img src="../assets/ms-store-badge-zh-dark.svg" width="161" height="44" alt="从商店下载 Microsoft Store"></picture></a>
+      <a class="btn ghost" href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe">下载 Windows 版</a>
     </div>
     <div class="fine">免费 · 源码公开 · 免安装 · 简体中文和英文界面 · Windows 10 / 11，64 位</div>
   </div>
@@ -272,7 +278,7 @@
     </div>
     <div>
       <h3>需要安装吗？要联网吗？会收集数据吗？</h3>
-      <p>不用安装，观画壁纸只是一个 exe 文件，放在哪个文件夹都能运行。下载图片需要联网。它没有账号、没有统计分析，也没有崩溃上报，不会把你或你电脑的任何信息发给开发者。详见<a href="privacy.html">隐私说明</a>。</p>
+      <p>不用安装，观画壁纸只是一个 exe 文件，放在哪个文件夹都能运行。也可以从 Microsoft Store 安装，由商店自动更新。下载图片需要联网。它没有账号、没有统计分析，也没有崩溃上报，不会把你或你电脑的任何信息发给开发者。详见<a href="privacy.html">隐私说明</a>。</p>
     </div>
     <div>
       <h3>和 Spice 是什么关系？</h3>

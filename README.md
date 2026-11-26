@@ -8,7 +8,13 @@
 
 <p align="center">Museum masterpieces on your desktop.</p>
 
-<p align="center"><a href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe"><b>Download for Windows</b></a> · <a href="https://begineri.github.io/Paintpane/">Website</a></p>
+<p align="center"><a href="https://apps.microsoft.com/detail/9PM9S0JCPJTX?referrer=appbadge&amp;mode=full"><picture><source media="(prefers-color-scheme: dark)" srcset="https://get.microsoft.com/images/en-us%20light.svg"><img src="https://get.microsoft.com/images/en-us%20dark.svg" width="200" alt="Download from the Microsoft Store"></picture></a></p>
+
+<p align="center"><a href="https://github.com/begineri/Paintpane/releases/latest"><img src="https://img.shields.io/github/v/release/begineri/Paintpane?label=release&amp;color=blue" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-PolyForm%20Noncommercial%201.0.0-lightgrey" alt="License: PolyForm Noncommercial 1.0.0"></a>
+  <a href="https://begineri.github.io/Paintpane/privacy.html"><img src="https://img.shields.io/badge/telemetry-none-brightgreen" alt="Telemetry: none"></a></p>
+
+<p align="center">Or download <a href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe"><b>paintpane.exe</b></a> directly (portable, no installer) · <a href="https://begineri.github.io/Paintpane/">Website</a></p>
 
 <p align="center"><img src="site/assets/img/s1-desktop.jpg" width="720" alt="A Windows desktop showing Renoir’s Two Sisters (On the Terrace) whole"><br><sub>Two Sisters (On the Terrace) — Pierre-Auguste Renoir · Art Institute of Chicago</sub></p>
 
@@ -29,6 +35,8 @@ Paintpane cycles wallpapers from open-access museum collections (The Metropolita
 ## Download
 
 Get `paintpane.exe` from the [latest release](https://github.com/begineri/Paintpane/releases/latest). It is a single portable file: no installer needed.
+
+Or get Paintpane from the [Microsoft Store](https://apps.microsoft.com/detail/9PM9S0JCPJTX): the Store installs and updates it, and its settings are kept apart from the portable exe.
 
 - **Windows 10 / 11, 64-bit.** macOS builds are not provided.
 - **Windows SmartScreen warning:** the build is not code-signed, so Windows may say it "protected your PC". Choose **More info → Run anyway**. You can check the file against the SHA-256 published with each release.

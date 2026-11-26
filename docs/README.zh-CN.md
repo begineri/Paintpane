@@ -8,7 +8,13 @@
 
 <p align="center">博物馆名作，就在你的桌面上。</p>
 
-<p align="center"><a href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe"><b>下载 Windows 版</b></a> · <a href="https://begineri.github.io/Paintpane/zh/">介绍页</a></p>
+<p align="center"><a href="https://apps.microsoft.com/detail/9PM9S0JCPJTX?referrer=appbadge&amp;mode=full"><picture><source media="(prefers-color-scheme: dark)" srcset="https://get.microsoft.com/images/zh-cn%20light.svg"><img src="https://get.microsoft.com/images/zh-cn%20dark.svg" width="200" alt="从商店下载 Microsoft Store"></picture></a></p>
+
+<p align="center"><a href="https://github.com/begineri/Paintpane/releases/latest"><img src="https://img.shields.io/github/v/release/begineri/Paintpane?label=%E7%89%88%E6%9C%AC&amp;color=blue" alt="最新版本"></a>
+  <a href="../LICENSE"><img src="https://img.shields.io/badge/%E8%AE%B8%E5%8F%AF%E8%AF%81-PolyForm%20%E9%9D%9E%E5%95%86%E4%B8%9A%201.0.0-lightgrey" alt="许可证：PolyForm Noncommercial 1.0.0"></a>
+  <a href="https://begineri.github.io/Paintpane/zh/privacy.html"><img src="https://img.shields.io/badge/%E6%95%B0%E6%8D%AE%E6%94%B6%E9%9B%86-%E6%97%A0-brightgreen" alt="数据收集：无"></a></p>
+
+<p align="center">也可以直接下载 <a href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe"><b>paintpane.exe</b></a>（免安装）· <a href="https://begineri.github.io/Paintpane/zh/">介绍页</a></p>
 
 <p align="center"><img src="../site/assets/img/s1-desktop.jpg" width="720" alt="Windows 桌面上完整显示雷诺阿的《两姐妹（在露台上）》"><br><sub>《两姐妹（在露台上）》— 皮埃尔-奥古斯特·雷诺阿 · 芝加哥艺术博物馆</sub></p>
 
@@ -29,6 +35,8 @@
 ## 下载
 
 在[最新版本](https://github.com/begineri/Paintpane/releases/latest)下载 `paintpane.exe`，单个文件，免安装，直接运行。
+
+也可以从 [Microsoft Store](https://apps.microsoft.com/detail/9PM9S0JCPJTX) 安装，由商店安装和更新，设置和便携版分开保存。
 
 - **Windows 10 / 11，64 位。** 不提供 macOS 版。
 - **SmartScreen 提示**：程序没有代码签名，Windows 可能提示“已保护你的电脑”，点**更多信息 → 仍要运行**。每个版本都附有 SHA-256，可以自行校验。

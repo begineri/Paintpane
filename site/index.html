@@ -31,7 +31,7 @@
 <meta name="twitter:image:alt" content="Renoir’s Two Sisters (On the Terrace) next to the name Paintpane">
 <!-- Structured data. Every statement here must also be visible on the page; the FAQPage answers are the
      E10 answers word for word (checked by internal/sitecheck). softwareVersion follows version.txt.
-     Once the Store listing is live, add its address to "sameAs", together with the Store button. -->
+     "sameAs" lists the GitHub repository and the Microsoft Store listing. -->
 <script type="application/ld+json">
 {
   "@context": "https://schema.org",
@@ -52,7 +52,7 @@
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
   "license": "https://polyformproject.org/licenses/noncommercial/1.0.0/",
   "isBasedOn": { "@type": "SoftwareApplication", "name": "Spice", "url": "https://github.com/dixieflatline76/Spice" },
-  "sameAs": ["https://github.com/begineri/Paintpane"]
+  "sameAs": ["https://github.com/begineri/Paintpane", "https://apps.microsoft.com/detail/9PM9S0JCPJTX"]
 }
 </script>
 <script type="application/ld+json">
@@ -82,7 +82,7 @@
       "name": "Do I need to install it? Does it need the internet or collect data?",
       "acceptedAnswer": {
         "@type": "Answer",
-        "text": "No installer: Paintpane is a single exe file that runs from any folder. It needs an internet connection to download pictures. It has no account, no analytics and no crash reporting, and sends nothing about you or your PC to the developer. See the privacy page."
+        "text": "No installer needed: Paintpane is a single exe file that runs from any folder. You can also install it from the Microsoft Store, which keeps it up to date. It needs an internet connection to download pictures. It has no account, no analytics and no crash reporting, and sends nothing about you or your PC to the developer. See the privacy page."
       }
     },
     {
@@ -168,8 +168,14 @@
     <h1>Museum masterpieces on your desktop.</h1>
     <p class="lead"><span>Turns your Windows wallpaper into museum paintings,</span> <span>to enjoy any time and choose as you like.</span></p>
     <div class="actions">
-      <a class="btn primary" href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe">Download for Windows</a>
-      <a class="btn ghost" href="https://github.com/begineri/Paintpane">View on GitHub</a>
+      <!-- S8 (owner, 2026-11-19): Microsoft Store and direct download, side by side. Store badge: Microsoft's
+           official artwork, copied unchanged into assets/ (no request to Microsoft), dark on a light page and light
+           on a dark page; link from Microsoft's badge generator, "full" mode. View on GitHub is in the top bar
+           (owner, 2026-11-26). Same in zh/index.html. -->
+      <a class="store-badge" href="https://apps.microsoft.com/detail/9PM9S0JCPJTX?referrer=appbadge&amp;mode=full"><picture>
+        <source media="(prefers-color-scheme: dark)" srcset="assets/ms-store-badge-en-light.svg">
+        <img src="assets/ms-store-badge-en-dark.svg" width="161" height="44" alt="Download from the Microsoft Store"></picture></a>
+      <a class="btn ghost" href="https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe">Download for Windows</a>
     </div>
     <div class="fine">Free · Source available · Portable · English and Simplified Chinese interface · Windows 10 / 11, 64-bit</div>
   </div>
@@ -269,7 +275,7 @@
     </div>
     <div>
       <h3>Do I need to install it? Does it need the internet or collect data?</h3>
-      <p>No installer: Paintpane is a single exe file that runs from any folder. It needs an internet connection to download pictures. It has no account, no analytics and no crash reporting, and sends nothing about you or your PC to the developer. See the <a href="privacy.html">privacy page</a>.</p>
+      <p>No installer needed: Paintpane is a single exe file that runs from any folder. You can also install it from the Microsoft Store, which keeps it up to date. It needs an internet connection to download pictures. It has no account, no analytics and no crash reporting, and sends nothing about you or your PC to the developer. See the <a href="privacy.html">privacy page</a>.</p>
     </div>
     <div>
       <h3>How does it relate to Spice?</h3>
