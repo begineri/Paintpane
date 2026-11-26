@@ -12,7 +12,7 @@
 
 <p align="center"><img src="site/assets/img/s1-desktop.jpg" width="720" alt="A Windows desktop showing Renoir’s Two Sisters (On the Terrace) whole"><br><sub>Two Sisters (On the Terrace) — Pierre-Auguste Renoir · Art Institute of Chicago</sub></p>
 
-Turns your Windows wallpaper into museum paintings, to enjoy any time and choose as you like.
+Paintpane is a free wallpaper app for Windows 10 and 11. It sets paintings from museums' open-access collections as your desktop wallpaper, shows each one whole without cropping, and changes to a new one on a schedule.
 
 - **Lives in the tray, changes on a schedule.** Works come from the open-access collections of The Metropolitan Museum of Art, the Art Institute of Chicago, the Cleveland Museum of Art, the Rijksmuseum, the National Palace Museum, Statens Museum for Kunst, the J. Paul Getty Museum, the National Gallery of Art, the Yale University Art Collections and Paris Musées. The first line of the tray menu names the work, the artist and the museum.
 - **Shown whole, never cropped.** Full artwork fits the entire painting on your screen. Nothing is cropped, and nothing is drawn over the picture.

@@ -1,0 +1,22 @@
+# Paintpane
+
+> Paintpane (Chinese name 观画壁纸) is a free Windows 10 / 11 tray app that sets paintings from museums' open-access collections as the desktop wallpaper, each shown whole, never cropped. The source is public under the PolyForm Noncommercial License 1.0.0.
+
+- What it does: changes the Windows wallpaper on a schedule, with each monitor rotating on its own; the lock screen gets a painting too. Three display modes: Full artwork (default: the whole painting on a wall colour), Museum frame (the whole painting in a frame) and Smart crop (fills the screen, edges cut off). The tray menu names the work, the artist and the museum.
+- Where the pictures come from: the open-access collections of The Metropolitan Museum of Art, the Art Institute of Chicago, the Cleveland Museum of Art, the Rijksmuseum, the National Palace Museum (Taipei), Statens Museum for Kunst (National Gallery of Denmark), the J. Paul Getty Museum, the National Gallery of Art (Washington), the Yale University Art Collections and Paris Musées, downloaded straight from the museums' servers. Optional other sources: Wikimedia Commons, wallhaven, Pexels and local folders.
+- Download: a single portable exe, no installer: https://github.com/begineri/Paintpane/releases/latest/download/paintpane.exe (Windows 10 / 11, 64-bit; English and Simplified Chinese interface).
+- Privacy: no account, no analytics, no crash reporting; nothing about the user is sent to the developer.
+- Origin: an unofficial, modified version of Spice by Karl Kwong (https://github.com/dixieflatline76/Spice), not made or endorsed by the Spice project.
+- Not available: macOS or Linux versions.
+
+## Links
+
+- [Website (English)](https://begineri.github.io/Paintpane/): what it does, screenshots, questions and answers
+- [Website (Chinese)](https://begineri.github.io/Paintpane/zh/)
+- [Source code and releases](https://github.com/begineri/Paintpane)
+- [Privacy](https://begineri.github.io/Paintpane/privacy.html): what is stored and which servers it connects to
+- [License: PolyForm Noncommercial 1.0.0](https://github.com/begineri/Paintpane/blob/main/LICENSE)
+
+## 中文
+
+观画壁纸（Paintpane）是免费的 Windows 10 / 11 托盘程序，定时把博物馆开放馆藏里的名画设成桌面壁纸，每一幅都整幅显示，不裁切。图源包括大都会艺术博物馆、芝加哥艺术博物馆、荷兰国立博物馆、台北故宫博物院等博物馆的开放馆藏。单个 exe，免安装，源码公开，许可证是 PolyForm Noncommercial 1.0.0。中文介绍页：https://begineri.github.io/Paintpane/zh/
